@@ -21,7 +21,7 @@ const FLOORS = { sheraton: { ground: 2, list: [['البدروم السفلي', '
 const DISC = ['انشائي', 'مباني', 'معماري / تشطيبات', 'كهرباء', 'ميكانيكا / صحي', 'واجهات', 'لاندسكيب', 'عام'];
 const ST = { submitted: ['pend', 'بانتظار المراجعة'], approved: ['appr', 'معتمد'], returned: ['ret', 'مرتجع للمهندس'] };
 
-const S = { bq: { ph: '', b: '', miss: false, q: '' }, sb: null, user: null, profile: null, admin: false, projects: [], roles: {}, names: {}, P: null, open: new Set(), q: '', bsel: '' };
+const S = { bq: { ph: '', b: '', miss: false, q: '', edit: false, pend: new Map() }, sb: null, user: null, profile: null, admin: false, projects: [], roles: {}, names: {}, P: null, open: new Set(), q: '', bsel: '' };
 const role = pid => S.admin ? 'management' : S.roles[pid];
 const can = (what, pid) => S.admin || CAN[what].includes(role(pid));
 
@@ -49,7 +49,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 1.4.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 1.5.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -95,7 +95,7 @@ async function route() {
   if (m && S.projects.some(p => p.id === m[1])) {
     const [, pid, view] = m;
     $('#app').innerHTML = shell(pid, view); bindOut();
-    if (!S.P || S.P.id !== pid) { S.P = { id: pid }; S.open.clear(); S.q = ''; S.bsel = ''; S.bq = { ph: '', b: '', miss: false, q: '' }; }
+    if (!S.P || S.P.id !== pid) { S.P = { id: pid }; S.open.clear(); S.q = ''; S.bsel = ''; S.bq = { ph: '', b: '', miss: false, q: '', edit: false, pend: new Map() }; }
     await loadProject(pid);
     if (view === 'report' && can('report', pid)) return renderReport();
     if (view === 'review' && can('review', pid)) return renderReview();
@@ -163,7 +163,7 @@ function renderStatus() {
     if (q && !groups.length) return ''; const ko = 'p' + x.n, isOpen = q || S.open.has(ko);
     return `<details class="ph" data-k="${ko}"${isOpen ? ' open' : ''}><summary><span class="num">${x.n}</span><div><div class="phn">${esc(x.name)}</div><div class="phm">${x.items} بند · وزن ${Math.round(x.weight * 1000) / 10}%${x.missing ? ` · <span class="tag">${x.missing} ناقص مستند</span>` : ''}${x.manual ? ' · <span class="tag">نسبة يدوية</span>' : ''}</div></div>${bar(x.pct)}</summary><div class="phb">
     ${ed ? `<div class="phset" data-ph="${x.n}"><label>وزن المرحلة %<input type="number" step="any" data-pf="weight" value="${Math.round(x.weight * 10000) / 100}"></label><label>نسبة يدوية %<input type="number" step="any" data-pf="manual" value="${x.manual ? Math.round(x.pct * 1000) / 10 : ''}" placeholder="${x.auto_pct != null ? 'محسوبة: ' + Math.round(x.auto_pct * 100) : '—'}"></label><label>المخطط حتى اليوم %<input type="number" step="any" data-pf="planned" value="${x.planned_pct ?? ''}"></label><button data-savewph="${x.n}">حفظ</button></div>` : ''}
-    ${groups.map(g => { const kg = ko + '|' + g.name, go = q || S.open.has(kg); return `<details class="gp" data-k="${esc(kg)}"${go ? ' open' : ''}><summary><span>${esc(g.name)} <span class="mut">(${g.rows.length})</span></span>${bar(g.pct)}</summary>${go ? itemTable(g.shown, multi, ed) : ''}</details>`; }).join('') || '<p class="mut">مفيش بنود في المرحلة دي.</p>'}</div></details>`;
+    ${groups.map(g => { const kg = ko + '|' + g.name, go = q || S.open.has(kg); return `<details class="gp" data-k="${esc(kg)}"${go ? ' open' : ''}><summary><span>${esc(g.name)} <span class="mut">(${g.rows.length})</span></span>${bar(g.pct)}</summary>${go ? itemTable(g.shown, multi, false) : ''}</details>`; }).join('') || '<p class="mut">مفيش بنود في المرحلة دي.</p>'}</div></details>`;
   }).join('');
   $('#main').innerHTML = `<div class="top"><div><h2>الموقف التنفيذي${S.bsel ? ' – ' + esc(S.bsel) : ''}</h2><div class="big">${list.length ? Math.round(ov * 100) + '%' : '–'}</div><div class="mut">نسبة الإنجاز الكلية = مجموع (نسبة كل مرحلة × وزنها)</div><div class="kp">${kp.map(k => `<div class="k"><b>${k[0]}</b><span>${k[1]}</span></div>`).join('')}</div></div><div class="sec">${pic}</div></div>
   <div class="strip">${list.map(x => `<button type="button" class="pcell${x.n === cur ? ' cur' : ''}" data-goph="${x.n}"><i>المرحلة ${x.n} · وزن ${Math.round(x.weight * 1000) / 10}%</i><b>${esc(x.name)}</b><span>${Math.round(x.pct * 100)}%</span><div class="fill"><u style="width:${Math.min(x.pct, 1) * 100}%"></u></div></button>`).join('')}</div>
@@ -364,8 +364,8 @@ async function renderBoq() {
   const P = S.P, multi = (P.proj.buildings || []).length > 1, ed = can('editBoq', P.id), F = S.bq;
   $('#main').innerHTML = `<h2>المقايسة والتكلفة</h2><p class="mut">سعر البند هنا هو تكلفة الوحدة التقديرية. التكلفة التقديرية = الكمية × السعر. التكلفة الفعلية هتيجي من أودو في مرحلة لاحقة.</p><div id="bqSum"></div>
   <div class="filters" style="margin-top:16px"><select id="bqPh"><option value="">كل المراحل</option>${P.phaseProg.map(x => `<option value="${x.n}"${String(x.n) === F.ph ? ' selected' : ''}>${x.n}. ${esc(x.name)}</option>`).join('')}</select>${multi ? `<select id="bqB"><option value="">كل المباني</option>${P.proj.buildings.map(b => `<option${b === F.b ? ' selected' : ''}>${esc(b)}</option>`).join('')}</select>` : ''}<input id="bqQ" type="search" placeholder="بحث في البنود أو الكود" value="${esc(F.q)}"><label class="chk"><input type="checkbox" id="bqM"${F.miss ? ' checked' : ''}> الناقص سعر أو كمية بس</label></div>
-  <div class="acts" style="margin-top:0"><button id="bqX" class="p">تحميل المقايسة Excel</button>${ed ? '<label class="btn">رفع ملف أسعار<input type="file" id="bqF" accept=".xlsx,.xls" hidden></label>' : ''}${can('ledger', P.id) ? '<label class="btn" title="شيت الحسابات بنفس شكل شيت الغردقة: المشروع والمرحلة الأساسية والفرعية والإيرادات والمصروفات. بيستبدل بيانات الإكسل القديمة.">رفع شيت الحسابات<input type="file" id="lgF" accept=".xlsx,.xls" hidden></label>' : ''}</div><div id="lgBox"></div>
-  ${ed ? '<p class="mut" style="margin-top:-4px">حمّل المقايسة، واملا عمود الكمية والسعر في الإكسل، وارفع نفس الملف. أو عدّل هنا مباشرة وكل خانة بتتحفظ لوحدها.</p>' : ''}<div id="bqImp"></div>${ed ? addItemForm() : ''}<div id="bqT"></div>`;
+  <div class="acts" style="margin-top:0">${ed ? `<button id="bqE" class="p"${F.edit ? ' hidden' : ''}>تعديل الكميات والأسعار</button>` : ''}<button id="bqX">تحميل المقايسة Excel</button>${ed ? '<label class="btn">رفع ملف أسعار<input type="file" id="bqF" accept=".xlsx,.xls" hidden></label>' : ''}${can('ledger', P.id) ? '<label class="btn" title="شيت الحسابات بنفس شكل شيت الغردقة: المشروع والمرحلة الأساسية والفرعية والإيرادات والمصروفات. بيستبدل بيانات الإكسل القديمة.">رفع شيت الحسابات<input type="file" id="lgF" accept=".xlsx,.xls" hidden></label>' : ''}</div><div id="lgBox"></div>
+  ${ed ? '<p class="mut" style="margin-top:-4px">للتعديل: اضغط "تعديل الكميات والأسعار"، واكتب التعديلات، وبعدين "حفظ". أو حمّل المقايسة Excel، واملاها، وارفعها تاني.</p>' : ''}<div id="bqImp"></div>${ed ? addItemForm() : ''}<div id="bqT"></div>${ed ? `<div class="editbar" id="bqBar"${F.edit ? '' : ' hidden'}><span id="bqN"></span><button class="ok" id="bqS">حفظ التعديلات</button><button id="bqC">إلغاء</button></div>` : ''}`;
   boqSummary(); boqTable();
   $('#lgF') && ($('#lgF').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) importLedger(f); });
   const set = (k, v) => { F[k] = v; if (k === 'b') boqSummary(); boqTable(); };
@@ -374,22 +374,33 @@ async function renderBoq() {
   $('#bqSum').onclick = e => { const t = e.target.closest('tr[data-ph]'); if (!t) return; F.ph = F.ph === t.dataset.ph ? '' : t.dataset.ph; $('#bqPh').value = F.ph; boqSummary(); boqTable(); };
   $('#addF') && bindAddItem();
   $('#bqX').onclick = exportBoq; $('#bqF') && ($('#bqF').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) importBoq(f); });
-  $('#bqT').addEventListener('change', async e => {
-    const i = e.target.closest('input[data-f]'); if (!i) return; const tr = i.closest('tr'), r = P.items.find(x => x.id === tr.dataset.id), v = i.value === '' ? 0 : +i.value;
-    const { error } = i.dataset.f === 'rate' ? await S.sb.from('boq_rates').upsert({ item_id: r.id, rate: v }) : await S.sb.from('boq_items').update({ qty: v }).eq('id', r.id);
-    if (error) return toast('مقدرتش أحفظ: ' + error.message);
-    if (i.dataset.f === 'rate') r.rate = v; else { r.qty = v; r.rem = v - r.ex; r.pct = v > 0 ? r.ex / v : 0; r.known = v > 0 || r.pct_override != null; }
-    r.val = (+r.qty || 0) * r.rate; tr.querySelector('.tot').textContent = r.val ? nf(r.val, 0) : '–'; tr.classList.toggle('lack', lacks(r)); toast('اتحفظ'); boqSummary();
+  const bar = () => { const n = F.pend.size; if ($('#bqN')) $('#bqN').textContent = n ? `${n} بند متعدّل ومش محفوظ` : 'وضع التعديل: اكتب الكميات والأسعار وبعدين احفظ'; if ($('#bqS')) $('#bqS').disabled = !n; };
+  const mode = on => { F.edit = on; if (!on) F.pend.clear(); $('#bqE') && ($('#bqE').hidden = on); $('#bqBar') && ($('#bqBar').hidden = !on); boqTable(); bar(); };
+  $('#bqE') && ($('#bqE').onclick = () => mode(true)); $('#bqC') && ($('#bqC').onclick = () => mode(false)); bar();
+  $('#bqT').addEventListener('input', e => {
+    const i = e.target.closest('input[data-f]'); if (!i) return; const tr = i.closest('tr'), r = P.items.find(x => x.id === tr.dataset.id), f = i.dataset.f, v = i.value === '' ? 0 : +i.value;
+    const orig = f === 'rate' ? r.rate : +r.qty || 0, pe = { ...(F.pend.get(r.id) || {}) };
+    if (v === orig) delete pe[f]; else pe[f] = v; Object.keys(pe).length ? F.pend.set(r.id, pe) : F.pend.delete(r.id);
+    i.closest('td').classList.toggle('chg', f in pe); const q = pe.qty ?? (+r.qty || 0), rt = pe.rate ?? r.rate; tr.querySelector('.tot').textContent = q * rt ? nf(q * rt, 0) : '–'; bar();
+  });
+  $('#bqS') && ($('#bqS').onclick = async () => {
+    const btn = $('#bqS'); btn.disabled = true; btn.textContent = 'جاري الحفظ…'; const ch = [...F.pend.entries()]; let err = null;
+    const R = ch.filter(([, v]) => 'rate' in v).map(([item_id, v]) => ({ item_id, rate: v.rate })); if (R.length) { const { error } = await S.sb.from('boq_rates').upsert(R); err = error; }
+    const Q = ch.filter(([, v]) => 'qty' in v); for (let k = 0; k < Q.length && !err; k += 10) { const res = await Promise.all(Q.slice(k, k + 10).map(([id, v]) => S.sb.from('boq_items').update({ qty: v.qty }).eq('id', id))); err = res.find(x => x.error)?.error; }
+    btn.textContent = 'حفظ التعديلات'; if (err) { btn.disabled = false; return toast('مقدرتش أحفظ: ' + err.message); }
+    ch.forEach(([id, v]) => { const r = P.items.find(x => x.id === id); if ('rate' in v) r.rate = v.rate; if ('qty' in v) { r.qty = v.qty; r.rem = v.qty - r.ex; r.pct = v.qty > 0 ? r.ex / v.qty : 0; r.known = v.qty > 0 || r.pct_override != null; } r.val = (+r.qty || 0) * r.rate; });
+    toast(`اتحفظ تعديل ${ch.length} بند`); mode(false); boqSummary();
   });
 }
 function boqTable() {
-  const P = S.P, F = S.bq, multi = (P.proj.buildings || []).length > 1, ed = can('editBoq', P.id);
+  const P = S.P, F = S.bq, multi = (P.proj.buildings || []).length > 1, ed = can('editBoq', P.id) && F.edit;
   const rows = P.items.filter(r => (!F.ph || String(r.phase_n) === F.ph) && (!F.b || r.building === F.b) && (!F.miss || lacks(r)) && (!F.q || (r.code + ' ' + r.name + ' ' + (r.description || '')).includes(F.q)));
   if (!rows.length) return $('#bqT').innerHTML = '<p class="mut">مفيش بنود بالفلتر ده.</p>';
   const cols = 6 + (multi ? 1 : 0), keys = [...new Set(rows.map(r => r.phase_n + '|' + r.group_name))];
-  const cell = (r, f) => ed ? `<input type="number" step="any" inputmode="decimal" data-f="${f}" value="${(f === 'qty' ? +r.qty : r.rate) || ''}">` : ((f === 'qty' ? +r.qty : r.rate) ? nf(f === 'qty' ? r.qty : r.rate) : '–');
+  const pv = (r, f) => { const pe = F.pend.get(r.id); return pe && f in pe ? pe[f] : (f === 'qty' ? +r.qty : r.rate); }, chg = (r, f) => F.pend.get(r.id) && f in F.pend.get(r.id);
+  const cell = (r, f) => ed ? `<input type="number" step="any" inputmode="decimal" data-f="${f}" value="${pv(r, f) || ''}">` : ((f === 'qty' ? +r.qty : r.rate) ? nf(f === 'qty' ? r.qty : r.rate) : '–');
   $('#bqT').innerHTML = `<div class="scroll"><table class="stack it bq"><thead><tr><th>الكود</th><th>البند</th>${multi ? '<th>المبنى</th>' : ''}<th>الوحدة</th><th class="n">الكمية</th><th class="n">السعر</th><th class="n">الإجمالي</th></tr></thead><tbody>${keys.map(k => { const L = rows.filter(r => r.phase_n + '|' + r.group_name === k), [n, g] = [L[0].phase_n, L[0].group_name], sub = L.reduce((s, r) => s + r.val, 0);
-    return `<tr class="gh"><td colspan="${cols - 1}">${n}. ${esc(P.phaseProg.find(x => x.n === n)?.name || '')} – ${esc(g)} <span class="mut">(${L.length})</span></td><td class="n">${sub ? nf(sub, 0) : ''}</td></tr>` + L.map(r => `<tr data-id="${esc(r.id)}" class="${lacks(r) ? 'lack' : ''}"><td data-l="الكود">${esc(r.code)}</td><td data-l="البند" title="${esc(r.description || '')}">${esc(r.name)}${r.note ? `<div class="mut" style="font-size:12px">${esc(r.note)}</div>` : ''}</td>${multi ? `<td data-l="المبنى">${esc(r.building)}</td>` : ''}<td data-l="الوحدة">${esc(r.unit)}</td><td class="n${ed ? ' ed' : ''}" data-l="الكمية">${cell(r, 'qty')}</td><td class="n${ed ? ' ed' : ''}" data-l="السعر">${cell(r, 'rate')}</td><td class="n tot" data-l="الإجمالي">${r.val ? nf(r.val, 0) : '–'}</td></tr>`).join(''); }).join('')}</tbody></table></div>`;
+    return `<tr class="gh"><td colspan="${cols - 1}">${n}. ${esc(P.phaseProg.find(x => x.n === n)?.name || '')} – ${esc(g)} <span class="mut">(${L.length})</span></td><td class="n">${sub ? nf(sub, 0) : ''}</td></tr>` + L.map(r => `<tr data-id="${esc(r.id)}" class="${lacks(r) ? 'lack' : ''}"><td data-l="الكود">${esc(r.code)}</td><td data-l="البند" title="${esc(r.description || '')}">${esc(r.name)}${r.note ? `<div class="mut" style="font-size:12px">${esc(r.note)}</div>` : ''}</td>${multi ? `<td data-l="المبنى">${esc(r.building)}</td>` : ''}<td data-l="الوحدة">${esc(r.unit)}</td><td class="n${ed ? ' ed' : ''}${ed && chg(r, 'qty') ? ' chg' : ''}" data-l="الكمية">${cell(r, 'qty')}</td><td class="n${ed ? ' ed' : ''}${ed && chg(r, 'rate') ? ' chg' : ''}" data-l="السعر">${cell(r, 'rate')}</td><td class="n tot" data-l="الإجمالي">${(ed ? pv(r, 'qty') * pv(r, 'rate') : r.val) ? nf(ed ? pv(r, 'qty') * pv(r, 'rate') : r.val, 0) : '–'}</td></tr>`).join(''); }).join('')}</tbody></table></div>`;
 }
 function addItemForm() {
   const P = S.P, bs = P.proj.buildings || [], grp = [...new Set(P.items.map(r => r.group_name))];
@@ -673,4 +684,5 @@ function exportXlsx() {
   wb.Workbook = { Views: [{ RTL: true }] }; X.writeFile(wb, 'موقف تنفيذي ' + p.name + ' ' + today() + '.xlsx');
 }
 
+addEventListener('beforeunload', e => { if (S.bq?.pend?.size) { e.preventDefault(); e.returnValue = ''; } });
 boot();
