@@ -56,7 +56,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 2.8.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 2.9.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -155,8 +155,8 @@ async function renderHome() {
   <dl class="who"><dt>المالك</dt><dd>${esc(p.owner_name)}</dd><dt>المقاول العام</dt><dd>${esc(p.contractor_name)}</dd><dt>الاستشاري</dt><dd>${esc(p.consultant_name)}</dd></dl>
   <div class="mbars">${list.map(x => `<div><span>${x.n}. ${esc(x.name)}</span><div class="bar${x.pct >= 1 ? ' full' : ''}"><u style="width:${Math.min(x.pct, 1) * 100}%"></u></div><em>${Math.round(x.pct * 100)}%</em></div>`).join('')}</div>
   ${liveWork(p, work, upd)}
-  <div class="acts" style="margin-top:0"><a class="btn p" href="#p/${p.id}/status">فتح المشروع</a>${can('report', p.id) ? `<a class="btn" href="#p/${p.id}/report">تقرير يومي</a>` : ''}${can('review', p.id) ? `<a class="btn" href="#p/${p.id}/review">المراجعة</a>` : ''}</div></article>`).join('')}</div>`;
-  $('#main').onclick = e => { const t = e.target.closest('[data-lt]'); if (!t) return; const box = t.closest('.live'); box.querySelectorAll('[data-lt]').forEach(b => b.classList.toggle('on', b === t)); box.querySelectorAll('[data-lp]').forEach(x => x.hidden = x.dataset.lp !== t.dataset.lt); };
+  <div class="acts" style="margin-top:0"><a class="btn p" href="#p/${p.id}/status">فتح المشروع</a>${can('report', p.id) ? `<a class="btn" href="#p/${p.id}/report">تقرير يومي</a>` : ''}${can('review', p.id) ? `<a class="btn" href="#p/${p.id}/review">المراجعة</a>` : ''}<button type="button" data-rep="${p.id}">📄 تقرير شامل</button></div></article>`).join('')}</div>`;
+  $('#main').onclick = e => { const rp = e.target.closest('[data-rep]'); if (rp) return projectReport(rp.dataset.rep, rp); const t = e.target.closest('[data-lt]'); if (!t) return; const box = t.closest('.live'); box.querySelectorAll('[data-lt]').forEach(b => b.classList.toggle('on', b === t)); box.querySelectorAll('[data-lp]').forEach(x => x.hidden = x.dataset.lp !== t.dataset.lt); };
 }
 const CRANE = `<svg class="crane" viewBox="0 0 64 56" aria-hidden="true"><path d="M10 54V8M4 54h14M10 8l44 0M10 8 22 2l32 6M10 18l12-10M18 8v0" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g class="trolley"><rect x="36" y="6" width="8" height="5" rx="1" fill="currentColor"/><line class="cable" x1="40" y1="11" x2="40" y2="30" stroke="currentColor" stroke-width="1.4"/><g class="hook"><rect x="35" y="30" width="10" height="8" rx="1.5" fill="var(--acc)"/></g></g></svg>`;
 function liveWork(p, work, upd) {
@@ -751,6 +751,86 @@ async function renderStore() {
   $('#main').onclick = async e => { const d1 = e.target.closest('[data-mvdel]'), d2 = e.target.closest('[data-ndel]'); const b = d1 || d2; if (!b) return; if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'متأكد؟'; return; }
     const { error } = d1 ? await S.sb.from('stock_moves').delete().eq('id', d1.dataset.mvdel) : await S.sb.from('material_norms').delete().eq('id', d2.dataset.ndel); if (error) return toast(error.message); re(); };
 }
+
+/* ---------------- full project report (from home) ---------------- */
+async function projectReport(pid, btn) {
+  const w = window.open('', '_blank'); if (!w) return toast('المتصفح منع فتح نافذة التقرير، اسمح بالنوافذ المنبثقة');
+  w.document.write('<p style="font-family:sans-serif;direction:rtl;padding:30px">جاري تجهيز التقرير…</p>');
+  if (btn) btn.disabled = true;
+  const saved = S.P; S.P = { id: pid };
+  try {
+    await loadProject(pid); const P = S.P, p = P.proj, r = role(pid), tdy = today();
+    const showCost = can('ledger', pid) || ['tech'].includes(r) || S.admin, isOwner = r === 'owner' && !S.admin;
+    const [sa, sp, cl, lg, iv, st, su] = await Promise.all([
+      S.sb.from('schedule_activities').select('*').eq('project_id', pid).order('sort'), S.sb.rpc('schedule_progress', { p_project: pid }),
+      S.sb.from('contract_lines').select('*').eq('project_id', pid).order('sort'),
+      showCost ? S.sb.rpc('ledger_summary', { p_project: pid }) : Promise.resolve({ data: [] }),
+      can('inv', pid) ? S.sb.from('owner_invoices').select('*').eq('project_id', pid).order('no') : Promise.resolve({ data: [] }),
+      can('store', pid) ? S.sb.rpc('stock_status', { p_project: pid }) : Promise.resolve({ data: [] }),
+      S.sb.rpc('site_updates', { p_project: pid, p_n: 14 })]);
+    const PP = P.phaseProg || [], ov = overall(PP), contract = (cl.data || []).reduce((s, x) => s + (+x.amount || +x.value || 0), 0) || P.items.reduce((s, i) => s + (+i.camt || 0), 0);
+    // schedule
+    const prog = Object.fromEntries((sp.data || []).map(x => [x.activity_id, x])), A = (sa.data || []), par = new Set(A.map(a => a.parent_id).filter(Boolean));
+    const leaf = A.filter(a => !par.has(a.id) && a.start && a.finish).map(a => { const pr = prog[a.id]?.pct; const s0 = new Date(a.start), f0 = new Date(a.finish), t = new Date(tdy); const plan = t <= s0 ? 0 : t >= f0 ? 1 : (t - s0) / Math.max(f0 - s0, 864e5); return { ...a, pct: pr == null ? null : +pr, plan }; });
+    const late = leaf.filter(a => a.pct != null && a.pct < 0.999 && (a.finish < tdy || a.plan - a.pct > 0.15)).sort((x, y) => (y.plan - (y.pct || 0)) - (x.plan - (x.pct || 0)));
+    const soon = leaf.filter(a => a.start > tdy && a.start <= addDaysISO(tdy, 21));
+    const planAll = leaf.length ? leaf.reduce((s, a) => s + a.plan, 0) / leaf.length : null, actAll = leaf.filter(a => a.pct != null).length ? leaf.filter(a => a.pct != null).reduce((s, a) => s + a.pct, 0) / leaf.filter(a => a.pct != null).length : null;
+    // site
+    const U = su.data || [], lab = U.length ? Math.round(U.reduce((s, u) => s + (+u.labor || 0), 0) / U.length) : 0;
+    const acts = U.flatMap(u => (u.acts || []).map(a => ({ d: u.report_date, t: a.desc || a.text || a.title || a.activity || (typeof a === 'string' ? a : ''), b: a.building || '' }))).filter(a => a.t).slice(0, 25);
+    const inProg = P.items.filter(i => +i.qty > 0 && i.ex > 0 && i.ex < +i.qty * 0.999).sort((a, b) => (b.camt || 0) - (a.camt || 0)).slice(0, 15);
+    // cost
+    const LG = lg.data || [], act = n => LG.filter(x => x.phase_n === n).reduce((s, x) => s + +x.expense, 0);
+    const costRows = PP.map(x => { const it = P.items.filter(i => i.phase_n === x.n), c = it.reduce((s, i) => s + (+i.camt || 0), 0), u = it.reduce((s, i) => s + updVal(i), 0), a = act(x.n); return { ...x, c, u: Math.max(u, a), a }; });
+    const ct = k => costRows.reduce((s, x) => s + x[k], 0);
+    // invoices
+    const I = (iv.data || []).filter(i => !isOwner || i.status !== 'draft'), Itot = I.reduce((s, i) => s + invSum(i), 0), Inet = I.reduce((s, i) => s + invPay(i).net, 0), lastI = I[I.length - 1];
+    // tech office & store
+    const miss = P.items.filter(lacks), checks = P.check || [], openC = c => checks.filter(x => x.category === c && x.status !== 'approved').length;
+    const short = (st.data || []).filter(x => +x.shortage > 0);
+    const pend = P.reports.filter(x => x.status === 'submitted').length, lastRep = P.reports.find(x => x.status === 'approved')?.report_date;
+    // key points
+    const K = [`نسبة الإنجاز الكلية <b>${Math.round(ov * 100)}%</b>${planAll != null ? ` مقابل مخطط ${Math.round(planAll * 100)}% حسب الجدول الزمني` : ''}.`,
+      late.length ? `<b class="bad">${late.length}</b> نشاط متأخر في الجدول الزمني.` : leaf.length ? 'مفيش أنشطة متأخرة في الجدول الزمني.' : '',
+      U.length ? `متوسط العمالة في آخر ${U.length} تقرير: <b>${lab}</b> عامل/يوم. آخر تقرير معتمد ${lastRep ? fmtD(lastRep) : '–'}.` : '',
+      !isOwner && miss.length ? `<b>${miss.length}</b> بند في المقايسة ناقص تسعير أو كمية (${miss.filter(i => i.phase_n > 4).length} منهم بعد الهيكل).` : '',
+      short.length ? `<b class="bad">نقص خامات</b>: ${short.map(x => `${esc(x.name)} ${nf(x.shortage, 1)} ${esc(x.unit)}`).join('، ')}.` : '',
+      lastI ? `آخر مستخلص: ${esc(lastI.title || '')} – المستحق صرفه ${nf(invPay(lastI).net, 0)} ج.م (${IST[lastI.status][1]}).` : '',
+      showCost && !isOwner && LG.length ? `التكلفة الفعلية المصروفة ${nf(ct('a'), 0)} ج.م من قيمة عقد ${nf(contract, 0)} ج.م.` : ''].filter(Boolean);
+    const bar = (v, c = '#f26b1d') => `<div class="br"><u style="width:${Math.min(Math.max(v, 0), 1) * 100}%;background:${c}"></u></div>`;
+    const sec = (t, body) => body ? `<section><h2>${t}</h2>${body}</section>` : '';
+    const html = `<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>تقرير شامل – ${esc(p.name)} – ${tdy}</title><base href="${location.href.split('#')[0]}"><style>
+    @page{size:A4;margin:14mm}body{font-family:"Segoe UI",Tahoma,Arial,sans-serif;color:#1b1c1e;margin:0;font-size:12.5px;line-height:1.55}
+    .top{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #f26b1d;padding-bottom:10px}.logo .lk{display:none}.logo img{height:52px}
+    h1{margin:0;font-size:24px}h2{font-size:16px;margin:0 0 8px;padding:4px 10px;background:#1b1c1e;color:#fff;border-radius:6px}section{margin-top:16px;break-inside:avoid-page}
+    .mut{color:#6b6c6f}.bad{color:#b3261e}.ok{color:#1d7a4f}.kp{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}.kp div{border:1px solid #d7d5ce;border-radius:10px;padding:8px 10px}.kp b{display:block;font-size:22px;color:#f26b1d}.kp span{font-size:11px;color:#6b6c6f}
+    table{width:100%;border-collapse:collapse}th{background:#f1efe9;text-align:right;padding:5px 6px;font-size:11.5px;border-bottom:1px solid #d7d5ce}td{padding:4px 6px;border-bottom:1px solid #eceae4;vertical-align:top}td.n,th.n{text-align:left;white-space:nowrap;font-variant-numeric:tabular-nums}tr.t td{font-weight:700;border-top:2px solid #1b1c1e}
+    .br{height:9px;background:#eceae4;border-radius:9px;overflow:hidden;min-width:120px}.br u{display:block;height:100%;float:right}
+    ul.k{margin:6px 0;padding-right:18px}ul.k li{margin:3px 0}.foot{margin-top:20px;font-size:10.5px;color:#6b6c6f;border-top:1px solid #d7d5ce;padding-top:6px;display:flex;justify-content:space-between}
+    .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}.chip{display:inline-block;padding:0 7px;border-radius:99px;background:#f1efe9;font-size:11px}
+    @media print{.np{display:none}}.np{position:fixed;bottom:14px;left:14px}.np button{font:inherit;padding:8px 16px;border-radius:8px;border:0;background:#f26b1d;color:#fff;cursor:pointer}
+    </style></head><body><div class="np"><button onclick="print()">🖨 طباعة / PDF</button></div>
+    <div class="top"><div><h1>${esc(p.name)}</h1><div class="mut">${esc(p.place || '')}${p.land ? ' · أرض ' + esc(p.land) : ''} · المالك: ${esc(p.owner_name || '')} · الاستشاري: ${esc(p.consultant_name || '')}</div><div style="margin-top:4px"><b>تقرير شامل عن المشروع</b> · ${new Date(tdy + 'T12:00:00Z').toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })}</div></div>${LOGO()}</div>
+    <div class="kp"><div><b>${Math.round(ov * 100)}%</b><span>الإنجاز الكلي</span></div><div><b>${planAll != null ? Math.round(planAll * 100) + '%' : '–'}</b><span>المخطط حسب الجدول</span></div><div><b>${nf(contract / 1e6, 2)} م</b><span>قيمة العقد</span></div><div><b>${I.length ? nf(Itot / 1e6, 2) + ' م' : '–'}</b><span>إجمالي المستخلصات</span></div></div>
+    ${sec('أهم النقاط', `<ul class="k">${K.map(x => `<li>${x}</li>`).join('')}</ul>`)}
+    ${sec('الإنجاز حسب المراحل', `<table><thead><tr><th>المرحلة</th><th class="n">الوزن</th><th style="width:45%">الإنجاز</th><th class="n">%</th></tr></thead><tbody>${PP.map(x => `<tr><td>${x.n}. ${esc(x.name)}</td><td class="n">${Math.round((+x.weight || 0) * 1000) / 10}%</td><td>${bar(+x.pct)}</td><td class="n"><b>${Math.round(+x.pct * 100)}%</b></td></tr>`).join('')}<tr class="t"><td>المشروع</td><td></td><td>${bar(ov)}</td><td class="n">${Math.round(ov * 100)}%</td></tr></tbody></table>`)}
+    ${sec('الجدول الزمني', leaf.length ? `<p class="mut" style="margin:0 0 6px">${leaf.length} نشاط · المخطط لحد النهارده ${Math.round(planAll * 100)}% · الفعلي ${actAll != null ? Math.round(actAll * 100) + '%' : '–'}</p>
+      ${late.length ? `<b class="bad">أنشطة متأخرة (${late.length})</b><table><thead><tr><th>النشاط</th><th>النهاية المخططة</th><th class="n">المخطط</th><th class="n">الفعلي</th></tr></thead><tbody>${late.slice(0, 15).map(a => `<tr><td>${esc(a.name)}</td><td>${fmtD(a.finish)}</td><td class="n">${Math.round(a.plan * 100)}%</td><td class="n bad">${Math.round(a.pct * 100)}%</td></tr>`).join('')}</tbody></table>` : '<p class="ok">✓ مفيش أنشطة متأخرة.</p>'}
+      ${soon.length ? `<b style="display:block;margin-top:8px">أنشطة هتبدأ خلال 3 أسابيع</b><table><tbody>${soon.slice(0, 10).map(a => `<tr><td>${esc(a.name)}</td><td class="n">${fmtD(a.start)} ← ${fmtD(a.finish)}</td></tr>`).join('')}</tbody></table>` : ''}` : '<p class="mut">لسه مفيش جدول زمني متسجل.</p>')}
+    ${sec('الموقع – آخر أسبوعين', (U.length || inProg.length) ? `<div class="two"><div><b>البنود الجاري تنفيذها</b><table><tbody>${inProg.map(i => `<tr><td>${esc(i.code)} ${esc(i.name.slice(0, 60))}${i.building ? ` <span class="chip">${esc(i.building)}</span>` : ''}</td><td style="width:90px">${bar(i.pct)}</td><td class="n">${Math.round(i.pct * 100)}%</td></tr>`).join('') || '<tr><td class="mut">–</td></tr>'}</tbody></table></div>
+      <div><b>من التقارير اليومية</b> <span class="mut">(متوسط ${lab} عامل/يوم)</span><table><tbody>${acts.map(a => `<tr><td class="n mut">${fmtD(a.d)}</td><td>${esc(String(a.t).slice(0, 110))}${a.b ? ` <span class="chip">${esc(a.b)}</span>` : ''}</td></tr>`).join('') || '<tr><td class="mut">مفيش تقارير معتمدة حديثة.</td></tr>'}</tbody></table></div></div>` : '')}
+    ${showCost && !isOwner ? sec('التكلفة حسب المراحل', `<table><thead><tr><th>المرحلة</th><th class="n">التعاقدي</th><th class="n">المحدّث</th><th class="n">الفعلي المصروف</th><th class="n">الفعلي ÷ التعاقدي</th></tr></thead><tbody>${costRows.map(x => `<tr><td>${x.n}. ${esc(x.name)}</td><td class="n">${nf(x.c, 0)}</td><td class="n">${nf(x.u, 0)}</td><td class="n">${x.a ? nf(x.a, 0) : '–'}</td><td class="n ${x.c && x.a > x.c ? 'bad' : ''}">${x.c && x.a ? Math.round(x.a / x.c * 100) + '%' : '–'}</td></tr>`).join('')}<tr class="t"><td>الإجمالي</td><td class="n">${nf(ct('c'), 0)}</td><td class="n">${nf(ct('u'), 0)}</td><td class="n">${nf(ct('a'), 0)}</td><td class="n">${ct('c') ? Math.round(ct('a') / ct('c') * 100) + '%' : '–'}</td></tr></tbody></table><p class="mut" style="margin:4px 0 0;font-size:11px">التعاقدي من قيمة العقد · المحدّث من أسعار البنود (توريد ومصنعيات) أو الفعلي لو أكبر · الفعلي من شيت الحسابات.</p>`) : ''}
+    ${I.length ? sec('المستخلصات', `<table><thead><tr><th>المستخلص</th><th>التاريخ</th><th>الحالة</th><th class="n">إجمالي الأعمال</th><th class="n">المستحق صرفه</th></tr></thead><tbody>${I.map(i => `<tr><td>${esc(i.title || 'مستخلص ' + i.no)}</td><td>${i.inv_date ? fmtD(i.inv_date) : '–'}</td><td>${IST[i.status][1]}</td><td class="n">${nf(invSum(i), 0)}</td><td class="n">${nf(invPay(i).net, 0)}</td></tr>`).join('')}<tr class="t"><td colspan="3">الإجمالي</td><td class="n">${nf(Itot, 0)}</td><td class="n">${nf(Inet, 0)}</td></tr></tbody></table>`) : ''}
+    ${!isOwner && can('tasks', pid) ? sec('جاهزية المكتب الفني', `<table><thead><tr><th>المرحلة</th><th class="n">بنود ناقصة تسعير</th><th class="n">تصاميم مفتوحة</th><th class="n">خامات محتاجة اعتماد</th></tr></thead><tbody>${PP.filter(x => x.n > 4).concat(PP.filter(x => x.n <= 4)).map(x => { const m = P.items.filter(i => i.phase_n === x.n && lacks(i)).length, d = checks.filter(c => c.phase_n === x.n && c.category === 'design' && c.status !== 'approved').length, mt = checks.filter(c => c.phase_n === x.n && c.category === 'material' && c.status !== 'approved').length; return `<tr><td>${x.n}. ${esc(x.name)}${x.n > 4 ? ' ★' : ''}</td><td class="n ${m ? 'bad' : 'ok'}">${m || '✓'}</td><td class="n">${d || '–'}</td><td class="n">${mt || '–'}</td></tr>`; }).join('')}<tr class="t"><td>الإجمالي</td><td class="n">${miss.length}</td><td class="n">${openC('design')}</td><td class="n">${openC('material')}</td></tr></tbody></table>`) : ''}
+    ${(st.data || []).length ? sec('المخزن', `<table><thead><tr><th>الخامة</th><th class="n">الرصيد</th><th class="n">مطلوب للبنود الجارية</th><th class="n">النقص</th></tr></thead><tbody>${(st.data || []).filter(x => +x.balance_est || +x.needed || +x.rec_reports || +x.rec_moves).map(x => `<tr><td>${esc(x.name)} <span class="mut">(${esc(x.unit)})</span></td><td class="n">${nf(+x.issued > 0 ? x.balance : x.balance_est, 1)}</td><td class="n">${+x.needed ? nf(x.needed, 1) : '–'}</td><td class="n ${+x.shortage > 0 ? 'bad' : ''}">${+x.shortage > 0 ? nf(x.shortage, 1) : '✓'}</td></tr>`).join('') || '<tr><td class="mut">مفيش حركة مخزن.</td></tr>'}</tbody></table>`) : ''}
+    ${!isOwner ? sec('التقارير اليومية', `<p style="margin:0">آخر تقرير معتمد: <b>${lastRep ? fmtD(lastRep) : '–'}</b> · تقارير مستنية مراجعة: <b class="${pend ? 'bad' : ''}">${pend}</b> · إجمالي التقارير المعتمدة: ${P.reports.filter(x => x.status === 'approved').length}</p>`) : ''}
+    <div class="foot"><span>RESAN On the go · ${esc(ROLE[r] || (S.admin ? 'الإدارة' : ''))}</span><span>اتطلع ${new Date().toLocaleString('ar-EG')}</span></div>
+    <script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script></body></html>`;
+    w.document.open(); w.document.write(html); w.document.close();
+  } catch (e) { w.close(); toast('مقدرتش أجهّز التقرير: ' + e.message); }
+  finally { S.P = saved; if (btn) btn.disabled = false; }
+}
+const addDaysISO = (d, n) => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
 
 /* ---------------- owner invoices (المستخلصات) ---------------- */
 const ICAT = { design: 'التصميمات', contract: 'الأعمال التعاقدية', supply: 'التوريدات والمشتريات', extra: 'المصروفات الإضافية' };
