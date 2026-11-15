@@ -51,7 +51,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 1.9.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 2.0.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -294,9 +294,13 @@ function renderReview() {
   const P = S.P, L = P.reports.filter(r => r.status === 'submitted').sort((a, b) => a.report_date.localeCompare(b.report_date));
   $('#main').innerHTML = `<h2>مراجعة المكتب الفني</h2><p class="mut">تقدر تعدّل الكميات قبل الاعتماد، والموقف بيتحدّث أول ما تعتمد.</p>${L.length ? L.map(r => { const lines = [...(r.body.qty || []), ...(r.body.pours || []).filter(x => x.item).map(x => ({ item: x.item, qty: x.vol, pour: 1 }))];
     return `<div class="card" data-id="${r.id}"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><b>${r.report_date}</b><span class="mut">${esc(S.names[r.created_by] || '')}</span></div>${details(r, false)}
-    <b>الكميات اللي هتتضاف للموقف</b>${lines.length ? `<div class="scroll"><table><thead><tr><th>البند</th><th class="n">الكمية</th></tr></thead><tbody>${lines.map((q, k) => `<tr><td>${esc(itemName(q.item))}${q.pour ? ' <span class="mut">(صبة)</span>' : ''}</td><td class="n"><input type="number" step="any" data-k="${k}" data-item="${esc(q.item)}" value="${q.qty}" style="width:110px;min-height:36px"></td></tr>`).join('')}</tbody></table></div>` : '<p class="mut">مفيش كميات.</p>'}
+    <div class="aibar"><button type="button" class="aib" data-ai="${r.id}">🤖 مراجعة AI</button><span class="mut">بيسكّن كل نشاط على المبنى والبند الصح، ويطلّع الكميات المكتوبة، وينبّه على المشاكل. القرار في الآخر ليك.</span></div><div class="aibox" data-aibox="${r.id}"></div>
+    <b>الكميات اللي هتتضاف للموقف</b><div class="scroll"><table><thead><tr><th>البند</th><th class="n">الكمية</th><th></th></tr></thead><tbody data-lines>${lines.map((q, k) => `<tr><td>${esc(itemName(q.item))}${q.pour ? ' <span class="mut">(صبة)</span>' : ''}</td><td class="n"><input type="number" step="any" data-k="${k}" data-item="${esc(q.item)}" value="${q.qty}" style="width:110px;min-height:36px"></td><td></td></tr>`).join('')}</tbody></table></div>${lines.length ? '' : '<p class="mut" data-nolines>مفيش كميات في التقرير.</p>'}
     <label style="margin-top:10px">تعليق للمهندس (مطلوب لو هترجّعه)<input data-c></label><div class="acts"><button class="ok" data-a="approve">اعتماد وتحديث الموقف</button><button data-a="return">إرجاع للمهندس</button></div></div>`; }).join('') : '<p class="mut">مفيش تقارير مستنية مراجعة.</p>'}`;
+  const prevAi = {}; S.sb.from('ai_reviews').select('report_id,result,created_at').in('report_id', L.map(r => r.id)).order('created_at', { ascending: false }).then(({ data }) => (data || []).forEach(x => { if (!prevAi[x.report_id]) { prevAi[x.report_id] = 1; showAi(x.report_id, x.result, x.created_at); } }));
   $('#main').onclick = async e => {
+    const ai = e.target.closest('[data-ai]'); if (ai) return runAi(ai);
+    const add = e.target.closest('[data-aiadd]'); if (add) return addAiLine(add);
     const b = e.target.closest('button[data-a]'); if (!b) return; const c = b.closest('[data-id]'), id = c.dataset.id, comment = c.querySelector('[data-c]').value.trim(); b.disabled = true;
     const { error } = b.dataset.a === 'approve'
       ? await S.sb.rpc('approve_report', { p_report: id, p_lines: [...c.querySelectorAll('input[data-k]')].map(i => ({ item: i.dataset.item, qty: +i.value || 0 })), p_comment: comment || null })
@@ -304,6 +308,34 @@ function renderReview() {
     if (error) { b.disabled = false; return toast(error.message); }
     toast(b.dataset.a === 'approve' ? 'اتعتمد والموقف اتحدّث' : 'التقرير رجع للمهندس'); await loadProject(P.id); renderReview();
   };
+}
+
+
+/* ---------------- AI reviewer ---------------- */
+async function runAi(btn) {
+  const id = btn.dataset.ai, box = document.querySelector(`[data-aibox="${id}"]`); btn.disabled = true; btn.textContent = '🤖 بيراجع…';
+  box.innerHTML = '<div class="aiload"><i></i><i></i><i></i> Claude بيقرا التقرير والمقايسة…</div>';
+  const { data, error } = await S.sb.functions.invoke('ai-review', { body: { report_id: id } });
+  btn.disabled = false; btn.textContent = '🤖 مراجعة AI تاني';
+  let msg = data?.error; if (error && !msg) { try { msg = (await error.context?.json())?.error; } catch { } msg = msg || error.message; }
+  if (msg) return box.innerHTML = `<div class="note">${msg === 'NO_KEY' ? 'المراجع الذكي لسه مش متفعّل: محتاج مفتاح Claude API يتحط في إعدادات Supabase (Edge Functions ← Secrets ← ANTHROPIC_API_KEY).' : esc(msg)}</div>`;
+  showAi(id, data.result);
+}
+function showAi(id, res, at) {
+  const P = S.P, box = document.querySelector(`[data-aibox="${id}"]`), r = P.reports.find(x => x.id === id); if (!box || !r) return;
+  const acts = r.body.acts || [], it = iid => P.items.find(x => x.id === iid), sev = { high: ['ret', 'مهم'], medium: ['pend', 'متوسط'], low: ['imp', 'ملاحظة'] };
+  const existing = new Set([...(r.body.qty || []), ...(r.body.pours || []).filter(x => x.item)].map(q => q.item));
+  box.innerHTML = `<div class="aires"><div class="aih"><b>🤖 نتيجة المراجعة</b>${at ? `<span class="mut">${fmtD(at.slice(0, 10))}</span>` : ''}</div><p>${esc(res.summary || '')}</p>
+  ${(res.issues || []).length ? `<ul class="aiiss">${res.issues.map(x => `<li><span class="st ${(sev[x.severity] || sev.low)[0]}">${(sev[x.severity] || sev.low)[1]}</span> ${esc(x.text)}</li>`).join('')}</ul>` : '<p class="mut">مفيش مشاكل واضحة.</p>'}
+  ${(res.acts || []).length ? `<div class="scroll"><table class="aitbl"><thead><tr><th>النشاط</th><th>المكان</th><th>التخصص</th><th>البنود</th></tr></thead><tbody>${res.acts.map(a => { const o = acts[a.index] || {}, chB = !!o.building && o.building !== (a.building || ''), chD = o.discipline && o.discipline !== a.discipline;
+    return `<tr><td>${esc(o.work || '')}${a.note ? `<div class="mut" style="font-size:12px">${esc(a.note)}</div>` : ''}</td><td>${chB ? `<s class="mut">${esc(o.building || '—')}</s> ` : ''}<b>${esc(a.building || '—')}</b></td><td>${chD ? `<s class="mut">${esc(o.discipline)}</s> ` : ''}${esc(a.discipline)}</td><td>${(a.items || []).map(x => { const i = it(x.item_id); return i ? `<span class="aichip" title="${esc(i.name)}">${esc(i.code)} <small>${Math.round(x.confidence * 100)}%</small> ${esc(i.name.slice(0, 34))}${i.name.length > 34 ? '…' : ''}${i.building ? ' – ' + esc(i.building) : ''}</span>` : ''; }).join('') || '<span class="mut">مش لاقي بند مناسب</span>'}</td></tr>`; }).join('')}</tbody></table></div>` : ''}
+  ${(res.qty_lines || []).length ? `<b>كميات مقترحة</b><div class="scroll"><table><tbody>${res.qty_lines.map((q, k) => { const i = it(q.item_id), rem = i ? (+i.qty || 0) - i.ex : 0, over = i && +i.qty > 0 && q.qty > rem;
+    return `<tr><td>${i ? esc(i.code + ' ' + i.name.slice(0, 50)) : esc(q.item_id)}<div class="mut" style="font-size:12px">«${esc(q.basis)}»</div></td><td class="n"><b>${nf(q.qty)}</b> ${esc(i?.unit || '')}${over ? `<div style="color:var(--bad);font-size:12px">أكبر من المتبقي (${nf(rem)})</div>` : ''}</td><td>${existing.has(q.item_id) ? '<span class="mut">موجودة في التقرير</span>' : `<button type="button" data-aiadd="${id}" data-item="${esc(q.item_id)}" data-qty="${q.qty}" style="min-height:34px;font-size:13px">+ للاعتماد</button>`}</td></tr>`; }).join('')}</tbody></table></div>` : ''}</div>`;
+}
+function addAiLine(b) {
+  const card = b.closest('[data-id]'), tb = card.querySelector('[data-lines]'), k = tb.querySelectorAll('input[data-k]').length + 100;
+  tb.insertAdjacentHTML('beforeend', `<tr class="aiadded"><td>${esc(itemName(b.dataset.item))} <span class="st appr">AI</span></td><td class="n"><input type="number" step="any" data-k="${k}" data-item="${esc(b.dataset.item)}" value="${b.dataset.qty}" style="width:110px;min-height:36px"></td><td><button type="button" class="x" onclick="this.closest('tr').remove()" style="min-height:30px;padding:0 10px">✕</button></td></tr>`);
+  card.querySelector('[data-nolines]')?.remove(); b.replaceWith(Object.assign(document.createElement('span'), { className: 'mut', textContent: 'اتضافت' })); toast('اتضافت للكميات. راجعها قبل الاعتماد');
 }
 
 /* ---------------- log ---------------- */
