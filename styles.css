@@ -249,3 +249,18 @@ button.aib{background:linear-gradient(135deg,var(--ink),color-mix(in srgb,var(--
 tr.aiadded td{background:color-mix(in srgb,var(--ok) 8%,var(--card))}
 .aiload{display:flex;align-items:center;gap:5px;color:var(--mut);font-size:14px;padding:10px 0}.aiload i{width:7px;height:7px;border-radius:50%;background:var(--acc);animation:aib 1s infinite ease-in-out}.aiload i:nth-child(2){animation-delay:.15s}.aiload i:nth-child(3){animation-delay:.3s}
 @keyframes aib{0%,80%,100%{transform:scale(.5);opacity:.4}40%{transform:scale(1);opacity:1}}
+/* tasks */
+.rchip{display:inline-flex;align-items:center;gap:4px;font-size:12px;border-radius:99px;padding:2px 10px;border:1px solid transparent;white-space:nowrap;min-height:0;font-weight:500;line-height:1.6}
+button.rchip{cursor:pointer;min-height:30px}
+.rchip.done{background:light-dark(#d6efe2,#173b2a);color:var(--ok)}.rchip.part{background:var(--acc2);color:var(--warn)}.rchip.miss{background:light-dark(#f7dcda,#40201e);color:var(--bad)}.rchip.none{background:var(--bg);color:var(--mut)}
+.phm .rchip{margin-inline-start:2px;font-size:11px;padding:0 7px}
+.tlist{display:flex;flex-direction:column;gap:6px}
+.trow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+.trow .tt{flex:1 1 300px;min-width:0;font-size:14px}.trow .tt .mut{font-size:12px}
+.trow label{flex:0 0 110px;font-size:12px}.trow label input{min-height:36px;padding:4px 8px}
+.trow>button,.trow>select{min-height:36px;padding:4px 10px;font-size:13px;width:auto}
+.trow.done{opacity:.65}.trow.done .tt b{text-decoration:line-through}.trow.late{border-color:var(--bad)}
+.tchk{font-size:20px;color:var(--mut)}.trow.done .tchk{color:var(--ok)}
+select.cst.appr{color:var(--ok);font-weight:700}select.cst.ret{color:var(--bad)}select.cst.pend,select.cst.run{color:var(--warn)}
+.chip2{font-size:11px;padding:1px 7px;border-radius:99px;background:var(--ink);color:var(--bg)}
+h4{margin:16px 0 8px;font-size:15px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}

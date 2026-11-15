@@ -14,6 +14,7 @@ const CAN = {
   review: ['tech', 'management'],
   log: ['site', 'tech', 'management'],
   docs: ['site', 'tech', 'finance', 'management'],
+  tasks: ['tech', 'finance', 'management', 'consultant'],
   docsUp: ['site', 'tech', 'management'],
   editBoq: ['tech', 'management'],
   ledger: ['finance', 'management'],
@@ -51,7 +52,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 2.0.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 2.1.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -84,13 +85,13 @@ async function afterLogin(user) {
 }
 
 /* ---------------- layout & routing ---------------- */
-const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', 'الجدول الزمني', null], ['boq', 'المقايسة والتكلفة', 'boq'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة المكتب الفني', 'review'], ['log', 'سجل التقارير', 'log'], ['docs', 'المستندات', 'docs']];
+const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', 'الجدول الزمني', null], ['tasks', 'مهام المكتب الفني', 'tasks'], ['boq', 'المقايسة والتكلفة', 'boq'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة المكتب الفني', 'review'], ['log', 'سجل التقارير', 'log'], ['docs', 'المستندات', 'docs']];
 function shell(pid, view) {
   const p = pid && S.projects.find(x => x.id === pid);
   return `<header><div class="hbar"><a class="brandlink" href="#home" title="الصفحة الرئيسية">${LOGO()}<span class="otg">On the go</span></a>
   <div class="who2"><a class="homeb${!p && view !== 'admin' && view !== 'staff' ? ' on' : ''}" href="#home"><svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M5.5 9.5V20h5v-6h3v6h5V9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>الرئيسية</a>${p ? `<span class="roleTag">${ROLE[role(pid)] || ''}</span>` : ''}<span class="uname">${esc(S.profile.full_name || S.profile.email)}</span>${S.admin ? '<a href="#staff" class="adm">فريق العمل</a><a href="#admin" class="adm">المستخدمين</a>' : ''}<button id="out">خروج</button></div></div>
   ${p ? `<div class="ptitle"><h1>${esc(p.name + ' – ' + p.place)}</h1><p>المالك: ${esc(p.owner_name)} · المقاول العام: ${esc(p.contractor_name)} · الاستشاري: ${esc(p.consultant_name)}</p></div>` : '<div class="ptitle"><h1>متابعة مشروعات الغردقة</h1></div>'}
-  <nav>${p ? VIEWS.filter(v => !v[2] || can(v[2], pid)).map(([v, l]) => `<a href="#p/${pid}/${v}" class="${v === view ? 'on' : ''}">${l}${v === 'review' ? ' <span class="badge" id="pendN" hidden></span>' : ''}</a>`).join('') : ''}</nav></header><main id="main"><p class="mut">جاري التحميل…</p></main>`;
+  <nav>${p ? VIEWS.filter(v => !v[2] || can(v[2], pid)).map(([v, l]) => `<a href="#p/${pid}/${v}" class="${v === view ? 'on' : ''}">${l}${v === 'review' ? ' <span class="badge" id="pendN" hidden></span>' : ''}${v === 'tasks' ? ' <span class="badge" id="taskN" hidden></span>' : ''}</a>`).join('') : ''}</nav></header><main id="main"><p class="mut">جاري التحميل…</p></main>`;
 }
 async function route() {
   const h = location.hash.slice(1) || 'home', m = h.match(/^p\/([a-z0-9_-]+)\/([a-z]+)$/);
@@ -105,6 +106,7 @@ async function route() {
     if (view === 'boq' && can('boq', pid)) return renderBoq();
     if (view === 'schedule') return renderSchedule();
     if (view === 'docs' && can('docs', pid)) return renderDocs();
+    if (view === 'tasks' && can('tasks', pid)) return renderTasks();
     return renderStatus();
   }
   $('#app').innerHTML = shell(null, h); bindOut();
@@ -132,6 +134,8 @@ async function loadProject(pid) {
   const ids = [...new Set([...P.reports.flatMap(r => [r.created_by, r.reviewed_by]), ...P.docs.map(d => d.uploaded_by)].filter(x => x && !(x in S.names)))];
   if (ids.length) { const { data } = await S.sb.from('profiles').select('id,full_name,email').in('id', ids); (data || []).forEach(u => S.names[u.id] = u.full_name || u.email); }
   const pend = P.reports.filter(r => r.status === 'submitted').length, b = $('#pendN'); if (b) { b.hidden = !pend; b.textContent = pend; }
+  P.check = can('tasks', pid) ? ((await S.sb.from('phase_checklist').select('*').eq('project_id', pid).order('phase_n').order('sort').order('created_at')).data || []) : [];
+  const open = can('tasks', pid) ? P.items.filter(lacks).length + P.check.filter(c => c.status !== 'approved').length : 0, tb = $('#taskN'); if (tb) { tb.hidden = !open; tb.textContent = open > 999 ? '999+' : open; }
 }
 const overall = list => { const W = list.reduce((s, x) => s + (+x.weight || 0), 0); return W ? list.reduce((s, x) => s + (+x.pct || 0) * (+x.weight || 0), 0) / W : 0; };
 const groupPct = rows => { const v = rows.filter(r => r.val > 0), avg = v.length ? v.reduce((s, r) => s + r.val, 0) / v.length : 1; let a = 0, b = 0; rows.forEach(r => { const w = r.val > 0 ? r.val : avg; a += w * Math.min(r.pct, 1); b += w; }); return b ? a / b : 0; };
@@ -184,7 +188,7 @@ function renderStatus() {
     const L = rows.filter(r => r.phase_n === x.n), groups = [...new Set(L.map(r => r.group_name))].map(g => ({ name: g, rows: L.filter(r => r.group_name === g) }))
       .map(g => ({ ...g, pct: groupPct(g.rows), shown: q ? g.rows.filter(r => (r.code + ' ' + r.name + ' ' + (r.description || '')).includes(q)) : g.rows })).filter(g => g.shown.length);
     if (q && !groups.length) return ''; const ko = 'p' + x.n, isOpen = q || S.open.has(ko);
-    return `<details class="ph" data-k="${ko}"${isOpen ? ' open' : ''}><summary><span class="num">${x.n}</span><div><div class="phn">${esc(x.name)}</div><div class="phm">${x.items} بند · وزن ${Math.round(x.weight * 1000) / 10}%${x.missing ? ` · <span class="tag">${x.missing} ناقص مستند</span>` : ''}${x.manual ? ' · <span class="tag">نسبة يدوية</span>' : ''}</div></div>${bar(x.pct)}</summary><div class="phb">
+    return `<details class="ph" data-k="${ko}"${isOpen ? ' open' : ''}><summary><span class="num">${x.n}</span><div><div class="phn">${esc(x.name)}</div><div class="phm">${x.items} بند · وزن ${Math.round(x.weight * 1000) / 10}%${x.missing ? ` · <span class="tag">${x.missing} ناقص مستند</span>` : ''}${x.manual ? ' · <span class="tag">نسبة يدوية</span>' : ''}${can('tasks', pid) ? ' ' + readyChips(x.n, true) : ''}</div></div>${bar(x.pct)}</summary><div class="phb">
     ${ed ? `<div class="phset" data-ph="${x.n}"><label>وزن المرحلة %<input type="number" step="any" data-pf="weight" value="${Math.round(x.weight * 10000) / 100}"></label><label>نسبة يدوية %<input type="number" step="any" data-pf="manual" value="${x.manual ? Math.round(x.pct * 1000) / 10 : ''}" placeholder="${x.auto_pct != null ? 'محسوبة: ' + Math.round(x.auto_pct * 100) : '—'}"></label><label>المخطط حتى اليوم %<input type="number" step="any" data-pf="planned" value="${x.planned_pct ?? ''}"></label><button data-savewph="${x.n}">حفظ</button></div>` : ''}
     ${groups.map(g => { const kg = ko + '|' + g.name, go = q || S.open.has(kg); return `<details class="gp" data-k="${esc(kg)}"${go ? ' open' : ''}><summary><span>${esc(g.name)} <span class="mut">(${g.rows.length})</span></span>${bar(g.pct)}</summary>${go ? itemTable(g.shown, multi, false) : ''}</details>`; }).join('') || '<p class="mut">مفيش بنود في المرحلة دي.</p>'}</div></details>`;
   }).join('');
@@ -495,6 +499,66 @@ async function importWhatsApp(file) {
 }
 
 
+
+
+/* ---------------- tech-office tasks: pricing, designs, materials ---------------- */
+const CST = { missing: ['ret', 'ناقص'], in_progress: ['pend', 'جاري'], submitted: ['run', 'مقدّم للاستشاري'], rejected: ['ret', 'عليه ملاحظات'], approved: ['appr', 'معتمد'] };
+const CCAT = { design: 'التصاميم', material: 'اعتماد الخامات' };
+const TPL = {
+  design: { 1: ['اللوحات المعمارية', 'اللوحات الإنشائية', 'لوحات الكهروميكانيك', 'لوحات اللاندسكيب', 'الرخصة والتصاريح'], 2: ['لوحة تجهيز الموقع والمرافق المؤقتة'], 3: ['لوحات السند ونزح المياه', 'لوحات الحفر والإحلال', 'تفاصيل عزل الأجزاء المدفونة'], 4: ['لوحات الأساسات', 'لوحات الأعمدة والحوائط', 'لوحات الأسقف والسلالم'], 5: ['لوحات التشطيبات الداخلية', 'لوحات الأرضيات', 'لوحات الأسقف المعلقة', 'جداول الأبواب والشبابيك'], 6: ['لوحات الواجهات', 'رسومات تنفيذية للواجهات (Shop drawings)'], 7: ['لوحات الكهرباء', 'لوحات الصحي والصرف', 'لوحات التكييف والتهوية', 'لوحات الحريق', 'لوحات التيار الخفيف'], 8: ['لوحات اللاندسكيب التنفيذية', 'لوحات الري والإضاءة الخارجية'], 9: ['خطة الاختبار والتشغيل'] },
+  material: { 3: ['مواد الإحلال', 'مواد عزل الأساسات'], 4: ['حديد التسليح', 'الخرسانة الجاهزة (المحطة والخلطة)', 'الأسمنت المقاوم'], 5: ['الطوب', 'البورسلين والسيراميك', 'الدهانات', 'الأسقف المعلقة', 'الأبواب الداخلية', 'الأدوات الصحية'], 6: ['قطاعات الألوميتال', 'الزجاج والسيكوريت', 'الرخام والجرانيت', 'دهانات الواجهات'], 7: ['الكابلات', 'اللوحات الكهربائية', 'المواسير والقطع', 'وحدات التكييف', 'المصاعد', 'منظومة الحريق', 'الإضاءة'], 8: ['الإنترلوك والبردورات', 'النباتات والتربة الزراعية', 'الإضاءة الخارجية'] },
+};
+function readiness(n, cat) {
+  const L = (S.P.check || []).filter(c => c.phase_n === n && c.category === cat), ok = L.filter(c => c.status === 'approved').length;
+  return { n: L.length, ok, state: !L.length ? 'none' : ok === L.length ? 'done' : ok ? 'part' : 'miss' };
+}
+function readyChips(n, compact) {
+  const P = S.P, it = P.items.filter(i => i.phase_n === n), pr = it.filter(i => !lacks(i)).length;
+  const chip = (lbl, st, txt) => `<span class="rchip ${st}" title="${lbl}">${compact ? ({ 'التسعير': 'تسعير', 'التصاميم': 'تصاميم', 'اعتماد الخامات': 'خامات' })[lbl] : lbl}: ${txt}</span> `;
+  const t = cat => { const r = readiness(n, cat); return r.state === 'none' ? '' : chip(CCAT[cat], r.state, r.state === 'done' ? 'مكتملة' : r.state === 'part' ? `ناقصها جزء ${r.ok}/${r.n}` : `ناقصة 0/${r.n}`); };
+  return (it.length ? chip('التسعير', pr === it.length ? 'done' : pr ? 'part' : 'miss', pr === it.length ? 'كامل' : `${pr}/${it.length}`) : '') + t('design') + t('material');
+}
+function renderTasks() {
+  const P = S.P, ed = can('editBoq', P.id), T = (S.tk ||= { tab: 'price', ph: '' }), C = P.check;
+  const miss = P.items.filter(lacks), phOpt = sel => P.phaseProg.map(x => `<option value="${x.n}"${String(x.n) === String(sel) ? ' selected' : ''}>${x.n}. ${esc(x.name)}</option>`).join('');
+  const openN = cat => C.filter(c => c.category === cat && c.status !== 'approved').length, overdue = c => c.due_date && c.due_date < today() && c.status !== 'approved';
+  const sum = `<div class="scroll"><table class="stack rtab"><thead><tr><th>المرحلة</th><th>التسعير</th><th>التصاميم</th><th>اعتماد الخامات</th></tr></thead><tbody>${P.phaseProg.map(x => { const it = P.items.filter(i => i.phase_n === x.n), pr = it.filter(i => !lacks(i)).length, d = readiness(x.n, 'design'), m = readiness(x.n, 'material');
+    const cell = (r, cat) => r.state === 'none' ? `<span class="mut">مش متحدد</span>` : `<button type="button" class="rchip ${r.state}" data-go="${cat}|${x.n}">${r.state === 'done' ? '✓ مكتملة' : r.state === 'part' ? 'ناقصها جزء' : 'ناقصة'} · ${r.ok}/${r.n}</button>`;
+    return `<tr><td data-l="المرحلة"><b>${x.n}. ${esc(x.name)}</b></td><td data-l="التسعير">${it.length ? `<button type="button" class="rchip ${pr === it.length ? 'done' : pr ? 'part' : 'miss'}" data-go="price|${x.n}">${pr === it.length ? '✓ كامل' : `ناقص ${it.length - pr}`} · ${pr}/${it.length}</button>` : '<span class="mut">مفيش بنود</span>'}</td><td data-l="التصاميم">${cell(d, 'design')}</td><td data-l="الخامات">${cell(m, 'material')}</td></tr>`; }).join('')}</tbody></table></div>`;
+  let body = '';
+  if (T.tab === 'price') {
+    const L = miss.filter(i => !T.ph || String(i.phase_n) === T.ph), grp = [...new Set(L.map(i => i.phase_n))];
+    body = `<p class="mut">البنود دي ناقصها سعر أو كمية، وهتفضل هنا لحد ما تكمل. اكتب الناقص واضغط "حفظ" جنب البند.</p>${L.length ? grp.map(n => `<h4>${n}. ${esc(P.phaseProg.find(x => x.n === n)?.name || '')} <span class="mut">(${L.filter(i => i.phase_n === n).length})</span></h4><div class="tlist">${L.filter(i => i.phase_n === n).slice(0, 80).map(i => `<div class="trow" data-id="${esc(i.id)}"><span class="tchk">☐</span><div class="tt"><b>${esc(i.code)}</b> ${esc(i.name.length > 90 ? i.name.slice(0, 90) + '…' : i.name)}<div class="mut">${esc(i.group_name)}${i.building ? ' · ' + esc(i.building) : ''} · ${esc(i.unit || '')} · ناقص ${!(+i.qty > 0) && !(i.rate > 0) ? 'الكمية والسعر' : !(+i.qty > 0) ? 'الكمية' : 'السعر'}</div></div>${ed ? `<label>الكمية<input type="number" step="any" data-f="qty" value="${+i.qty || ''}"></label><label>السعر<input type="number" step="any" data-f="rate" value="${i.rate || ''}"></label><button type="button" class="p" data-savep>حفظ</button>` : ''}</div>`).join('')}</div>`).join('') : '<div class="note">✓ كل البنود متسعّرة.</div>'}`;
+  } else {
+    const cat = T.tab, L = C.filter(c => c.category === cat && (!T.ph || String(c.phase_n) === T.ph)), ph = [...new Set(L.map(c => c.phase_n))];
+    const docs = P.docs || [];
+    body = `${ed ? `<details class="card"><summary><b>+ إضافة ${cat === 'design' ? 'لوحة / تصميم' : 'خامة للاعتماد'}</b></summary><form id="cF" class="grid" style="margin-top:10px"><label>المرحلة<select name="ph">${phOpt(T.ph || P.phaseProg[0]?.n)}</select></label><label class="wide">البيان<input name="title" required placeholder="${cat === 'design' ? 'مثلاً: لوحات أسقف الدور الأول' : 'مثلاً: عينة البورسلين للحمامات'}"></label>${(P.proj.buildings || []).length > 1 ? `<label>المبنى<select name="bld"><option value="">الكل</option>${P.proj.buildings.map(b => `<option>${esc(b)}</option>`).join('')}</select></label>` : ''}<label>الحالة<select name="st">${Object.entries(CST).map(([k, [, l]]) => `<option value="${k}">${l}</option>`).join('')}</select></label><label>مطلوب قبل<input type="date" name="due"></label><label>المسؤول<input name="owner"></label><div class="acts" style="margin:0;align-self:end"><button class="p">إضافة</button></div></form></details>
+      ${!C.some(c => c.category === cat) ? `<div class="note">لسه مفيش قائمة ${CCAT[cat]}. <button type="button" id="cTpl" class="p" style="margin-inline-start:8px">إضافة القائمة الافتراضية لكل المراحل</button> <span class="mut">وبعدها امسح اللي مش لازم وضيف الناقص.</span></div>` : ''}` : ''}
+      ${L.length ? ph.map(n => { const r = readiness(n, cat); return `<h4>${n}. ${esc(P.phaseProg.find(x => x.n === n)?.name || '')} <span class="rchip ${r.state}">${r.state === 'done' ? '✓ مكتملة' : r.state === 'part' ? 'ناقصها جزء' : 'ناقصة'} ${r.ok}/${r.n}</span></h4><div class="tlist">${L.filter(c => c.phase_n === n).map(c => `<div class="trow${c.status === 'approved' ? ' done' : ''}${overdue(c) ? ' late' : ''}" data-cid="${c.id}"><span class="tchk">${c.status === 'approved' ? '☑' : '☐'}</span><div class="tt"><b>${esc(c.title)}</b>${c.building ? ` <span class="chip2">${esc(c.building)}</span>` : ''}<div class="mut">${c.owner ? 'المسؤول: ' + esc(c.owner) + ' · ' : ''}${c.due_date ? `مطلوب قبل ${fmtD(c.due_date)}${overdue(c) ? ' <b style="color:var(--bad)">متأخر</b>' : ''} · ` : ''}${c.notes ? esc(c.notes) : ''}${c.doc_id && docs.find(d => d.id === c.doc_id) ? ' ' + docChip(docs.find(d => d.id === c.doc_id)) : ''}</div></div>
+        ${ed ? `<select data-cst class="cst ${CST[c.status][0]}">${Object.entries(CST).map(([k, [, l]]) => `<option value="${k}"${k === c.status ? ' selected' : ''}>${l}</option>`).join('')}</select><select data-cdoc title="ربط بمستند"><option value="">📎 —</option>${docs.map(d => `<option value="${d.id}"${d.id === c.doc_id ? ' selected' : ''}>📎 ${esc(d.title.slice(0, 30))}</option>`).join('')}</select><button type="button" data-cdel class="danger" title="حذف">✕</button>` : `<span class="st ${CST[c.status][0]}">${CST[c.status][1]}</span>`}</div>`).join('')}</div>`; }).join('') : C.some(c => c.category === cat) ? '<p class="mut">مفيش بنود في المرحلة دي.</p>' : ''}`;
+  }
+  $('#main').innerHTML = `<h2>مهام المكتب الفني</h2><p class="mut">جاهزية كل مرحلة: التسعير والتصاميم واعتماد الخامات. اضغط على أي خانة عشان تروح للناقص فيها.</p>${sum}
+  <div class="filters" style="margin-top:18px"><div class="seg" style="flex:0 0 auto"><button type="button" data-tab="price" class="${T.tab === 'price' ? 'on' : ''}">التسعير (${miss.length})</button><button type="button" data-tab="design" class="${T.tab === 'design' ? 'on' : ''}">التصاميم (${openN('design')})</button><button type="button" data-tab="material" class="${T.tab === 'material' ? 'on' : ''}">اعتماد الخامات (${openN('material')})</button></div><select id="tPh" style="max-width:260px"><option value="">كل المراحل</option>${phOpt(T.ph)}</select></div>${body}`;
+  const re = async () => { await loadProject(P.id); renderTasks(); };
+  document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { T.tab = b.dataset.tab; renderTasks(); });
+  $('#tPh').onchange = e => { T.ph = e.target.value; renderTasks(); };
+  $('#main').onclick = async e => {
+    const g = e.target.closest('[data-go]'); if (g) { const [t, n] = g.dataset.go.split('|'); T.tab = t; T.ph = n; renderTasks(); return document.querySelector('.filters')?.scrollIntoView({ behavior: 'smooth' }); }
+    const sp = e.target.closest('[data-savep]'); if (sp) { const row = sp.closest('.trow'), id = row.dataset.id, v = f => { const x = row.querySelector(`[data-f=${f}]`).value; return x === '' ? null : +x; }; sp.disabled = true;
+      const q = v('qty'), r = v('rate'), i = P.items.find(x => x.id === id); let err = null;
+      if (r != null && r !== i.rate) ({ error: err } = await S.sb.from('boq_rates').upsert({ item_id: id, rate: r }));
+      if (!err && q != null && q !== (+i.qty || 0)) ({ error: err } = await S.sb.from('boq_items').update({ qty: q }).eq('id', id));
+      if (err) { sp.disabled = false; return toast('مقدرتش أحفظ: ' + err.message); } toast('اتحفظ'); return re(); }
+    const del = e.target.closest('[data-cdel]'); if (del) { if (del.dataset.sure !== '1') { del.dataset.sure = '1'; del.textContent = 'متأكد؟'; return; } const { error } = await S.sb.from('phase_checklist').delete().eq('id', del.closest('[data-cid]').dataset.cid); if (error) return toast(error.message); return re(); }
+    if (e.target.closest('[data-open]')) return docClick(e);
+    if (e.target.id === 'cTpl') { const rows = []; Object.entries(TPL[T.tab]).forEach(([n, L]) => P.phaseProg.some(x => x.n === +n) && L.forEach((t, k) => rows.push({ project_id: P.id, phase_n: +n, category: T.tab, title: t, sort: k }))); const { error } = await S.sb.from('phase_checklist').insert(rows); if (error) return toast(error.message); toast(`اتضاف ${rows.length} بند`); return re(); }
+  };
+  $('#main').onchange = async e => { const row = e.target.closest('[data-cid]'); if (!row) return; const patch = e.target.matches('[data-cst]') ? { status: e.target.value } : e.target.matches('[data-cdoc]') ? { doc_id: e.target.value || null } : null; if (!patch) return;
+    const { error } = await S.sb.from('phase_checklist').update({ ...patch, updated_at: new Date().toISOString(), updated_by: S.user.id }).eq('id', row.dataset.cid); if (error) return toast(error.message); toast('اتحدّث'); re(); };
+  const cf = $('#cF'); if (cf) cf.onsubmit = async e => { e.preventDefault(); const f = new FormData(cf);
+    const { error } = await S.sb.from('phase_checklist').insert({ project_id: P.id, phase_n: +f.get('ph'), category: T.tab, title: f.get('title').trim(), building: f.get('bld') || null, status: f.get('st'), due_date: f.get('due') || null, owner: f.get('owner')?.trim() || null, sort: 999 });
+    if (error) return toast(error.message); toast('اتضاف'); re(); };
+}
 
 /* ---------------- documents ---------------- */
 const DOC_ACCEPT = '.pdf,.xlsx,.xls,.xlsm,.csv,.docx,.doc,.jpg,.jpeg,.png,.webp';
