@@ -185,3 +185,35 @@ tr.gh2 td{background:var(--bg)}
 .editbar{position:sticky;bottom:12px;z-index:5;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;padding:10px 14px;border-radius:12px;background:var(--ink);color:var(--bg);box-shadow:0 6px 20px rgb(0 0 0/.25)}
 .editbar span{flex:1;font-size:14px}.editbar button:not(.ok){background:transparent;color:inherit;border-color:currentColor}
 td.chg input{border-color:var(--acc);background:var(--acc2);font-weight:700}
+/* live work (home) */
+.live{border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:linear-gradient(135deg,color-mix(in srgb,var(--acc) 7%,var(--card)),var(--card) 60%);position:relative;overflow:hidden}
+.live .lh{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.live .lh>div:nth-child(2){flex:1;display:flex;flex-direction:column;line-height:1.3}
+.live .lh b{display:flex;align-items:center;gap:8px;font-size:15px}.live .lh .mut{font-size:12px}
+.live .seg.sm button{min-height:32px;padding:2px 10px;font-size:12px}
+.live .dot{width:9px;height:9px;border-radius:50%;background:var(--ok);display:inline-block;box-shadow:0 0 0 0 color-mix(in srgb,var(--ok) 60%,transparent);animation:pulse 1.8s infinite}
+.live.stale .dot{background:var(--warn);animation:none}.live.idle .dot{display:none}
+.crane{width:42px;height:38px;color:var(--ink);flex:0 0 auto}
+.crane .trolley{animation:trolley 6s ease-in-out infinite}
+.crane .cable{animation:cable 3s ease-in-out infinite;transform-origin:40px 11px}
+.crane .hook{animation:hook 3s ease-in-out infinite}
+.live.idle .crane *{animation:none}
+.live ul{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:9px}
+.live li{display:grid;grid-template-columns:minmax(0,1fr) 92px 38px;gap:10px;align-items:center;font-size:13px;animation:rise .5s both}
+.live li:nth-child(2){animation-delay:.08s}.live li:nth-child(3){animation-delay:.16s}.live li:nth-child(4){animation-delay:.24s}.live li:nth-child(5){animation-delay:.32s}.live li:nth-child(n+6){animation-delay:.4s}
+.live .lt{display:flex;align-items:center;gap:6px;min-width:0;color:inherit;text-decoration:none}.live a.lt:hover .lw{color:var(--acc)}
+.live .lw{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.4}
+.live .chip{flex:0 0 auto;font-size:11px;padding:1px 7px;border-radius:99px;background:var(--ink);color:var(--bg)}
+.live .up{flex:0 0 auto;font-size:11px;color:var(--ok);font-weight:700;font-variant-numeric:tabular-nums}
+.live em{font-style:normal;text-align:left;font-variant-numeric:tabular-nums;font-weight:700}
+.lbar{height:8px;border-radius:99px;background:var(--conc);overflow:hidden;position:relative}
+.lbar u{position:absolute;inset:0 0 0 auto;width:var(--w);border-radius:99px;background:repeating-linear-gradient(-45deg,var(--acc) 0 6px,color-mix(in srgb,var(--acc) 70%,#fff) 6px 12px);background-size:17px 17px;animation:grow 1.1s cubic-bezier(.2,.8,.2,1) both,stripes 1s linear infinite}
+.lbar.done u{background:var(--ok);animation:grow 1.1s both}
+@keyframes stripes{to{background-position:17px 0}}
+@keyframes grow{from{width:0}}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}}
+@keyframes pulse{70%{box-shadow:0 0 0 8px transparent}100%{box-shadow:0 0 0 0 transparent}}
+@keyframes trolley{0%,100%{transform:translateX(0)}50%{transform:translateX(-14px)}}
+@keyframes cable{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.55)}}
+@keyframes hook{0%,100%{transform:translateY(0)}50%{transform:translateY(-8.5px)}}
+@media(max-width:600px){.live li{grid-template-columns:minmax(0,1fr) 60px 34px}}
+@media(prefers-reduced-motion:reduce){.live *,.live .lbar u{animation:none!important}}

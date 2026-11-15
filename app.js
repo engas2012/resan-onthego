@@ -49,7 +49,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 1.5.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 1.6.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -133,11 +133,29 @@ const groupPct = rows => { const v = rows.filter(r => r.val > 0), avg = v.length
 
 /* ---------------- home ---------------- */
 async function renderHome() {
-  const cards = await Promise.all(S.projects.map(async p => { const { data } = await S.sb.rpc('phase_progress', { p_project: p.id }); return { p, list: data || [] }; }));
-  $('#main').innerHTML = `<h2>المشاريع</h2><div class="pgrid">${cards.map(({ p, list }) => `<article class="pc"><div class="row2"><div><h2>${esc(p.name)}</h2><div class="mut">${esc(p.place)}${p.land ? ' · أرض ' + esc(p.land) : ''} · <span class="roleTag">${ROLE[role(p.id)] || ''}</span></div></div><div class="pbig">${list.length ? Math.round(overall(list) * 100) + '%' : '–'}</div></div>
+  const cards = await Promise.all(S.projects.map(async p => { const [a, w, u] = await Promise.all([S.sb.rpc('phase_progress', { p_project: p.id }), S.sb.rpc('active_work', { p_project: p.id, p_limit: 8 }), S.sb.rpc('site_updates', { p_project: p.id, p_n: 2 })]); return { p, list: a.data || [], work: w.data || [], upd: u.data || [] }; }));
+  $('#main').innerHTML = `<h2>المشاريع</h2><div class="pgrid">${cards.map(({ p, list, work, upd }) => `<article class="pc"><div class="row2"><div><h2>${esc(p.name)}</h2><div class="mut">${esc(p.place)}${p.land ? ' · أرض ' + esc(p.land) : ''} · <span class="roleTag">${ROLE[role(p.id)] || ''}</span></div></div><div class="pbig">${list.length ? Math.round(overall(list) * 100) + '%' : '–'}</div></div>
   <dl class="who"><dt>المالك</dt><dd>${esc(p.owner_name)}</dd><dt>المقاول العام</dt><dd>${esc(p.contractor_name)}</dd><dt>الاستشاري</dt><dd>${esc(p.consultant_name)}</dd></dl>
   <div class="mbars">${list.map(x => `<div><span>${x.n}. ${esc(x.name)}</span><div class="bar${x.pct >= 1 ? ' full' : ''}"><u style="width:${Math.min(x.pct, 1) * 100}%"></u></div><em>${Math.round(x.pct * 100)}%</em></div>`).join('')}</div>
+  ${liveWork(p, work, upd)}
   <div class="acts" style="margin-top:0"><a class="btn p" href="#p/${p.id}/status">فتح المشروع</a>${can('report', p.id) ? `<a class="btn" href="#p/${p.id}/report">تقرير يومي</a>` : ''}${can('review', p.id) ? `<a class="btn" href="#p/${p.id}/review">المراجعة</a>` : ''}</div></article>`).join('')}</div>`;
+  $('#main').onclick = e => { const t = e.target.closest('[data-lt]'); if (!t) return; const box = t.closest('.live'); box.querySelectorAll('[data-lt]').forEach(b => b.classList.toggle('on', b === t)); box.querySelectorAll('[data-lp]').forEach(x => x.hidden = x.dataset.lp !== t.dataset.lt); };
+}
+const CRANE = `<svg class="crane" viewBox="0 0 64 56" aria-hidden="true"><path d="M10 54V8M4 54h14M10 8l44 0M10 8 22 2l32 6M10 18l12-10M18 8v0" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g class="trolley"><rect x="36" y="6" width="8" height="5" rx="1" fill="currentColor"/><line class="cable" x1="40" y1="11" x2="40" y2="30" stroke="currentColor" stroke-width="1.4"/><g class="hook"><rect x="35" y="30" width="10" height="8" rx="1.5" fill="var(--acc)"/></g></g></svg>`;
+function liveWork(p, work, upd) {
+  const [cur, prev] = upd, acts = (cur?.acts || []).filter(a => a.work), key = a => (a.building || '') + '|' + (a.work || '').replace(/^جاري\s+/, '').trim();
+  const pm = Object.fromEntries((prev?.acts || []).map(a => [key(a), +a.progress || 0]));
+  const days = cur ? Math.round((Date.parse(today()) - Date.parse(cur.report_date)) / 864e5) : null;
+  const ago = days == null ? '' : days <= 0 ? 'النهارده' : days === 1 ? 'امبارح' : `من ${days} يوم`;
+  if (!acts.length && !work.length) return `<div class="live idle"><div class="lh">${CRANE}<div><b>جاري التنفيذ</b><span class="mut">مفيش تقارير معتمدة لسه</span></div></div></div>`;
+  const fresh = days != null && days <= 10;
+  const actHtml = acts.map(a => { const pr = Math.max(0, Math.min(+a.progress || 0, 100)), d = pr - (pm[key(a)] ?? pr);
+    return `<li><div class="lt">${a.building ? `<span class="chip">${esc(a.building)}</span>` : ''}<span class="lw">${esc(a.work)}</span>${d > 0 ? `<span class="up">+${d}%</span>` : ''}</div><div class="lbar${pr >= 100 ? ' done' : ''}"><u style="--w:${pr}%"></u></div><em>${pr}%</em></li>`; }).join('');
+  const itemHtml = work.map(w => { const pc = Math.round(+w.pct * 100);
+    return `<li><a class="lt" href="#p/${p.id}/status" title="${esc(w.name)}">${w.building ? `<span class="chip">${esc(w.building)}</span>` : ''}<span class="lw">${esc(w.code)} · ${esc(w.name.length > 46 ? w.name.slice(0, 46) + '…' : w.name)}</span>${+w.recent_qty > 0 ? `<span class="up">+${nf(w.recent_qty, 1)} ${esc(w.unit || '')}</span>` : ''}</a><div class="lbar"><u style="--w:${pc}%"></u></div><em>${pc}%</em></li>`; }).join('');
+  return `<div class="live${fresh ? '' : ' stale'}"><div class="lh">${CRANE}<div><b><i class="dot"></i>جاري التنفيذ الآن</b><span class="mut">${cur ? `آخر تقرير معتمد ${ago} · ${fmtD(cur.report_date)}${cur.labor ? ` · ${cur.labor} عامل` : ''}` : 'من بنود المقايسة'}</span></div>
+  ${acts.length && work.length ? `<div class="seg sm"><button type="button" data-lt="a" class="on">من الموقع (${acts.length})</button><button type="button" data-lt="i">بنود المقايسة (${work.length})</button></div>` : ''}</div>
+  ${acts.length ? `<ul data-lp="a">${actHtml}</ul>` : ''}${work.length ? `<ul data-lp="i"${acts.length ? ' hidden' : ''}>${itemHtml}</ul>` : ''}</div>`;
 }
 
 /* ---------------- status ---------------- */
