@@ -48,7 +48,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 1.2.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 1.3.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -81,7 +81,7 @@ async function afterLogin(user) {
 }
 
 /* ---------------- layout & routing ---------------- */
-const VIEWS = [['status', 'الموقف التنفيذي', null], ['boq', 'المقايسة والتكلفة', 'boq'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة المكتب الفني', 'review'], ['log', 'سجل التقارير', 'log']];
+const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', 'الجدول الزمني', null], ['boq', 'المقايسة والتكلفة', 'boq'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة المكتب الفني', 'review'], ['log', 'سجل التقارير', 'log']];
 function shell(pid, view) {
   const p = pid && S.projects.find(x => x.id === pid);
   return `<header><div class="hbar"><a class="brandlink" href="#home" title="الصفحة الرئيسية">${LOGO()}<span class="otg">On the go</span></a>
@@ -100,6 +100,7 @@ async function route() {
     if (view === 'review' && can('review', pid)) return renderReview();
     if (view === 'log' && can('log', pid)) return renderLog();
     if (view === 'boq' && can('boq', pid)) return renderBoq();
+    if (view === 'schedule') return renderSchedule();
     return renderStatus();
   }
   $('#app').innerHTML = shell(null, h); bindOut();
@@ -307,12 +308,23 @@ async function renderAdmin() {
 const lacks = r => !(+r.qty > 0) || !(r.rate > 0);
 function boqSummary() {
   const P = S.P, rows = S.bq.b ? P.items.filter(r => r.building === S.bq.b) : P.items, tot = rows.reduce((s, r) => s + r.val, 0), pr = rows.filter(r => r.rate > 0).length, nq = rows.filter(r => !(+r.qty > 0)).length;
-  const bud = S.bq.b ? 0 : P.phases.reduce((s, x) => s + (+x.budget || 0), 0);
-  const ph = P.phaseProg.map(x => { const L = rows.filter(r => r.phase_n === x.n), est = L.reduce((s, r) => s + r.val, 0), b = S.bq.b ? 0 : +(P.phases.find(y => y.n === x.n)?.budget) || 0; return { ...x, L, est, b, pr: L.filter(r => r.rate > 0).length }; });
-  $('#bqSum').innerHTML = `<div class="kp" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))"><div class="k"><b>${money(tot)}</b><span>التكلفة التقديرية للبنود المسعّرة (ج.م)</span></div><div class="k"><b>${pr} / ${rows.length}</b><span>بند متسعّر (${rows.length ? Math.round(pr / rows.length * 100) : 0}%)</span></div><div class="k"><b>${nq}</b><span>بند من غير كمية</span></div>${bud ? `<div class="k"><b>${money(bud)}</b><span>ميزانية المراحل</span></div>` : ''}</div>
-  <div class="scroll" style="margin-top:14px"><table class="stack"><thead><tr><th>المرحلة</th><th class="n">البنود</th><th class="n">متسعّر</th><th class="n">التكلفة التقديرية</th>${bud ? '<th class="n">الميزانية</th><th class="n">الفرق</th>' : ''}</tr></thead><tbody>${ph.map(x => `<tr class="pick${String(x.n) === S.bq.ph ? ' on' : ''}" data-ph="${x.n}"><td data-l="المرحلة">${x.n}. ${esc(x.name)}</td><td class="n" data-l="البنود">${x.L.length}</td><td class="n" data-l="متسعّر">${x.pr}</td><td class="n" data-l="التكلفة">${nf(x.est, 0)}</td>${bud ? `<td class="n" data-l="الميزانية">${x.b ? nf(x.b, 0) : '–'}</td><td class="n" data-l="الفرق" style="${x.b && x.est > x.b ? 'color:var(--bad)' : ''}">${x.b ? nf(x.est - x.b, 0) : '–'}</td>` : ''}</tr>`).join('')}</tbody></table></div>`;
+  const CL = S.bq.b ? [] : P.contract || [], ctot = CL.reduce((s, l) => s + +l.value, 0), bud = S.bq.b ? 0 : P.phases.reduce((s, x) => s + (+x.budget || 0), 0);
+  // comparison groups: contract sections can span several system phases (e.g. 3+4) → merge overlapping phase sets
+  const grp = P.phaseProg.map(x => ({ ns: [x.n], c: 0 }));
+  CL.forEach(l => { const ns = (l.phase_ns || []).map(Number); if (!ns.length) return; const hit = grp.filter(g => g.ns.some(n => ns.includes(n))); const m = { ns: [...new Set([...ns, ...hit.flatMap(g => g.ns)])].sort((a, b) => a - b), c: hit.reduce((s, g) => s + g.c, 0) + +l.value };
+    hit.forEach(g => grp.splice(grp.indexOf(g), 1)); grp.push(m); });
+  grp.sort((a, b) => a.ns[0] - b.ns[0]);
+  const G = grp.map(g => { const L = rows.filter(r => g.ns.includes(r.phase_n)), est = L.reduce((s, r) => s + r.val, 0), b = S.bq.b ? 0 : g.ns.reduce((s, n) => s + (+(P.phases.find(y => y.n === n)?.budget) || 0), 0);
+    return { ...g, name: g.ns.map(n => n + '. ' + (P.phaseProg.find(x => x.n === n)?.name || '')).join(' + '), L, est, b, pr: L.filter(r => r.rate > 0).length }; });
+  const dv = (a, c) => c ? `<span dir="ltr" style="unicode-bidi:isolate;color:${a > c ? 'var(--bad)' : 'var(--ok)'}">${a > c ? '+' : ''}${nf(a - c, 0)}<small> (${a > c ? '+' : ''}${Math.round((a - c) / c * 100)}%)</small></span>` : '–';
+  const hasC = CL.length > 0;
+  $('#bqSum').innerHTML = `<div class="kp" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">${hasC ? `<div class="k"><b>${money(ctot)}</b><span>قيمة العقد (ج.م)</span></div>` : ''}${bud ? `<div class="k"><b>${money(bud)}</b><span>الميزانية الحالية للمراحل${hasC ? ` · ${bud > ctot ? '+' : ''}${Math.round((bud - ctot) / ctot * 100)}% عن العقد` : ''}</span></div>` : ''}<div class="k"><b>${money(tot)}</b><span>التكلفة التقديرية من البنود المسعّرة</span></div><div class="k"><b>${pr} / ${rows.length}</b><span>بند متسعّر (${rows.length ? Math.round(pr / rows.length * 100) : 0}%) · ${nq} من غير كمية</span></div></div>
+  <div class="scroll" style="margin-top:14px"><table class="stack"><thead><tr><th>المرحلة</th><th class="n">البنود</th><th class="n">متسعّر</th>${hasC ? '<th class="n">قيمة العقد</th>' : ''}${bud ? `<th class="n">الميزانية الحالية</th>${hasC ? '<th class="n">الفرق عن العقد</th>' : ''}` : ''}<th class="n">من البنود</th>${hasC ? '<th class="n">الفرق عن العقد</th>' : ''}</tr></thead><tbody>${G.map(x => `<tr class="pick${x.ns.length === 1 && String(x.ns[0]) === S.bq.ph ? ' on' : ''}" data-ph="${x.ns[0]}"><td data-l="المرحلة">${esc(x.name)}${x.ns.length > 1 ? ' <span class="tag">مجمّعة في العقد</span>' : ''}${hasC && !x.c ? ' <span class="tag">مش في العقد</span>' : ''}</td><td class="n" data-l="البنود">${x.L.length}</td><td class="n" data-l="متسعّر">${x.pr}</td>${hasC ? `<td class="n" data-l="قيمة العقد">${x.c ? nf(x.c, 0) : '–'}</td>` : ''}${bud ? `<td class="n" data-l="الميزانية">${x.b ? nf(x.b, 0) : '–'}</td>${hasC ? `<td class="n" data-l="فرق الميزانية">${x.b ? dv(x.b, x.c) : '–'}</td>` : ''}` : ''}<td class="n" data-l="من البنود">${x.est ? nf(x.est, 0) : '–'}</td>${hasC ? `<td class="n" data-l="فرق البنود">${x.est ? dv(x.est, x.c) : '–'}</td>` : ''}</tr>`).join('')}
+  <tr class="tot"><td data-l="">الإجمالي</td><td class="n" data-l="البنود">${rows.length}</td><td class="n" data-l="متسعّر">${pr}</td>${hasC ? `<td class="n" data-l="قيمة العقد">${nf(ctot, 0)}</td>` : ''}${bud ? `<td class="n" data-l="الميزانية">${nf(bud, 0)}</td>${hasC ? `<td class="n" data-l="فرق الميزانية">${dv(bud, ctot)}</td>` : ''}` : ''}<td class="n" data-l="من البنود">${nf(tot, 0)}</td>${hasC ? `<td class="n" data-l="فرق البنود">${tot ? dv(tot, ctot) : '–'}</td>` : ''}</tr></tbody></table></div>
+  ${hasC ? `<details class="card" style="margin-top:12px"><summary><b>تفاصيل قيمة العقد</b> <span class="mut">(${CL.length} بند)</span></summary><div class="scroll"><table><thead><tr><th>القسم</th><th>الأعمال</th><th class="n">القيمة</th><th>من</th><th>إلى</th><th class="n">دفعة مقدمة</th></tr></thead><tbody>${CL.map(l => `<tr><td>${l.sec}. ${esc(l.section)}</td><td>${esc(l.line || '')}</td><td class="n">${nf(l.value, 0)}</td><td>${l.start ? fmtD(l.start) : '–'}</td><td>${l.finish ? fmtD(l.finish) : '–'}</td><td class="n">${l.advance_pct != null ? +l.advance_pct + '%' : '–'}</td></tr>`).join('')}</tbody></table></div></details>` : ''}`;
 }
-function renderBoq() {
+async function renderBoq() {
+  if (!S.P.contract) { const { data } = await S.sb.from('contract_lines').select('*').eq('project_id', S.P.id).order('sort'); S.P.contract = data || []; }
   const P = S.P, multi = (P.proj.buildings || []).length > 1, ed = can('editBoq', P.id), F = S.bq;
   $('#main').innerHTML = `<h2>المقايسة والتكلفة</h2><p class="mut">سعر البند هنا هو تكلفة الوحدة التقديرية. التكلفة التقديرية = الكمية × السعر. التكلفة الفعلية هتيجي من أودو في مرحلة لاحقة.</p><div id="bqSum"></div>
   <div class="filters" style="margin-top:16px"><select id="bqPh"><option value="">كل المراحل</option>${P.phaseProg.map(x => `<option value="${x.n}"${String(x.n) === F.ph ? ' selected' : ''}>${x.n}. ${esc(x.name)}</option>`).join('')}</select>${multi ? `<select id="bqB"><option value="">كل المباني</option>${P.proj.buildings.map(b => `<option${b === F.b ? ' selected' : ''}>${esc(b)}</option>`).join('')}</select>` : ''}<input id="bqQ" type="search" placeholder="بحث في البنود أو الكود" value="${esc(F.q)}"><label class="chk"><input type="checkbox" id="bqM"${F.miss ? ' checked' : ''}> الناقص سعر أو كمية بس</label></div>
@@ -396,6 +408,220 @@ async function importBoq(file) {
     const R = ch.filter(c => 'rate' in c).map(c => ({ item_id: c.r.id, rate: c.rate })); if (R.length) { const { error } = await S.sb.from('boq_rates').upsert(R); err = err || error; }
     const Q = ch.filter(c => 'qty' in c); for (let k = 0; k < Q.length; k += 10) { const res = await Promise.all(Q.slice(k, k + 10).map(c => S.sb.from('boq_items').update({ qty: c.qty }).eq('id', c.r.id))); err = err || res.find(x => x.error)?.error; }
     if (err) toast('حصلت مشكلة في جزء من التعديلات: ' + err.message); else toast('اتطبقت ' + ch.length + ' تعديل'); await refresh(); };
+}
+
+/* ---------------- schedule (الجدول الزمني) ---------------- */
+const DAY = 864e5, TD = s => s ? Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) : null, DS = t => t == null ? null : new Date(t).toISOString().slice(0, 10);
+const isWork = t => new Date(t).getUTCDay() !== 5;   // الجمعة إجازة
+const addWork = (t, n) => { if (!Number.isFinite(t)) return t; n = Math.round(+n || 0); const st = n < 0 ? -DAY : DAY; while (!isWork(t)) t += st; while (n) { t += st; if (isWork(t)) n -= Math.sign(n); } return t; };
+const workDays = (a, b) => { if (!Number.isFinite(a) || !Number.isFinite(b) || b < a) return 0; const days = Math.round((b - a) / DAY) + 1, wk = Math.floor(days / 7); let n = wk * 6; for (let t = a + wk * 7 * DAY; t <= b; t += DAY) if (isWork(t)) n++; return n; };
+const fmtD = s => s ? s.slice(8, 10) + '/' + s.slice(5, 7) + '/' + s.slice(2, 4) : '–';
+const SCH = { rowH: 34, zoom: { 'يوم': 22, 'أسبوع': 7, 'شهر': 2.4 } };
+if (!S.sc) S.sc = { zoom: 'أسبوع', closed: new Set(), late: false, q: '', b: '' };
+
+async function loadSchedule() {
+  const P = S.P, ed = can('editBoq', P.id);
+  const [a, l, pr, li] = await Promise.all([
+    S.sb.from('schedule_activities').select('*').eq('project_id', P.id).order('sort'),
+    S.sb.from('schedule_links').select('*').eq('project_id', P.id),
+    S.sb.rpc('schedule_progress', { p_project: P.id }),
+    ed ? S.sb.from('schedule_activity_items').select('activity_id,item_id') : Promise.resolve({ data: [] }),
+  ]);
+  if (a.error) toast('مقدرتش أحمّل الجدول: ' + a.error.message);
+  const prog = Object.fromEntries((pr.data || []).map(x => [x.activity_id, x]));
+  const A = (a.data || []).map(x => ({ ...x, s: TD(x.start), f: TD(x.finish), bs: TD(x.bl_start), bf: TD(x.bl_finish), pr: prog[x.id] || {}, kids: [] }));
+  const byId = Object.fromEntries(A.map(x => [x.id, x]));
+  A.forEach(x => { if (x.parent_id && byId[x.parent_id]) byId[x.parent_id].kids.push(x); });
+  P.sch = { A, byId, links: l.data || [], items: {} };
+  (li.data || []).forEach(r => (P.sch.items[r.activity_id] ||= []).push(r.item_id));
+  schCompute();
+}
+function schCompute() {
+  const { A } = S.P.sch, now = TD(today());
+  const leafs = x => x.kids.length ? x.kids.flatMap(leafs) : [x];
+  A.forEach(x => { x.dur = x.is_milestone ? 0 : (x.duration_days != null ? +x.duration_days : workDays(x.s, x.f)); });
+  A.forEach(x => {
+    const L = x.kids.length ? leafs(x) : [x], w = y => Math.max(y.dur, 1);
+    const plan = y => y.s == null ? 0 : now < y.s ? 0 : now >= (y.f ?? y.s) ? 1 : (now - y.s + DAY) / ((y.f - y.s) + DAY);
+    const W = L.reduce((s, y) => s + w(y), 0); x.plan = W ? L.reduce((s, y) => s + w(y) * plan(y), 0) / W : 0;
+    const K = L.filter(y => y.pr.pct != null), WK = K.reduce((s, y) => s + w(y), 0);
+    x.act = x.kids.length ? (WK ? K.reduce((s, y) => s + w(y) * +y.pr.pct, 0) / WK : null) : (x.pr.pct != null ? +x.pr.pct : null);
+    x.st = x.act != null && x.act >= 0.999 ? 'done' : x.s == null || now < x.s ? 'wait' : x.act == null ? 'nodata' : (x.f != null && now > x.f) || x.act < x.plan - 0.05 ? 'late' : 'run';
+  });
+}
+const SST = { done: ['appr', 'خلص'], run: ['run', 'شغال'], late: ['ret', 'متأخر'], wait: ['imp', 'لسه'], nodata: ['imp', 'بدون ربط'] };
+
+async function renderSchedule() {
+  const P = S.P, ed = can('editBoq', P.id);
+  $('#main').innerHTML = '<p class="mut">جاري تحميل الجدول الزمني…</p>';
+  await loadSchedule(); const { A } = P.sch, F = S.sc;
+  const top = A.filter(x => !x.parent_id), leafs = A.filter(x => !x.kids.length);
+  const W = leafs.reduce((s, y) => s + Math.max(y.dur, 1), 0), plan = W ? leafs.reduce((s, y) => s + Math.max(y.dur, 1) * y.plan, 0) / W : 0;
+  const K = leafs.filter(y => y.act != null), WK = K.reduce((s, y) => s + Math.max(y.dur, 1), 0), act = WK ? K.reduce((s, y) => s + Math.max(y.dur, 1) * y.act, 0) / WK : null, planK = WK ? K.reduce((s, y) => s + Math.max(y.dur, 1) * y.plan, 0) / WK : 0;
+  const fin = Math.max(0, ...A.map(x => x.f || 0)), bfin = Math.max(0, ...A.map(x => x.bf || 0)), slip = fin && bfin ? workDays(Math.min(fin, bfin), Math.max(fin, bfin)) * Math.sign(fin - bfin) : 0;
+  const lateN = leafs.filter(x => x.st === 'late').length, linked = leafs.filter(x => x.pr.items > 0 || x.manual_pct != null).length;
+  $('#main').innerHTML = `<h2>الجدول الزمني</h2>
+  ${A.length ? `<div class="kp" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"><div class="k"><b>${Math.round(plan * 100)}%</b><span>المخطط حتى النهارده</span></div><div class="k"><b style="color:var(--acc)">${act == null ? '–' : Math.round(act * 100) + '%'}</b><span>الفعلي (من الأنشطة المربوطة)</span></div><div class="k"><b>${act == null || !planK ? '–' : nf(act / planK, 2)}</b><span>مؤشر الأداء الزمني SPI</span></div><div class="k"><b style="${lateN ? 'color:var(--bad)' : ''}">${lateN}</b><span>نشاط متأخر</span></div><div class="k"><b>${fin ? fmtD(DS(fin)) : '–'}</b><span>نهاية المشروع${bfin ? ` · ${slip > 0 ? 'متأخر ' + slip + ' يوم عن' : slip < 0 ? 'متقدم ' + -slip + ' يوم عن' : 'مطابق لـ'} خط الأساس` : ''}</span></div></div>
+  <p class="mut" style="margin-top:8px">${linked} من ${leafs.length} نشاط مربوطين ببنود المقايسة أو ليهم نسبة يدوية. نسبة النشاط بتتحسب لوحدها من كميات التقارير المعتمدة. أيام العمل من السبت للخميس.</p>` : `<div class="note">لسه مفيش جدول زمني للمشروع ده.${ed ? ' ارفع ملف MS Project، أو ابدأ تضيف أنشطة.' : ' المكتب الفني هيرفعه قريب.'}</div>`}
+  <div class="acts">${ed ? `<button class="p" id="scAdd">+ نشاط</button><label class="btn">استيراد MS Project (XML)<input type="file" id="scImp" accept=".xml" hidden></label>${A.length ? '<button id="scCalc">إعادة حساب التواريخ</button><button id="scBase">حفظ خط الأساس</button>' : ''}` : ''}${A.length ? '<button id="scX">تحميل Excel</button>' : ''}</div>
+  ${ed ? '<p class="mut" style="margin-top:-4px">من برنامج MS Project احفظ الجدول بصيغة XML (من Save As اختار XML Format). لو رفعت نسخة أحدث بعدين، الأنشطة بتتحدّث وربطها بالبنود بيفضل زي ما هو.</p>' : ''}<div id="scImpBox"></div>
+  ${A.length ? `<div class="filters" style="margin-top:12px">${(P.proj.buildings || []).length > 1 ? `<select id="scB"><option value="">كل المباني</option>${P.proj.buildings.map(b => `<option${b === F.b ? ' selected' : ''}>${esc(b)}</option>`).join('')}</select>` : ''}<input id="scQ" type="search" placeholder="بحث في الأنشطة" value="${esc(F.q)}"><label class="chk"><input type="checkbox" id="scL"${F.late ? ' checked' : ''}> المتأخر بس</label><div class="seg">${Object.keys(SCH.zoom).map(z => `<button type="button" data-z="${z}" class="${z === F.zoom ? 'on' : ''}">${z}</button>`).join('')}</div></div><div id="gantt"></div>` : ''}`;
+  if (A.length) drawGantt();
+  const on = (id, ev, fn) => { const e = $(id); if (e) e[ev] = fn; };
+  on('#scQ', 'onchange', e => { F.q = e.target.value.trim(); drawGantt(); }); on('#scL', 'onchange', e => { F.late = e.target.checked; drawGantt(); }); on('#scB', 'onchange', e => { F.b = e.target.value; drawGantt(); });
+  document.querySelectorAll('[data-z]').forEach(b => b.onclick = () => { F.zoom = b.dataset.z; document.querySelectorAll('[data-z]').forEach(x => x.classList.toggle('on', x === b)); drawGantt(); });
+  on('#scAdd', 'onclick', () => editActivity(null)); on('#scX', 'onclick', exportSchedule); on('#scCalc', 'onclick', recalcSchedule); on('#scBase', 'onclick', saveBaseline);
+  on('#scImp', 'onchange', e => { const f = e.target.files[0]; e.target.value = ''; if (f) importMsp(f); });
+}
+
+function drawGantt() {
+  const P = S.P, { A } = P.sch, F = S.sc, px = SCH.zoom[F.zoom], now = TD(today());
+  const match = x => (!F.q || x.name.includes(F.q) || (x.wbs || '').startsWith(F.q)) && (!F.b || x.building === F.b || x.kids.length) && (!F.late || x.st === 'late');
+  const keep = new Set(); const mark = x => { let ok = match(x); x.kids.forEach(k => { if (mark(k)) ok = true; }); if (ok && (F.q || F.late || F.b ? (match(x) || x.kids.some(k => keep.has(k.id))) : true)) keep.add(x.id); return keep.has(x.id); };
+  A.filter(x => !x.parent_id).forEach(mark);
+  const rows = []; const walk = x => { if (!keep.has(x.id)) return; rows.push(x); if (!F.closed.has(x.id) || F.q || F.late) x.kids.forEach(walk); };
+  A.filter(x => !x.parent_id).forEach(walk);
+  const ds = A.flatMap(x => [x.s, x.f, x.bs, x.bf]).filter(Boolean); if (!ds.length) return $('#gantt').innerHTML = '<p class="mut">الأنشطة مفيهاش تواريخ.</p>';
+  let t0 = Math.min(...ds, now), t1 = Math.max(...ds, now); t0 = Date.UTC(new Date(t0).getUTCFullYear(), new Date(t0).getUTCMonth(), 1); t1 = Date.UTC(new Date(t1).getUTCFullYear(), new Date(t1).getUTCMonth() + 1, 1);
+  const TW = Math.round((t1 - t0) / DAY * px), X = t => Math.round((t - t0) / DAY * px);
+  const months = []; for (let t = t0; t < t1;) { const d = new Date(t), n = Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1); months.push([t, n]); t = n; }
+  const MN = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+  const head = months.map(([a, b]) => `<i style="right:${X(a)}px;width:${X(b) - X(a)}px">${X(b) - X(a) > 46 ? MN[new Date(a).getUTCMonth()] + ' ' + String(new Date(a).getUTCFullYear()).slice(2) : ''}</i>`).join('');
+  const grid = months.map(([a]) => `<b style="right:${X(a)}px"></b>`).join('');
+  const bar = x => { if (x.s == null) return '';
+    const r = X(x.s), w = Math.max(X((x.f ?? x.s) + DAY) - r, 3), bl = x.bs != null ? `<em class="bl" style="right:${X(x.bs)}px;width:${Math.max(X((x.bf ?? x.bs) + DAY) - X(x.bs), 3)}px"></em>` : '';
+    if (x.is_milestone) return `${bl}<span class="ms ${x.st}" style="right:${r - 7}px" title="${esc(x.name)} ${fmtD(x.start)}"></span>`;
+    if (x.kids.length) return `${bl}<span class="sm" style="right:${r}px;width:${w}px"><u style="width:${(x.act || 0) * 100}%"></u></span>`;
+    return `${bl}<span class="br ${x.st}" style="right:${r}px;width:${w}px" title="${esc(x.name)}: ${fmtD(x.start)} → ${fmtD(x.finish)} · مخطط ${Math.round(x.plan * 100)}% · فعلي ${x.act == null ? '–' : Math.round(x.act * 100) + '%'}"><u style="width:${(x.act || 0) * 100}%"></u></span>`; };
+  $('#gantt').innerHTML = `<div class="gwrap"><div class="gt" style="--tw:${TW}px">
+  <div class="gr gh"><div class="gi"><span class="gn">النشاط</span><span class="gd">البداية</span><span class="gd">النهاية</span><span class="gp">الفعلي</span></div><div class="gl">${head}</div></div>
+  ${rows.map(x => `<div class="gr${x.kids.length ? ' sum' : ''}" data-id="${x.id}"><div class="gi"><span class="gn" style="padding-inline-start:${(x.outline_level - 1) * 14 + 6}px">${x.kids.length ? `<button type="button" class="tg" data-tg="${x.id}">${F.closed.has(x.id) && !F.q && !F.late ? '◂' : '▾'}</button>` : ''}<a href="#" data-open="${x.id}" title="${esc(x.name)}">${x.wbs ? `<small>${esc(x.wbs)}</small> ` : ''}${esc(x.name)}</a></span><span class="gd">${fmtD(x.start)}</span><span class="gd">${fmtD(x.finish)}</span><span class="gp">${x.act == null ? '<span class="mut">–</span>' : Math.round(x.act * 100) + '%'}${!x.kids.length ? ` <span class="st ${SST[x.st][0]}">${SST[x.st][1]}</span>` : ''}</span></div><div class="gl">${bar(x)}</div></div>`).join('')}
+  <div class="gbg" style="height:${(rows.length + 1) * SCH.rowH}px">${grid}${now >= t0 && now <= t1 ? `<s style="right:${X(now)}px" title="النهارده"></s>` : ''}</div></div></div>
+  <div class="leg"><span><i style="background:var(--acc)"></i>الفعلي</span><span><i style="background:var(--conc)"></i>المخطط</span><span><i style="background:var(--bad)"></i>متأخر</span><span><i style="background:var(--mut);height:3px"></i>خط الأساس</span><span><i style="background:var(--acc);width:2px"></i>النهارده</span></div>`;
+  const wrap = $('#gantt .gwrap'); if (!S.sc.scrolled) { wrap.scrollLeft = -(X(now) - wrap.clientWidth / 2); }
+  $('#gantt').onclick = e => { const tg = e.target.closest('[data-tg]'); if (tg) { F.closed.has(tg.dataset.tg) ? F.closed.delete(tg.dataset.tg) : F.closed.add(tg.dataset.tg); return drawGantt(); }
+    const o = e.target.closest('[data-open]'); if (o) { e.preventDefault(); editActivity(P.sch.byId[o.dataset.open]); } };
+}
+
+/* activity editor / details */
+function editActivity(x) {
+  const P = S.P, ed = can('editBoq', P.id), { A, links, items } = P.sch, sumOpts = A.filter(y => (y.kids.length || y.is_summary) && (!x || y.id !== x.id));
+  const preds = x ? links.filter(l => l.succ_id === x.id) : [], sel = new Set(x ? items[x.id] || [] : []), bs = P.proj.buildings || [];
+  const dlg = document.createElement('dialog'); dlg.className = 'adlg';
+  const ro = !ed;
+  dlg.innerHTML = `<form method="dialog" id="aF"><div class="dh"><h3 style="margin:0">${x ? esc(x.name) : 'نشاط جديد'}</h3><button value="x" type="button" class="dx">✕</button></div>
+  ${x ? `<div class="mut">${x.wbs ? 'WBS ' + esc(x.wbs) + ' · ' : ''}مخطط ${Math.round(x.plan * 100)}% · فعلي ${x.act == null ? '–' : Math.round(x.act * 100) + '%'}${x.pr.act_start ? ' · أول كمية ' + fmtD(x.pr.act_start) : ''}${x.pr.act_finish ? ' · خلص ' + fmtD(x.pr.act_finish) : ''}${x.bs ? ' · خط الأساس ' + fmtD(x.bl_start) + ' → ' + fmtD(x.bl_finish) : ''}</div>` : ''}
+  <div class="grid" style="margin-top:10px"><label class="wide">اسم النشاط<input name="name" required value="${esc(x?.name || '')}" ${ro ? 'disabled' : ''}></label>
+  <label>تحت (نشاط رئيسي)<select name="parent" ${ro ? 'disabled' : ''}><option value="">— مستوى أول —</option>${sumOpts.map(y => `<option value="${y.id}"${x?.parent_id === y.id ? ' selected' : ''}>${esc((y.wbs ? y.wbs + ' ' : '') + y.name)}</option>`).join('')}</select></label>
+  <label>البداية<input type="date" name="start" value="${x?.start || today()}" ${ro || x?.kids.length ? 'disabled' : ''}></label>
+  <label>المدة (أيام عمل)<input type="number" name="dur" min="0" step="1" value="${x ? x.dur : 5}" ${ro || x?.kids.length ? 'disabled' : ''}></label>
+  <label>النهاية<input type="date" name="finish" value="${x?.finish || ''}" disabled></label>
+  ${bs.length > 1 ? `<label>المبنى<select name="building" ${ro ? 'disabled' : ''}><option value="">—</option>${bs.map(b => `<option${x?.building === b ? ' selected' : ''}>${esc(b)}</option>`).join('')}</select></label>` : ''}
+  <label>نسبة يدوية %<input type="number" name="manual" min="0" max="100" step="any" value="${x?.manual_pct ?? ''}" placeholder="من البنود" ${ro ? 'disabled' : ''}></label>
+  <label class="chk" style="align-self:end"><input type="checkbox" name="ms"${x?.is_milestone ? ' checked' : ''} ${ro ? 'disabled' : ''}> حدث (Milestone)</label></div>
+  ${x?.kids.length ? '<p class="mut">ده نشاط رئيسي: تواريخه ونسبته بتتحسب من الأنشطة اللي تحته.</p>' : `
+  <h4>الأنشطة السابقة</h4><div id="pL">${preds.map(l => predRow(l, x)).join('')}</div>${ed ? '<button type="button" id="pAdd">+ نشاط سابق</button>' : ''}
+  ${ed ? `<h4>بنود المقايسة المربوطة <span class="mut" id="iN">(${sel.size})</span></h4><p class="mut" style="margin-top:-6px">نسبة النشاط بتتحسب من الكميات المعتمدة للبنود دي.</p><input type="search" id="iQ" placeholder="بحث بالكود أو الاسم"><div class="ilist" id="iL"></div>` : `<p class="mut">${x?.pr.items || 0} بند مربوط بالنشاط.</p>`}`}
+  <div class="acts">${ed ? `<button class="p" value="save" type="submit">حفظ</button>${x ? '<button type="button" id="aDel" class="danger">حذف النشاط</button>' : ''}` : ''}<button type="button" class="dx">إغلاق</button></div></form>`;
+  document.body.append(dlg); dlg.showModal();
+  const close = () => { dlg.close(); dlg.remove(); }; dlg.querySelectorAll('.dx').forEach(b => b.onclick = close); dlg.addEventListener('cancel', () => dlg.remove());
+  const f = dlg.querySelector('form'), fin = () => { const s = f.start.value, d = +f.dur.value || 0; f.finish.value = s ? DS(f.ms.checked || d <= 1 ? addWork(TD(s), 0) : addWork(TD(s), d - 1)) : ''; };
+  if (!x?.kids.length) { if (!x?.finish) fin(); f.start.oninput = fin; f.dur.oninput = fin; f.ms.onchange = () => { if (f.ms.checked) f.dur.value = 0; fin(); }; }
+  if (!ed) return;
+  const pA = dlg.querySelector('#pAdd'); if (pA) pA.onclick = () => dlg.querySelector('#pL').insertAdjacentHTML('beforeend', predRow({ type: 'FS', lag_days: 0 }, x));
+  dlg.querySelector('#pL')?.addEventListener('click', e => { const b = e.target.closest('.prx'); if (b) b.closest('.prow').remove(); });
+  const iL = dlg.querySelector('#iL'); if (iL) { const draw = () => { const q = dlg.querySelector('#iQ').value.trim(), L = P.items.filter(i => sel.has(i.id) || (q && (i.code + ' ' + i.name + ' ' + (i.building || '')).includes(q))).slice(0, 80);
+    iL.innerHTML = L.length ? L.map(i => `<label class="chk"><input type="checkbox" value="${esc(i.id)}"${sel.has(i.id) ? ' checked' : ''}> <span><b>${esc(i.code)}</b> ${esc(i.name)}${i.building ? ' – ' + esc(i.building) : ''} <span class="mut">(${esc(i.unit || '')})</span></span></label>`).join('') : '<p class="mut">اكتب في البحث عشان تختار بنود.</p>'; };
+    draw(); dlg.querySelector('#iQ').oninput = draw; iL.onchange = e => { const c = e.target; c.checked ? sel.add(c.value) : sel.delete(c.value); dlg.querySelector('#iN').textContent = `(${sel.size})`; }; }
+  const del = dlg.querySelector('#aDel'); if (del) del.onclick = async () => { if (del.dataset.sure !== '1') { del.dataset.sure = '1'; del.textContent = 'متأكد؟ اضغط تاني للحذف'; return; }
+    const { error } = await S.sb.from('schedule_activities').delete().eq('id', x.id); if (error) return toast('مقدرتش أحذف: ' + error.message); close(); toast('اتحذف النشاط'); renderSchedule(); };
+  f.onsubmit = async e => { e.preventDefault(); const btn = f.querySelector('button.p'); btn.disabled = true;
+    const id = x?.id || crypto.randomUUID(), par = f.parent.value || null, pa = par && P.sch.byId[par];
+    const row = { id, project_id: P.id, name: f.name.value.trim(), parent_id: par, outline_level: pa ? pa.outline_level + 1 : 1, is_milestone: f.ms.checked, manual_pct: f.manual.value === '' ? null : +f.manual.value, building: f.building ? f.building.value || null : x?.building ?? null, updated_at: new Date().toISOString() };
+    if (!x?.kids.length) Object.assign(row, { start: f.start.value || null, finish: f.finish.value || null, duration_days: f.ms.checked ? 0 : +f.dur.value || 0 });
+    if (!x) row.sort = Math.max(0, ...A.map(y => y.sort)) + 1;
+    let { error } = await S.sb.from('schedule_activities').upsert(row); if (error) { btn.disabled = false; return toast('مقدرتش أحفظ: ' + error.message); }
+    if (pa && !pa.is_summary) await S.sb.from('schedule_activities').update({ is_summary: true }).eq('id', pa.id);
+    if (!x?.kids.length) {
+      const P2 = [...dlg.querySelectorAll('.prow')].map(r => ({ project_id: P.id, pred_id: r.querySelector('[data-p]').value, succ_id: id, type: r.querySelector('[data-t]').value, lag_days: +r.querySelector('[data-l]').value || 0 })).filter(l => l.pred_id && l.pred_id !== id);
+      const uniq = Object.values(Object.fromEntries(P2.map(l => [l.pred_id, l])));
+      if (x) await S.sb.from('schedule_links').delete().eq('succ_id', id); if (uniq.length) ({ error } = await S.sb.from('schedule_links').insert(uniq));
+      if (error) toast('النشاط اتحفظ بس فيه مشكلة في السوابق: ' + error.message);
+      if (x) await S.sb.from('schedule_activity_items').delete().eq('activity_id', id); if (sel.size) ({ error } = await S.sb.from('schedule_activity_items').insert([...sel].map(item_id => ({ activity_id: id, item_id }))));
+      if (error) toast('النشاط اتحفظ بس فيه مشكلة في ربط البنود: ' + error.message);
+    }
+    close(); toast('اتحفظ النشاط'); renderSchedule(); };
+}
+function predRow(l, x) {
+  const A = S.P.sch.A.filter(y => !y.kids.length && (!x || y.id !== x.id)), ro = !can('editBoq', S.P.id);
+  return `<div class="prow"><select data-p ${ro ? 'disabled' : ''}><option value="">— اختار —</option>${A.map(y => `<option value="${y.id}"${l.pred_id === y.id ? ' selected' : ''}>${esc((y.wbs ? y.wbs + ' ' : '') + y.name)}</option>`).join('')}</select><select data-t ${ro ? 'disabled' : ''}>${[['FS', 'نهاية ← بداية'], ['SS', 'بداية ← بداية'], ['FF', 'نهاية ← نهاية'], ['SF', 'بداية ← نهاية']].map(([v, t]) => `<option value="${v}"${l.type === v ? ' selected' : ''}>${t}</option>`).join('')}</select><input data-l type="number" step="1" value="${+l.lag_days || 0}" title="تأخير بالأيام" ${ro ? 'disabled' : ''}>${ro ? '' : '<button type="button" class="prx">✕</button>'}</div>`;
+}
+
+/* CPM forward pass on working days, then roll summaries up */
+async function recalcSchedule() {
+  const P = S.P, { A, links, byId } = P.sch, leaves = A.filter(x => !x.kids.length), inN = {}, out = {};
+  links.forEach(l => { inN[l.succ_id] = (inN[l.succ_id] || 0) + 1; (out[l.pred_id] ||= []).push(l); });
+  const q = leaves.filter(x => !inN[x.id]), done = new Set(), ns = {}, nf = {};
+  leaves.forEach(x => { ns[x.id] = x.s; nf[x.id] = x.f; });
+  const pending = Object.fromEntries(leaves.map(x => [x.id, links.filter(l => l.succ_id === x.id)]));
+  while (q.length) { const x = q.shift(); done.add(x.id); const P1 = pending[x.id], d = x.is_milestone ? 0 : Math.max(x.dur, 1);
+    if (P1.length && P1.every(l => byId[l.pred_id])) { let st = null; P1.forEach(l => { const ps = ns[l.pred_id], pf = nf[l.pred_id], lag = +l.lag_days || 0; if (ps == null) return;
+        let c = l.type === 'FS' ? addWork(pf, 1 + lag) : l.type === 'SS' ? addWork(ps, lag) : l.type === 'FF' ? addWork(addWork(pf, lag), -(d ? d - 1 : 0)) : addWork(addWork(ps, lag), -(d ? d - 1 : 0));
+        if (byId[l.pred_id].is_milestone && l.type === 'FS') c = addWork(pf, lag); st = st == null ? c : Math.max(st, c); });
+      if (st != null) { ns[x.id] = st; nf[x.id] = d ? addWork(st, d - 1) : st; } }
+    else if (ns[x.id] != null && x.dur != null) nf[x.id] = d ? addWork(ns[x.id], d - 1) : ns[x.id];
+    (out[x.id] || []).forEach(l => { if (--inN[l.succ_id] === 0 && byId[l.succ_id] && !byId[l.succ_id].kids.length) q.push(byId[l.succ_id]); }); }
+  if (done.size < leaves.length) return toast('فيه حلقة في العلاقات بين الأنشطة، راجع السوابق');
+  const ss = {}, sf = {}, roll = x => { if (!x.kids.length) return [ns[x.id], nf[x.id]]; const r = x.kids.map(roll).filter(v => v[0] != null); ss[x.id] = r.length ? Math.min(...r.map(v => v[0])) : x.s; sf[x.id] = r.length ? Math.max(...r.map(v => v[1])) : x.f; return [ss[x.id], sf[x.id]]; };
+  A.filter(x => !x.parent_id).forEach(roll);
+  const ch = A.map(x => { const s1 = x.kids.length ? ss[x.id] : ns[x.id], f1 = x.kids.length ? sf[x.id] : nf[x.id]; return s1 !== x.s || f1 !== x.f ? { x, start: DS(s1), finish: DS(f1) } : null; }).filter(Boolean);
+  if (!ch.length) return toast('التواريخ مظبوطة، مفيش تغيير');
+  const res = await Promise.all(ch.map(c => S.sb.from('schedule_activities').update({ start: c.start, finish: c.finish, ...(c.x.kids.length ? { duration_days: workDays(TD(c.start), TD(c.finish)) } : {}) }).eq('id', c.x.id)));
+  const err = res.find(r => r.error); toast(err ? 'حصلت مشكلة: ' + err.error.message : `اتعدّلت تواريخ ${ch.length} نشاط`); renderSchedule();
+}
+async function saveBaseline() {
+  const b = $('#scBase'); if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'متأكد؟ هيستبدل خط الأساس القديم'; return; }
+  const { A } = S.P.sch, res = await Promise.all(A.map(x => S.sb.from('schedule_activities').update({ bl_start: x.start, bl_finish: x.finish }).eq('id', x.id)));
+  const err = res.find(r => r.error); toast(err ? 'حصلت مشكلة: ' + err.error.message : 'اتحفظ خط الأساس'); renderSchedule();
+}
+
+/* MS Project XML import */
+async function importMsp(file) {
+  const P = S.P, doc = new DOMParser().parseFromString(await file.text(), 'application/xml'), box = $('#scImpBox');
+  if (doc.querySelector('parsererror') || !doc.getElementsByTagName('Task').length) return box.innerHTML = '<div class="note">الملف ده مش ملف MS Project XML. من MS Project اختار File ← Save As ← XML Format.</div>';
+  const kid = (el, n) => { for (const c of el.children) if (c.localName === n) return c.textContent; return null; };
+  const hrs = d => { const m = /PT(\d+(?:\.\d+)?)H(\d+)M/.exec(d || ''); return m ? +m[1] + +m[2] / 60 : 0; };
+  const T = [...doc.getElementsByTagName('Task')].filter(t => kid(t, 'UID') !== '0' && kid(t, 'IsNull') !== '1' && kid(t, 'Name'));
+  const old = Object.fromEntries(P.sch.A.filter(x => x.ext_uid).map(x => [x.ext_uid, x.id]));
+  const stack = [], rows = [], ln = [], ids = {}; let usePct = 0;
+  T.forEach((t, k) => { const uid = kid(t, 'UID'), lvl = +kid(t, 'OutlineLevel') || 1, id = old[uid] || crypto.randomUUID(); ids[uid] = id;
+    while (stack.length && stack[stack.length - 1].lvl >= lvl) stack.pop(); const par = stack[stack.length - 1];
+    let bs = null, bf = null; for (const b of t.children) if (b.localName === 'Baseline' && kid(b, 'Number') === '0') { bs = (kid(b, 'Start') || '').slice(0, 10) || null; bf = (kid(b, 'Finish') || '').slice(0, 10) || null; }
+    const pc = +kid(t, 'PercentComplete') || 0; if (pc) usePct++;
+    rows.push({ id, project_id: P.id, ext_uid: uid, wbs: kid(t, 'WBS') || kid(t, 'OutlineNumber'), outline_level: lvl, parent_id: par ? par.id : null, name: kid(t, 'Name').trim(), is_summary: kid(t, 'Summary') === '1', is_milestone: kid(t, 'Milestone') === '1',
+      start: (kid(t, 'Start') || '').slice(0, 10) || null, finish: (kid(t, 'Finish') || '').slice(0, 10) || null, duration_days: Math.round(hrs(kid(t, 'Duration')) / 8 * 10) / 10, bl_start: bs, bl_finish: bf, sort: k + 1, updated_at: new Date().toISOString(), _pc: pc });
+    stack.push({ lvl, id });
+    for (const l of t.children) if (l.localName === 'PredecessorLink') ln.push({ pu: kid(l, 'PredecessorUID'), su: uid, type: ['FF', 'FS', 'SF', 'SS'][+kid(l, 'Type')] || 'FS', lag: Math.round((+kid(l, 'LinkLag') || 0) / 4800 * 10) / 10 }); });
+  const gone = P.sch.A.filter(x => x.ext_uid && !rows.some(r => r.ext_uid === x.ext_uid)), fresh = rows.filter(r => !old[r.ext_uid]).length;
+  box.innerHTML = `<div class="card"><b>${esc(file.name)}</b>: ${rows.length} نشاط و${ln.length} علاقة. <span class="mut">(${fresh} جديد · ${rows.length - fresh} تحديث${gone.length ? ` · ${gone.length} هيتشال لأنه مش في الملف` : ''})</span>
+  ${usePct ? `<label class="chk" style="margin-top:8px"><input type="checkbox" id="impPct"> استخدم نسب الإنجاز اللي في الملف للأنشطة اللي مش مربوطة ببنود (${usePct} نشاط)</label>` : ''}
+  <label class="chk"><input type="checkbox" id="impBl"${P.sch.A.some(x => x.bs) ? '' : ' checked'}> احفظ تواريخ الملف كخط أساس للأنشطة اللي ملهاش خط أساس في الملف</label>
+  <div class="acts"><button class="ok" id="impGo2">استيراد</button><button id="impNo2">إلغاء</button></div></div>`;
+  $('#impNo2').onclick = () => box.innerHTML = '';
+  $('#impGo2').onclick = async () => { $('#impGo2').disabled = true; const pct = $('#impPct')?.checked, bl = $('#impBl').checked, items = P.sch.items;
+    const up = rows.map(({ _pc, ...r }) => ({ ...r, ...(bl && !r.bl_start ? { bl_start: r.start, bl_finish: r.finish } : {}), ...(pct && _pc && !(items[r.id] || []).length ? { manual_pct: _pc } : {}) }));
+    let { error } = await S.sb.from('schedule_activities').upsert(up, { onConflict: 'id' });
+    if (!error && gone.length) ({ error } = await S.sb.from('schedule_activities').delete().in('id', gone.map(x => x.id)));
+    if (!error) ({ error } = await S.sb.from('schedule_links').delete().eq('project_id', P.id));
+    const L2 = Object.values(Object.fromEntries(ln.filter(l => ids[l.pu] && ids[l.su]).map(l => [l.pu + l.su, { project_id: P.id, pred_id: ids[l.pu], succ_id: ids[l.su], type: l.type, lag_days: l.lag }])));
+    if (!error && L2.length) ({ error } = await S.sb.from('schedule_links').insert(L2));
+    if (error) { $('#impGo2').disabled = false; return toast('الاستيراد وقف: ' + error.message); }
+    toast(`اتستورد ${rows.length} نشاط`); renderSchedule(); };
+}
+function exportSchedule() {
+  if (!window.XLSX) return toast('مكتبة الإكسل لسه ماحمّلتش');
+  const P = S.P, rows = [['WBS', 'النشاط', 'البداية', 'النهاية', 'المدة (أيام عمل)', 'بداية خط الأساس', 'نهاية خط الأساس', 'المخطط %', 'الفعلي %', 'الحالة', 'المبنى'], ...P.sch.A.map(x => [x.wbs || '', '  '.repeat(x.outline_level - 1) + x.name, x.start, x.finish, x.dur, x.bl_start, x.bl_finish, Math.round(x.plan * 100), x.act == null ? '' : Math.round(x.act * 100), x.kids.length ? '' : SST[x.st][1], x.building || ''])];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'الجدول الزمني'); wb.Workbook = { Views: [{ RTL: true }] }; XLSX.writeFile(wb, 'جدول زمني ' + P.proj.name + ' ' + today() + '.xlsx');
 }
 
 /* ---------------- excel ---------------- */
