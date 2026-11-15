@@ -14,12 +14,13 @@ const CAN = {
   review: ['tech', 'management'],
   log: ['site', 'tech', 'management'],
   editBoq: ['tech', 'management'],
+  boq: ['tech', 'finance', 'management'],
 };
 const FLOORS = { sheraton: { ground: 2, list: [['البدروم السفلي', 'SH-4-04', 'SH-4-06'], ['البدروم العلوي', 'SH-4-07', 'SH-4-08'], ['الأرضي', 'SH-4-09', 'SH-4-10'], ['الأول', 'SH-4-11', 'SH-4-12'], ['الثاني', 'SH-4-14', 'SH-4-15'], ['الثالث', 'SH-4-16', 'SH-4-17'], ['الرابع', 'SH-4-18', 'SH-4-19'], ['الخامس', 'SH-4-20', 'SH-4-21'], ['السطح', null, 'SH-4-22']] } };
 const DISC = ['انشائي', 'مباني', 'معماري / تشطيبات', 'كهرباء', 'ميكانيكا / صحي', 'واجهات', 'لاندسكيب', 'عام'];
 const ST = { submitted: ['pend', 'بانتظار المراجعة'], approved: ['appr', 'معتمد'], returned: ['ret', 'مرتجع للمهندس'] };
 
-const S = { sb: null, user: null, profile: null, admin: false, projects: [], roles: {}, names: {}, P: null, open: new Set(), q: '', bsel: '' };
+const S = { bq: { ph: '', b: '', miss: false, q: '' }, sb: null, user: null, profile: null, admin: false, projects: [], roles: {}, names: {}, P: null, open: new Set(), q: '', bsel: '' };
 const role = pid => S.admin ? 'management' : S.roles[pid];
 const can = (what, pid) => S.admin || CAN[what].includes(role(pid));
 
@@ -46,7 +47,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 1.0.1</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 1.1.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -79,7 +80,7 @@ async function afterLogin(user) {
 }
 
 /* ---------------- layout & routing ---------------- */
-const VIEWS = [['status', 'الموقف التنفيذي', null], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة المكتب الفني', 'review'], ['log', 'سجل التقارير', 'log']];
+const VIEWS = [['status', 'الموقف التنفيذي', null], ['boq', 'المقايسة والتكلفة', 'boq'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة المكتب الفني', 'review'], ['log', 'سجل التقارير', 'log']];
 function shell(pid, view) {
   const p = pid && S.projects.find(x => x.id === pid);
   return `<header><div class="hbar"><div>${p ? '<a class="back" href="#home">→ كل المشاريع</a>' : ''}<h1>${p ? esc(p.name + ' – ' + p.place) : '<span class="brand">RESAN</span> On the go'}</h1>
@@ -92,11 +93,12 @@ async function route() {
   if (m && S.projects.some(p => p.id === m[1])) {
     const [, pid, view] = m;
     $('#app').innerHTML = shell(pid, view); bindOut();
-    if (!S.P || S.P.id !== pid) { S.P = { id: pid }; S.open.clear(); S.q = ''; S.bsel = ''; }
+    if (!S.P || S.P.id !== pid) { S.P = { id: pid }; S.open.clear(); S.q = ''; S.bsel = ''; S.bq = { ph: '', b: '', miss: false, q: '' }; }
     await loadProject(pid);
     if (view === 'report' && can('report', pid)) return renderReport();
     if (view === 'review' && can('review', pid)) return renderReview();
     if (view === 'log' && can('log', pid)) return renderLog();
+    if (view === 'boq' && can('boq', pid)) return renderBoq();
     return renderStatus();
   }
   $('#app').innerHTML = shell(null); bindOut();
@@ -115,7 +117,7 @@ async function loadProject(pid) {
   const [pp, ph, it, rt, rp] = await Promise.all(jobs);
   P.phaseProg = pp.data || []; P.phases = ph.data || [];
   const rates = Object.fromEntries((rt.data || []).map(r => [r.item_id, +r.rate]));
-  P.showRates = (rt.data || []).length > 0 && ['tech', 'finance', 'management'].includes(role(pid));
+  P.showRates = ['tech', 'finance', 'management'].includes(role(pid));
   P.items = (it.data || []).map(i => { const q = +i.qty || 0, ex = +i.executed || 0, rate = rates[i.id] || 0; const pct = q > 0 ? ex / q : (i.pct_override != null ? +i.pct_override : 0); return { ...i, ex, rate, pct: Math.max(0, pct), rem: q - ex, val: q * rate, known: q > 0 || i.pct_override != null }; });
   P.reports = rp.data || [];
   P.proj = S.projects.find(x => x.id === pid);
@@ -298,6 +300,101 @@ async function renderAdmin() {
     const { error } = s.value ? await S.sb.from('project_members').upsert({ ...k, role: s.value }) : await S.sb.from('project_members').delete().eq('user_id', k.user_id).eq('project_id', k.project_id);
     toast(error ? 'مقدرتش أحفظ: ' + error.message : 'اتحفظت الصلاحية');
   };
+}
+
+/* ---------------- BOQ & cost ---------------- */
+const lacks = r => !(+r.qty > 0) || !(r.rate > 0);
+function boqSummary() {
+  const P = S.P, rows = S.bq.b ? P.items.filter(r => r.building === S.bq.b) : P.items, tot = rows.reduce((s, r) => s + r.val, 0), pr = rows.filter(r => r.rate > 0).length, nq = rows.filter(r => !(+r.qty > 0)).length;
+  const bud = S.bq.b ? 0 : P.phases.reduce((s, x) => s + (+x.budget || 0), 0);
+  const ph = P.phaseProg.map(x => { const L = rows.filter(r => r.phase_n === x.n), est = L.reduce((s, r) => s + r.val, 0), b = S.bq.b ? 0 : +(P.phases.find(y => y.n === x.n)?.budget) || 0; return { ...x, L, est, b, pr: L.filter(r => r.rate > 0).length }; });
+  $('#bqSum').innerHTML = `<div class="kp" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))"><div class="k"><b>${money(tot)}</b><span>التكلفة التقديرية للبنود المسعّرة (ج.م)</span></div><div class="k"><b>${pr} / ${rows.length}</b><span>بند متسعّر (${rows.length ? Math.round(pr / rows.length * 100) : 0}%)</span></div><div class="k"><b>${nq}</b><span>بند من غير كمية</span></div>${bud ? `<div class="k"><b>${money(bud)}</b><span>ميزانية المراحل</span></div>` : ''}</div>
+  <div class="scroll" style="margin-top:14px"><table class="stack"><thead><tr><th>المرحلة</th><th class="n">البنود</th><th class="n">متسعّر</th><th class="n">التكلفة التقديرية</th>${bud ? '<th class="n">الميزانية</th><th class="n">الفرق</th>' : ''}</tr></thead><tbody>${ph.map(x => `<tr class="pick${String(x.n) === S.bq.ph ? ' on' : ''}" data-ph="${x.n}"><td data-l="المرحلة">${x.n}. ${esc(x.name)}</td><td class="n" data-l="البنود">${x.L.length}</td><td class="n" data-l="متسعّر">${x.pr}</td><td class="n" data-l="التكلفة">${nf(x.est, 0)}</td>${bud ? `<td class="n" data-l="الميزانية">${x.b ? nf(x.b, 0) : '–'}</td><td class="n" data-l="الفرق" style="${x.b && x.est > x.b ? 'color:var(--bad)' : ''}">${x.b ? nf(x.est - x.b, 0) : '–'}</td>` : ''}</tr>`).join('')}</tbody></table></div>`;
+}
+function renderBoq() {
+  const P = S.P, multi = (P.proj.buildings || []).length > 1, ed = can('editBoq', P.id), F = S.bq;
+  $('#main').innerHTML = `<h2>المقايسة والتكلفة</h2><p class="mut">سعر البند هنا هو تكلفة الوحدة التقديرية. التكلفة التقديرية = الكمية × السعر. التكلفة الفعلية هتيجي من أودو في مرحلة لاحقة.</p><div id="bqSum"></div>
+  <div class="filters" style="margin-top:16px"><select id="bqPh"><option value="">كل المراحل</option>${P.phaseProg.map(x => `<option value="${x.n}"${String(x.n) === F.ph ? ' selected' : ''}>${x.n}. ${esc(x.name)}</option>`).join('')}</select>${multi ? `<select id="bqB"><option value="">كل المباني</option>${P.proj.buildings.map(b => `<option${b === F.b ? ' selected' : ''}>${esc(b)}</option>`).join('')}</select>` : ''}<input id="bqQ" type="search" placeholder="بحث في البنود أو الكود" value="${esc(F.q)}"><label class="chk"><input type="checkbox" id="bqM"${F.miss ? ' checked' : ''}> الناقص سعر أو كمية بس</label></div>
+  <div class="acts" style="margin-top:0"><button id="bqX" class="p">تحميل المقايسة Excel</button>${ed ? '<label class="btn">رفع ملف أسعار<input type="file" id="bqF" accept=".xlsx,.xls" hidden></label>' : ''}</div>
+  ${ed ? '<p class="mut" style="margin-top:-4px">حمّل المقايسة، واملا عمود الكمية والسعر في الإكسل، وارفع نفس الملف. أو عدّل هنا مباشرة وكل خانة بتتحفظ لوحدها.</p>' : ''}<div id="bqImp"></div>${ed ? addItemForm() : ''}<div id="bqT"></div>`;
+  boqSummary(); boqTable();
+  const set = (k, v) => { F[k] = v; if (k === 'b') boqSummary(); boqTable(); };
+  $('#bqPh').onchange = e => set('ph', e.target.value); $('#bqB') && ($('#bqB').onchange = e => set('b', e.target.value));
+  $('#bqQ').onchange = e => set('q', e.target.value.trim()); $('#bqM').onchange = e => set('miss', e.target.checked);
+  $('#bqSum').onclick = e => { const t = e.target.closest('tr[data-ph]'); if (!t) return; F.ph = F.ph === t.dataset.ph ? '' : t.dataset.ph; $('#bqPh').value = F.ph; boqSummary(); boqTable(); };
+  $('#addF') && bindAddItem();
+  $('#bqX').onclick = exportBoq; $('#bqF') && ($('#bqF').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) importBoq(f); });
+  $('#bqT').addEventListener('change', async e => {
+    const i = e.target.closest('input[data-f]'); if (!i) return; const tr = i.closest('tr'), r = P.items.find(x => x.id === tr.dataset.id), v = i.value === '' ? 0 : +i.value;
+    const { error } = i.dataset.f === 'rate' ? await S.sb.from('boq_rates').upsert({ item_id: r.id, rate: v }) : await S.sb.from('boq_items').update({ qty: v }).eq('id', r.id);
+    if (error) return toast('مقدرتش أحفظ: ' + error.message);
+    if (i.dataset.f === 'rate') r.rate = v; else { r.qty = v; r.rem = v - r.ex; r.pct = v > 0 ? r.ex / v : 0; r.known = v > 0 || r.pct_override != null; }
+    r.val = (+r.qty || 0) * r.rate; tr.querySelector('.tot').textContent = r.val ? nf(r.val, 0) : '–'; tr.classList.toggle('lack', lacks(r)); toast('اتحفظ'); boqSummary();
+  });
+}
+function boqTable() {
+  const P = S.P, F = S.bq, multi = (P.proj.buildings || []).length > 1, ed = can('editBoq', P.id);
+  const rows = P.items.filter(r => (!F.ph || String(r.phase_n) === F.ph) && (!F.b || r.building === F.b) && (!F.miss || lacks(r)) && (!F.q || (r.code + ' ' + r.name + ' ' + (r.description || '')).includes(F.q)));
+  if (!rows.length) return $('#bqT').innerHTML = '<p class="mut">مفيش بنود بالفلتر ده.</p>';
+  const cols = 6 + (multi ? 1 : 0), keys = [...new Set(rows.map(r => r.phase_n + '|' + r.group_name))];
+  const cell = (r, f) => ed ? `<input type="number" step="any" inputmode="decimal" data-f="${f}" value="${(f === 'qty' ? +r.qty : r.rate) || ''}">` : ((f === 'qty' ? +r.qty : r.rate) ? nf(f === 'qty' ? r.qty : r.rate) : '–');
+  $('#bqT').innerHTML = `<div class="scroll"><table class="stack it bq"><thead><tr><th>الكود</th><th>البند</th>${multi ? '<th>المبنى</th>' : ''}<th>الوحدة</th><th class="n">الكمية</th><th class="n">السعر</th><th class="n">الإجمالي</th></tr></thead><tbody>${keys.map(k => { const L = rows.filter(r => r.phase_n + '|' + r.group_name === k), [n, g] = [L[0].phase_n, L[0].group_name], sub = L.reduce((s, r) => s + r.val, 0);
+    return `<tr class="gh"><td colspan="${cols - 1}">${n}. ${esc(P.phaseProg.find(x => x.n === n)?.name || '')} – ${esc(g)} <span class="mut">(${L.length})</span></td><td class="n">${sub ? nf(sub, 0) : ''}</td></tr>` + L.map(r => `<tr data-id="${esc(r.id)}" class="${lacks(r) ? 'lack' : ''}"><td data-l="الكود">${esc(r.code)}</td><td data-l="البند" title="${esc(r.description || '')}">${esc(r.name)}${r.note ? `<div class="mut" style="font-size:12px">${esc(r.note)}</div>` : ''}</td>${multi ? `<td data-l="المبنى">${esc(r.building)}</td>` : ''}<td data-l="الوحدة">${esc(r.unit)}</td><td class="n${ed ? ' ed' : ''}" data-l="الكمية">${cell(r, 'qty')}</td><td class="n${ed ? ' ed' : ''}" data-l="السعر">${cell(r, 'rate')}</td><td class="n tot" data-l="الإجمالي">${r.val ? nf(r.val, 0) : '–'}</td></tr>`).join(''); }).join('')}</tbody></table></div>`;
+}
+function addItemForm() {
+  const P = S.P, bs = P.proj.buildings || [], grp = [...new Set(P.items.map(r => r.group_name))];
+  return `<details class="card addi"><summary><b>+ إضافة بند جديد للمقايسة</b></summary><form id="addF" class="grid" style="margin-top:10px">
+  <label>المرحلة<select name="phase" required>${P.phaseProg.map(x => `<option value="${x.n}"${String(x.n) === S.bq.ph ? ' selected' : ''}>${x.n}. ${esc(x.name)}</option>`).join('')}</select></label>
+  <label>المجموعة<input name="group" list="grpL" required placeholder="مثلاً: خرسانة الأسقف"><datalist id="grpL">${grp.map(g => `<option value="${esc(g)}">`).join('')}</datalist></label>
+  ${bs.length > 1 ? `<label>المبنى<select name="building"><option value="">— عام —</option>${bs.map(b => `<option>${esc(b)}</option>`).join('')}</select></label>` : ''}
+  <label class="wide">بيان البند<input name="name" required></label>
+  <label>الوحدة<input name="unit" list="unitL" required><datalist id="unitL">${['م3', 'م2', 'م.ط', 'طن', 'عدد', 'مقطوعية'].map(u => `<option value="${u}">`).join('')}</datalist></label>
+  <label>الكمية<input name="qty" type="number" step="any" inputmode="decimal"></label><label>السعر<input name="rate" type="number" step="any" inputmode="decimal"></label>
+  <div class="acts" style="margin:0;align-self:end"><button class="p">إضافة</button></div></form><p class="mut" style="margin:6px 0 0">الكود بيتعمل لوحده حسب المرحلة.</p></details>`;
+}
+function bindAddItem() {
+  const P = S.P;
+  $('#addF').onsubmit = async e => {
+    e.preventDefault(); const f = new FormData(e.target), n = +f.get('phase'), pre = (P.items[0]?.code || P.id.slice(0, 2).toUpperCase()).split('-')[0];
+    const nums = P.items.map(r => (r.code.match(new RegExp('^' + pre + '-' + n + '-(\\d+)$')) || [])[1]).filter(Boolean).map(Number);
+    let k = nums.length ? Math.max(...nums) + 1 : 1, code; do code = `${pre}-${n}-${String(k++).padStart(2, '0')}`; while (P.items.some(r => r.id === code || r.code === code));
+    const row = { id: code, project_id: P.id, phase_n: n, group_name: f.get('group').trim(), building: f.get('building') || null, code, name: f.get('name').trim(), unit: f.get('unit').trim(), qty: +f.get('qty') || 0, sort: Math.max(0, ...P.items.map(r => +r.sort || 0)) + 1 };
+    const btn = e.target.querySelector('button'); btn.disabled = true;
+    const { error } = await S.sb.from('boq_items').insert(row); if (error) { btn.disabled = false; return toast('مقدرتش أضيف: ' + error.message); }
+    const rate = +f.get('rate'); if (rate > 0) { const r2 = await S.sb.from('boq_rates').upsert({ item_id: code, rate }); if (r2.error) toast('البند اتضاف بس السعر ماتحفظش: ' + r2.error.message); }
+    toast('اتضاف البند ' + code); S.bq.ph = String(n); await refresh();
+  };
+}
+const BQH = ['المعرّف', 'المرحلة', 'المجموعة', 'الكود', 'البند', 'المبنى', 'الوحدة', 'الكمية', 'السعر', 'الإجمالي'];
+function exportBoq() {
+  if (!window.XLSX) return toast('مكتبة الإكسل لسه ماحمّلتش');
+  const X = XLSX, P = S.P, aoa = [BQH, ...P.items.map(r => [r.id, r.phase_n, r.group_name, r.code, r.name, r.building || '', r.unit, +r.qty || '', r.rate || '', null])];
+  const ws = X.utils.aoa_to_sheet(aoa); for (let k = 2; k <= aoa.length; k++) ws['J' + k] = { t: 'n', f: `H${k}*I${k}` };
+  ws['!cols'] = [{ hidden: true }, { wch: 7 }, { wch: 22 }, { wch: 10 }, { wch: 60 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 14 }];
+  const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, 'المقايسة'); wb.Workbook = { Views: [{ RTL: true }] }; X.writeFile(wb, 'مقايسة ' + P.proj.name + ' ' + today() + '.xlsx');
+}
+async function importBoq(file) {
+  if (!window.XLSX) return toast('مكتبة الإكسل لسه ماحمّلتش');
+  const P = S.P, wb = XLSX.read(await file.arrayBuffer()), A = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+  const hi = A.findIndex(r => r.some(c => String(c).trim() === 'الكود')); if (hi < 0) return toast('مش لاقي عمود "الكود" في الملف');
+  const H = A[hi].map(c => String(c).trim()), col = (...n) => H.findIndex(h => n.includes(h)), cI = col('المعرّف', 'المعرف'), cC = col('الكود'), cB = col('المبنى'), cQ = col('الكمية'), cR = col('السعر', 'سعر الوحدة');
+  if (cQ < 0 && cR < 0) return toast('مش لاقي عمود الكمية أو السعر');
+  const num = v => { if (v === '' || v == null) return null; const x = +String(v).replace(/,/g, ''); return isFinite(x) ? x : null; };
+  const ch = [], miss = [];
+  A.slice(hi + 1).forEach(row => { const id = cI >= 0 ? String(row[cI]).trim() : '', code = String(row[cC] ?? '').trim(); if (!id && !code) return;
+    const r = (id && P.items.find(x => x.id === id)) || P.items.find(x => x.code === code && (cB < 0 || !(P.proj.buildings || []).length || (x.building || '') === String(row[cB]).trim()));
+    if (!r) return miss.push(code || id); const q = cQ >= 0 ? num(row[cQ]) : null, rt = cR >= 0 ? num(row[cR]) : null;
+    const c = { r }; if (q != null && q !== (+r.qty || 0)) c.qty = q; if (rt != null && rt !== r.rate) c.rate = rt; if ('qty' in c || 'rate' in c) ch.push(c); });
+  const box = $('#bqImp');
+  if (!ch.length) { box.innerHTML = `<div class="note">مفيش تغييرات في الملف${miss.length ? ` · ${miss.length} كود مش موجود في المقايسة` : ''}.</div>`; return; }
+  box.innerHTML = `<div class="card"><b>الملف فيه ${ch.length} تعديل</b> <span class="mut">(${ch.filter(c => 'rate' in c).length} سعر · ${ch.filter(c => 'qty' in c).length} كمية)</span>${miss.length ? `<div class="mut">${miss.length} كود مش موجود في المقايسة واتجاهل: ${esc(miss.slice(0, 8).join('، '))}${miss.length > 8 ? '…' : ''}</div>` : ''}
+  <div class="scroll" style="max-height:300px;overflow:auto"><table><thead><tr><th>الكود</th><th>البند</th><th class="n">الكمية</th><th class="n">السعر</th></tr></thead><tbody>${ch.slice(0, 200).map(c => `<tr><td>${esc(c.r.code)}</td><td>${esc(c.r.name.slice(0, 60))}${c.r.building ? ' – ' + esc(c.r.building) : ''}</td><td class="n">${'qty' in c ? nf(+c.r.qty || 0) + ' ← <b>' + nf(c.qty) + '</b>' : ''}</td><td class="n">${'rate' in c ? nf(c.r.rate) + ' ← <b>' + nf(c.rate) + '</b>' : ''}</td></tr>`).join('')}</tbody></table></div>
+  <div class="acts"><button class="ok" id="impGo">تطبيق التعديلات</button><button id="impNo">إلغاء</button></div></div>`;
+  $('#impNo').onclick = () => box.innerHTML = '';
+  $('#impGo').onclick = async () => { $('#impGo').disabled = true; let err = null;
+    const R = ch.filter(c => 'rate' in c).map(c => ({ item_id: c.r.id, rate: c.rate })); if (R.length) { const { error } = await S.sb.from('boq_rates').upsert(R); err = err || error; }
+    const Q = ch.filter(c => 'qty' in c); for (let k = 0; k < Q.length; k += 10) { const res = await Promise.all(Q.slice(k, k + 10).map(c => S.sb.from('boq_items').update({ qty: c.qty }).eq('id', c.r.id))); err = err || res.find(x => x.error)?.error; }
+    if (err) toast('حصلت مشكلة في جزء من التعديلات: ' + err.message); else toast('اتطبقت ' + ch.length + ' تعديل'); await refresh(); };
 }
 
 /* ---------------- excel ---------------- */

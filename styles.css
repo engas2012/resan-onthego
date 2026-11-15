@@ -62,7 +62,7 @@ tr.g td{background:light-dark(#e4e2db,#2a2c30);font-weight:700}
 .mbars{display:flex;flex-direction:column;gap:6px;font-size:13px}
 .mbars div{display:grid;grid-template-columns:130px minmax(0,1fr) 40px;gap:8px;align-items:center}
 .mbars em{font-style:normal;text-align:left;font-variant-numeric:tabular-nums}
-a.btn,button{font:inherit;font-size:15px;min-height:44px;padding:8px 16px;border-radius:9px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+a.btn,label.btn,button{font:inherit;font-size:15px;min-height:44px;padding:8px 16px;border-radius:9px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
 a.btn.p,button.p{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:700}
 button.ok{background:var(--ok);border-color:var(--ok);color:var(--card);font-weight:700}
 button.x{min-height:40px;padding:4px 12px;color:var(--bad)}
@@ -123,3 +123,12 @@ header .who2{font-size:13px;opacity:.8;display:flex;gap:10px;align-items:center}
 header .who2 button{min-height:32px;padding:2px 10px;font-size:13px;background:transparent;color:inherit;border-color:currentColor}
 .roleTag{font-size:12px;border-radius:99px;padding:1px 9px;background:var(--acc);color:#fff}
 .adm td select{min-height:36px;padding:2px 6px;font-size:14px}
+
+/* BOQ & cost */
+.bq tr.gh td{background:var(--bg);font-weight:700;font-size:13px}.bq tr.lack td:first-child{box-shadow:inset -3px 0 0 var(--acc)}.bq .ed input{width:110px}
+tr.pick{cursor:pointer}tr.pick:hover td,tr.pick.on td{background:var(--acc2)}
+label.chk{display:flex;align-items:center;gap:8px;flex-direction:row;font-size:14px}label.chk input{width:auto;min-height:0}
+label.btn{display:inline-flex;flex-direction:row;align-items:center;font-weight:400}
+@media(max-width:600px){.bq tr.gh{display:block;padding:6px 10px}.bq tr.gh td{display:inline;padding:0}}
+.addi summary{cursor:pointer;list-style:none}.addi summary::-webkit-details-marker{display:none}.addi{margin-bottom:12px}
+.grid .wide{grid-column:1/-1}
