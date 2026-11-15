@@ -7,7 +7,7 @@ const today = () => { const d = new Date(); return new Date(d - d.getTimezoneOff
 const toast = t => { const m = $('#msg'); m.textContent = t; m.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => m.classList.remove('on'), 2800); };
 const bar = p => `<div class="pct"><div class="bar${p >= 1 ? ' full' : ''}" style="flex:1"><u style="width:${Math.min(Math.max(p, 0), 1) * 100}%"></u></div><span>${Math.round(p * 100)}%</span></div>`;
 
-const ROLE = { site: 'مهندس الموقع', tech: 'المكتب الفني', consultant: 'الاستشاري', owner: 'المالك', finance: 'الماليات', management: 'الإدارة' };
+const ROLE = { site: 'مهندس الموقع', tech: 'المكتب الفني', consultant: 'الاستشاري', owner: 'المالك', finance: 'الماليات', management: 'الإدارة', store: 'أمين المخزن' };
 const CAN = {
   items: ['site', 'tech', 'consultant', 'finance', 'management'],
   report: ['site', 'tech'],
@@ -15,6 +15,8 @@ const CAN = {
   log: ['site', 'tech', 'management'],
   docs: ['site', 'tech', 'finance', 'management'],
   tasks: ['tech', 'finance', 'management', 'consultant'],
+  store: ['site', 'tech', 'finance', 'management', 'store'],
+  storeMove: ['tech', 'management', 'store'],
   docsUp: ['site', 'tech', 'management'],
   editBoq: ['tech', 'management'],
   ledger: ['finance', 'management'],
@@ -52,7 +54,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 2.5.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 2.6.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -85,7 +87,7 @@ async function afterLogin(user) {
 }
 
 /* ---------------- layout & routing ---------------- */
-const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', 'الجدول الزمني', null], ['tasks', 'مهام المكتب الفني', 'tasks'], ['boq', 'المقايسة والتكلفة', 'boq'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة المكتب الفني', 'review'], ['log', 'سجل التقارير', 'log'], ['docs', 'المستندات', 'docs']];
+const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', 'الجدول الزمني', null], ['tasks', 'مهام المكتب الفني', 'tasks'], ['boq', 'المقايسة والتكلفة', 'boq'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة المكتب الفني', 'review'], ['log', 'سجل التقارير', 'log'], ['store', 'المخزن', 'store'], ['docs', 'المستندات', 'docs']];
 function shell(pid, view) {
   const p = pid && S.projects.find(x => x.id === pid);
   return `<header><div class="hbar"><a class="brandlink" href="#home" title="الصفحة الرئيسية">${LOGO()}<span class="otg">On the go</span></a>
@@ -107,6 +109,7 @@ async function route() {
     if (view === 'schedule') return renderSchedule();
     if (view === 'docs' && can('docs', pid)) return renderDocs();
     if (view === 'tasks' && can('tasks', pid)) return renderTasks();
+    if (view === 'store' && can('store', pid)) return renderStore();
     return renderStatus();
   }
   $('#app').innerHTML = shell(null, h); bindOut();
@@ -604,6 +607,52 @@ function renderTasks() {
   const cf = $('#cF'); if (cf) cf.onsubmit = async e => { e.preventDefault(); const f = new FormData(cf);
     const { error } = await S.sb.from('phase_checklist').insert({ project_id: P.id, phase_n: +f.get('ph'), category: T.tab, title: f.get('title').trim(), building: f.get('bld') || null, status: f.get('st'), due_date: f.get('due') || null, owner: f.get('owner')?.trim() || null, sort: 999 });
     if (error) return toast(error.message); toast('اتضاف'); re(); };
+}
+
+
+/* ---------------- store / warehouse ---------------- */
+const MVK = { receipt: ['وارد', 'appr'], issue: ['صرف', 'pend'], return: ['مرتجع', 'imp'], adjust: ['تسوية / رصيد افتتاحي', 'run'] };
+async function renderStore() {
+  const P = S.P, ed = can('editBoq', P.id), mv = can('storeMove', P.id);
+  $('#main').innerHTML = '<p class="mut">جاري تحميل المخزن…</p>';
+  const [st, mats, norms, moves, set] = await Promise.all([S.sb.rpc('stock_status', { p_project: P.id }), S.sb.from('materials').select('*').order('sort'), S.sb.from('material_norms').select('*'), S.sb.from('stock_moves').select('*').eq('project_id', P.id).order('move_date', { ascending: false }).order('id', { ascending: false }).limit(60), S.sb.from('stock_settings').select('*').eq('project_id', P.id).maybeSingle()]);
+  if (st.error) return $('#main').innerHTML = `<div class="note">${esc(st.error.message)}</div>`;
+  const R = st.data || [], M = mats.data || [], N = norms.data || [], MV = moves.data || [], start = set.data?.start_date || today();
+  const mName = id => M.find(m => m.id === id)?.name || '', mUnit = id => M.find(m => m.id === id)?.unit || '';
+  const short = R.filter(r => +r.shortage > 0), bal = r => +r.issued > 0 ? +r.balance : +r.balance_est;
+  const sinceRep = P.reports.filter(r => r.status === 'approved' && r.report_date >= start).flatMap(r => (r.body.supply || []).map(x => ({ ...x, d: r.report_date })));
+  const unmatched = sinceRep.filter(x => x.item && !M.some(m => (m.aliases || []).some(a => normAr(x.item).includes(normAr(a)))));
+  const itemOpt = '<option value="">— بدون بند —</option>' + P.items.filter(i => +i.qty > 0).map(i => `<option value="${esc(i.id)}">${esc(i.code + ' ' + i.name.slice(0, 55) + (i.building ? ' – ' + i.building : ''))}</option>`).join('');
+  $('#main').innerHTML = `<h2>المخزن</h2><p class="mut">الوارد من توريدات التقارير المعتمدة وأذون المخزن. المنصرف من أذون الصرف، ولو مفيش أذون بيتحسب الاستهلاك من الكميات المنفذة × معدلات الاستهلاك. المتابعة من ${fmtD(start)}${ed ? ' <a href="#" id="stStart">تغيير</a>' : ''}.</p>
+  ${short.length ? `<div class="card shortbox"><b>⚠️ نقص خامات للبنود الجارية</b>${short.map(r => `<div class="srow"><b>${esc(r.name)}</b>: محتاج <b>${nf(r.needed, 1)}</b> ${esc(r.unit)} لاستكمال البنود الجارية والبادئة خلال أسبوعين${+r.min_stock ? ` + حد أدنى ${nf(r.min_stock)}` : ''}، والرصيد ${nf(bal(r), 1)} ← <b style="color:var(--bad)">ناقص ${nf(r.shortage, 1)} ${esc(r.unit)}</b><div class="mut" style="font-size:12px">${(r.items || []).slice(0, 6).map(x => `${esc(x.code)} (${nf(x.need, 1)})`).join(' · ')}</div></div>`).join('')}</div>` : '<div class="note">✓ مفيش نقص متوقع في الخامات للبنود الجارية.</div>'}
+  <div class="scroll" style="margin-top:12px"><table class="stack"><thead><tr><th>الخامة</th><th class="n">وارد التقارير</th><th class="n">وارد الأذون</th><th class="n">منصرف بالأذون</th><th class="n">استهلاك محسوب</th><th class="n">الرصيد</th><th class="n">الفرق (هالك؟)</th><th class="n">مطلوب للجاري</th></tr></thead><tbody>${R.map(r => { const b = bal(r), diff = +r.issued > 0 ? +r.issued - +r.consumed_est : null, mt = M.find(m => m.id === r.material_id);
+    return `<tr><td data-l="الخامة"><b>${esc(r.name)}</b> <span class="mut">(${esc(r.unit)})</span>${mt && !mt.stocked ? ' <span class="tag">مش بتتخزن</span>' : ''}</td><td class="n" data-l="وارد التقارير">${+r.rec_reports ? nf(r.rec_reports, 1) : '–'}</td><td class="n" data-l="وارد الأذون">${+r.rec_moves || +r.adjusted ? nf(+r.rec_moves + +r.adjusted, 1) : '–'}</td><td class="n" data-l="منصرف">${+r.issued ? nf(r.issued, 1) : '–'}</td><td class="n" data-l="استهلاك محسوب">${+r.consumed_est ? nf(r.consumed_est, 1) : '–'}</td><td class="n" data-l="الرصيد"><b style="${b < 0 ? 'color:var(--bad)' : ''}">${nf(b, 1)}</b>${+r.issued > 0 ? '' : '<div class="rsrc">محسوب</div>'}</td><td class="n" data-l="الفرق">${diff == null ? '–' : `<span style="color:${diff > 0.05 * Math.max(+r.consumed_est, 1) ? 'var(--bad)' : 'inherit'}">${diff > 0 ? '+' : ''}${nf(diff, 1)}</span>`}</td><td class="n" data-l="مطلوب">${+r.needed ? nf(r.needed, 1) : '–'}</td></tr>`; }).join('')}</tbody></table></div>
+  <p class="mut" style="margin-top:4px">الفرق = المنصرف بالأذون − الاستهلاك المحسوب. لو موجب وكبير يبقى فيه هالك أو صرف زيادة أو معدل استهلاك محتاج يتظبط.</p>
+  ${mv ? `<details class="card"${MV.length ? '' : ' open'}><summary><b>+ تسجيل حركة مخزن</b></summary><form id="mvF" class="grid" style="margin-top:10px">
+    <label>نوع الحركة<select name="kind">${Object.entries(MVK).map(([k, [l]]) => `<option value="${k}">${l}</option>`).join('')}</select></label>
+    <label>الخامة<select name="mat" required>${M.map(m => `<option value="${m.id}">${esc(m.name)} (${esc(m.unit)})</option>`).join('')}</select></label>
+    <label>الكمية<input name="qty" type="number" step="any" inputmode="decimal" required></label><label>التاريخ<input name="d" type="date" value="${today()}"></label>
+    <label data-k="receipt">المورد<input name="sup"></label><label data-k="issue return" class="wide">للبند<select name="item">${itemOpt}</select></label><label class="wide">ملاحظات<input name="note"></label>
+    <div class="acts" style="margin:0"><button class="p">تسجيل</button></div></form><p class="mut" style="margin:6px 0 0">الرصيد الموجود فعلاً النهارده سجّله كـ"تسوية / رصيد افتتاحي". التسوية ممكن تكون بالسالب لو الجرد طلع أقل.</p></details>` : ''}
+  ${MV.length ? `<h3>آخر الحركات</h3><div class="scroll"><table><thead><tr><th>التاريخ</th><th>الحركة</th><th>الخامة</th><th class="n">الكمية</th><th>بند / مورد</th><th>ملاحظات</th><th></th></tr></thead><tbody>${MV.map(x => `<tr><td>${fmtD(x.move_date)}</td><td><span class="st ${MVK[x.kind][1]}">${MVK[x.kind][0]}</span></td><td>${esc(mName(x.material_id))}</td><td class="n">${nf(x.qty, 2)} ${esc(mUnit(x.material_id))}</td><td>${esc(x.item_id ? (P.items.find(i => i.id === x.item_id)?.code || x.item_id) : x.supplier || '')}</td><td class="mut">${esc(x.note || '')}</td><td>${x.created_by === S.user.id || role(P.id) === 'management' ? `<button type="button" data-mvdel="${x.id}" class="danger" style="min-height:30px;padding:0 10px">✕</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : ''}
+  ${unmatched.length ? `<div class="card" style="margin-top:12px"><b>توريدات في التقارير مش متعرّفة على خامة</b><p class="mut" style="margin:4px 0">ضيف الاسم ده لـ"أسماء في التقارير" للخامة المناسبة تحت في الإعدادات، عشان يتحسب في الوارد.</p>${[...new Set(unmatched.map(x => x.item))].slice(0, 20).map(t => `<span class="chip3">${esc(t)}</span>`).join(' ')}</div>` : ''}
+  ${ed ? `<details class="card" style="margin-top:12px"><summary><b>⚙️ الخامات ومعدلات الاستهلاك</b></summary>
+    <h4>الخامات</h4><div class="scroll"><table class="stack medt"><thead><tr><th>الخامة</th><th>الوحدة</th><th>أسماء في التقارير</th><th>حد أدنى</th><th>بتتخزن</th></tr></thead><tbody>${M.map(m => `<tr data-mid="${m.id}"><td data-l="الخامة"><input data-k="name" value="${esc(m.name)}"></td><td data-l="الوحدة"><input data-k="unit" value="${esc(m.unit)}" style="width:90px"></td><td data-l="أسماء في التقارير"><input data-k="aliases" value="${esc((m.aliases || []).join('، '))}"></td><td data-l="حد أدنى"><input data-k="min_stock" type="number" step="any" value="${+m.min_stock || 0}" style="width:90px"></td><td data-l="بتتخزن"><input data-k="stocked" type="checkbox"${m.stocked ? ' checked' : ''} style="width:auto;min-height:0"></td></tr>`).join('')}</tbody></table></div>
+    <div class="acts"><button id="matSave" class="p">حفظ الخامات</button><button id="matAdd">+ خامة</button></div>
+    <h4>معدلات الاستهلاك</h4><p class="mut" style="margin-top:-4px">لكل خامة: البنود اللي اسمها أو مجموعتها فيها الكلمات دي (افصل بـ |)، والكمية من الخامة لكل وحدة من البند. مثال: حديد تسليح · سقف|كمر · م3 · 0.11 يعني 110 كجم حديد لكل م3 خرسانة أسقف.</p>
+    <div class="scroll"><table><thead><tr><th>الخامة</th><th>كلمات البند</th><th>وحدة البند</th><th>المرحلة</th><th class="n">المعدل</th><th>ملاحظة</th><th></th></tr></thead><tbody>${N.filter(n => !n.project_id || n.project_id === P.id).map(n => `<tr><td>${esc(mName(n.material_id))}</td><td dir="auto">${esc(n.pattern)}</td><td>${esc(n.item_unit || 'أي وحدة')}</td><td>${n.phase_n || 'الكل'}</td><td class="n">${nf(n.rate, 4)} ${esc(mUnit(n.material_id))}</td><td class="mut">${esc(n.note || '')}${n.project_id ? '' : ' <span class="tag">عام</span>'}</td><td><button type="button" data-ndel="${n.id}" class="danger" style="min-height:30px;padding:0 10px">✕</button></td></tr>`).join('')}</tbody></table></div>
+    <form id="nF" class="grid" style="margin-top:8px"><label>الخامة<select name="mat">${M.map(m => `<option value="${m.id}">${esc(m.name)}</option>`).join('')}</select></label><label>كلمات البند<input name="pat" required placeholder="مثلاً: مباني|طوب"></label><label>وحدة البند<input name="unit" placeholder="م2"></label><label>المرحلة<select name="ph"><option value="">الكل</option>${P.phaseProg.map(x => `<option value="${x.n}">${x.n}. ${esc(x.name)}</option>`).join('')}</select></label><label>المعدل<input name="rate" type="number" step="any" required></label><label>ملاحظة<input name="note"></label><div class="acts" style="margin:0;align-self:end"><button class="p">إضافة معدل</button></div></form></details>` : ''}`;
+  const re = () => renderStore();
+  const f = $('#mvF'); if (f) { const sync = () => f.querySelectorAll('[data-k]').forEach(x => x.hidden = !x.dataset.k.split(' ').includes(f.kind.value)); f.kind.onchange = sync; sync();
+    f.onsubmit = async e => { e.preventDefault(); const g = n => f[n].value; const row = { project_id: P.id, material_id: g('mat'), kind: g('kind'), qty: +g('qty'), move_date: g('d') || today(), item_id: ['issue', 'return'].includes(g('kind')) ? g('item') || null : null, supplier: g('kind') === 'receipt' ? g('sup').trim() || null : null, note: g('note').trim() || null };
+      if (row.kind !== 'adjust' && !(row.qty > 0)) return toast('الكمية لازم تكون أكبر من صفر'); const { error } = await S.sb.from('stock_moves').insert(row); if (error) return toast(error.message); toast('اتسجلت الحركة'); re(); }; }
+  $('#stStart') && ($('#stStart').onclick = async e => { e.preventDefault(); const d = prompt('تاريخ بداية متابعة المخزن (YYYY-MM-DD)', start); if (!d) return; const { error } = await S.sb.from('stock_settings').upsert({ project_id: P.id, start_date: d }); if (error) return toast(error.message); re(); });
+  $('#matAdd') && ($('#matAdd').onclick = async () => { const { error } = await S.sb.from('materials').insert({ name: 'خامة جديدة ' + (M.length + 1), unit: 'وحدة', sort: M.length + 1 }); if (error) return toast(error.message); re(); });
+  $('#matSave') && ($('#matSave').onclick = async () => { const rows = [...document.querySelectorAll('.medt tr[data-mid]')].map(tr => { const g = k => tr.querySelector(`[data-k=${k}]`); return { id: tr.dataset.mid, name: g('name').value.trim(), unit: g('unit').value.trim(), aliases: g('aliases').value.split(/[،,]/).map(x => x.trim()).filter(Boolean), min_stock: +g('min_stock').value || 0, stocked: g('stocked').checked }; });
+    const { error } = await S.sb.from('materials').upsert(rows); if (error) return toast(error.message); toast('اتحفظت الخامات'); re(); });
+  const nf2 = $('#nF'); if (nf2) nf2.onsubmit = async e => { e.preventDefault(); const g = n => nf2[n].value; const { error } = await S.sb.from('material_norms').insert({ project_id: P.id, material_id: g('mat'), pattern: g('pat').trim(), item_unit: g('unit').trim() || null, phase_n: g('ph') ? +g('ph') : null, rate: +g('rate'), note: g('note').trim() || null }); if (error) return toast(error.message); toast('اتضاف المعدل'); re(); };
+  $('#main').onclick = async e => { const d1 = e.target.closest('[data-mvdel]'), d2 = e.target.closest('[data-ndel]'); const b = d1 || d2; if (!b) return; if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'متأكد؟'; return; }
+    const { error } = d1 ? await S.sb.from('stock_moves').delete().eq('id', d1.dataset.mvdel) : await S.sb.from('material_norms').delete().eq('id', d2.dataset.ndel); if (error) return toast(error.message); re(); };
 }
 
 /* ---------------- documents ---------------- */
@@ -1165,7 +1214,7 @@ async function updateBell() {
   const b = $('#bellN'); if (b) { b.hidden = !count; b.textContent = count > 99 ? '99+' : count; }
   try { navigator.setAppBadge && (count ? navigator.setAppBadge(count) : navigator.clearAppBadge()); } catch { }
 }
-const NK = { report_missing: '📝', report_returned: '↩️', review_waiting: '🧾', checklist_overdue: '📐', consultant_waiting: '✍️', digest: '📊' };
+const NK = { stock_short: '📦', report_missing: '📝', report_returned: '↩️', review_waiting: '🧾', checklist_overdue: '📐', consultant_waiting: '✍️', digest: '📊' };
 const b64u = s => { const p = '='.repeat((4 - s.length % 4) % 4), r = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from([...r].map(c => c.charCodeAt(0))); };
 async function enablePush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return toast(/iphone|ipad/i.test(navigator.userAgent) ? 'على الآيفون: ضيف التطبيق للشاشة الرئيسية الأول، وافتحه من الأيقونة' : 'المتصفح ده مابيدعمش الإشعارات');
