@@ -264,3 +264,4 @@ button.rchip{cursor:pointer;min-height:30px}
 select.cst.appr{color:var(--ok);font-weight:700}select.cst.ret{color:var(--bad)}select.cst.pend,select.cst.run{color:var(--warn)}
 .chip2{font-size:11px;padding:1px 7px;border-radius:99px;background:var(--ink);color:var(--bg)}
 h4{margin:16px 0 8px;font-size:15px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.staffgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
