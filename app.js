@@ -21,6 +21,8 @@ const CAN = {
   editBoq: ['tech', 'management'],
   ledger: ['finance', 'management'],
   boq: ['tech', 'finance', 'management'],
+  inv: ['tech', 'finance', 'management', 'owner', 'consultant'],
+  invEdit: ['tech', 'finance', 'management'],
 };
 const FLOORS = { sheraton: { ground: 2, list: [['البدروم السفلي', 'SH-4-04', 'SH-4-06'], ['البدروم العلوي', 'SH-4-07', 'SH-4-08'], ['الأرضي', 'SH-4-09', 'SH-4-10'], ['الأول', 'SH-4-11', 'SH-4-12'], ['الثاني', 'SH-4-14', 'SH-4-15'], ['الثالث', 'SH-4-16', 'SH-4-17'], ['الرابع', 'SH-4-18', 'SH-4-19'], ['الخامس', 'SH-4-20', 'SH-4-21'], ['السطح', null, 'SH-4-22']] } };
 const DISC = ['انشائي', 'مباني', 'معماري / تشطيبات', 'كهرباء', 'ميكانيكا / صحي', 'واجهات', 'لاندسكيب', 'عام'];
@@ -54,7 +56,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 2.7.1</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 2.8.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -87,7 +89,7 @@ async function afterLogin(user) {
 }
 
 /* ---------------- layout & routing ---------------- */
-const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', 'الجدول الزمني', null], ['tasks', 'مهام المكتب الفني', 'tasks'], ['boq', 'المقايسة والتكلفة', 'boq'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة المكتب الفني', 'review'], ['log', 'سجل التقارير', 'log'], ['store', 'المخزن', 'store'], ['docs', 'المستندات', 'docs']];
+const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', 'الجدول الزمني', null], ['tasks', 'مهام المكتب الفني', 'tasks'], ['boq', 'المقايسة والتكلفة', 'boq'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة المكتب الفني', 'review'], ['log', 'سجل التقارير', 'log'], ['store', 'المخزن', 'store'], ['inv', 'المستخلصات', 'inv'], ['docs', 'المستندات', 'docs']];
 function shell(pid, view) {
   const p = pid && S.projects.find(x => x.id === pid);
   return `<header><div class="hbar"><a class="brandlink" href="#home" title="الصفحة الرئيسية">${LOGO()}<span class="otg">On the go</span></a>
@@ -110,6 +112,7 @@ async function route() {
     if (view === 'docs' && can('docs', pid)) return renderDocs();
     if (view === 'tasks' && can('tasks', pid)) return renderTasks();
     if (view === 'store' && can('store', pid)) return renderStore();
+    if (view === 'inv' && can('inv', pid)) return renderInv();
     return renderStatus();
   }
   $('#app').innerHTML = shell(null, h); bindOut();
@@ -747,6 +750,175 @@ async function renderStore() {
   const nf2 = $('#nF'); if (nf2) nf2.onsubmit = async e => { e.preventDefault(); const g = n => nf2[n].value; const { error } = await S.sb.from('material_norms').insert({ project_id: P.id, material_id: g('mat'), pattern: g('pat').trim(), item_unit: g('unit').trim() || null, phase_n: g('ph') ? +g('ph') : null, rate: +g('rate'), note: g('note').trim() || null }); if (error) return toast(error.message); toast('اتضاف المعدل'); re(); };
   $('#main').onclick = async e => { const d1 = e.target.closest('[data-mvdel]'), d2 = e.target.closest('[data-ndel]'); const b = d1 || d2; if (!b) return; if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'متأكد؟'; return; }
     const { error } = d1 ? await S.sb.from('stock_moves').delete().eq('id', d1.dataset.mvdel) : await S.sb.from('material_norms').delete().eq('id', d2.dataset.ndel); if (error) return toast(error.message); re(); };
+}
+
+/* ---------------- owner invoices (المستخلصات) ---------------- */
+const ICAT = { design: 'التصميمات', contract: 'الأعمال التعاقدية', supply: 'التوريدات والمشتريات', extra: 'المصروفات الإضافية' };
+const ICUM = c => c === 'design' || c === 'contract';
+const IST = { draft: ['pend', 'مسودة'], submitted: ['run', 'اتقدّم للمالك'], approved: ['appr', 'معتمد'], paid: ['appr', 'اتصرف'] };
+const lnVal = l => l.kind !== 'line' ? 0 : ICUM(l.cat) ? (+l.prev_qty + +l.cur_qty) * +l.rate * +l.pct : +l.cur_qty * +l.rate * +l.pct;
+const lnCur = l => l.kind !== 'line' ? 0 : ICUM(l.cat) ? lnVal(l) - +l.prev_value : lnVal(l);
+const invTot = L => { const t = { design: 0, contract: 0, supply: 0, extra: 0, cumDesign: 0, cumContract: 0, prevContract: 0, prevDesign: 0 }; L.forEach(l => { t[l.cat] += lnCur(l); if (l.cat === 'contract') { t.cumContract += lnVal(l); t.prevContract += +l.prev_value; } if (l.cat === 'design') { t.cumDesign += lnVal(l); t.prevDesign += +l.prev_value; } }); return t; };
+const invSum = i => +i.amt_design + +i.amt_contract + +i.amt_supply + +i.amt_extra;
+const invPay = i => { const w = invSum(i); return { works: w, worksPay: w * +i.pay_pct, fee: w * +i.fee_pct, net: w * +i.pay_pct + w * +i.fee_pct }; };
+async function renderInv() {
+  const P = S.P, ed = can('invEdit', P.id), V = S.iv ||= { id: null };
+  if (V.pid !== P.id) { V.pid = P.id; V.id = null; }
+  if (V.id) return renderInvOne();
+  $('#main').innerHTML = '<p class="mut">جاري التحميل…</p>';
+  const { data, error } = await S.sb.from('owner_invoices').select('*').eq('project_id', P.id).order('no');
+  if (error) return $('#main').innerHTML = `<div class="note">${esc(error.message)}</div>`;
+  const I = data || [], last = I[I.length - 1], tot = I.reduce((a, i) => { Object.keys(ICAT).forEach(k => a[k] += +i['amt_' + k]); return a; }, { design: 0, contract: 0, supply: 0, extra: 0 }), all = Object.values(tot).reduce((a, b) => a + b, 0);
+  const paidNet = I.filter(i => i.status !== 'draft').reduce((s, i) => s + invPay(i).net, 0);
+  $('#main').innerHTML = `<div class="sthead"><div><h2 style="margin:0">مستخلصات المالك</h2><p class="mut" style="margin:2px 0 0;font-size:13px">بنظام التكلفة + أتعاب الشركة. كل مستخلص بيكمّل كميات اللي قبله تلقائياً.</p></div>${ed ? '<button id="ivNew" class="p">+ مستخلص جديد</button>' : ''}</div>
+  <div class="kpis"><div class="kpi"><b>${I.length}</b><span>مستخلص</span></div><div class="kpi"><b>${nf(all / 1e6, 2)}<small> م</small></b><span>إجمالي الأعمال</span></div><div class="kpi k-ok"><b>${nf(paidNet / 1e6, 2)}<small> م</small></b><span>إجمالي المستحق صرفه</span></div><div class="kpi"><b>${last ? nf(invPay(last).net, 0) : '–'}</b><span>صافي آخر مستخلص${last ? ' (' + last.no + ')' : ''}</span></div></div>
+  ${I.length ? `<div class="card" style="padding:0"><div class="scroll"><table class="ivsum"><thead><tr><th>البند</th>${I.map(i => `<th class="n"><a href="#" data-iv="${i.id}">مستخلص ${i.no}</a></th>`).join('')}<th class="n">الإجمالي</th></tr></thead><tbody>
+    ${Object.entries(ICAT).map(([k, l]) => `<tr><td>${l}</td>${I.map(i => `<td class="n">${nf(i['amt_' + k], 0)}</td>`).join('')}<td class="n"><b>${nf(tot[k], 0)}</b></td></tr>`).join('')}
+    <tr class="tot"><td>إجمالي الأعمال</td>${I.map(i => `<td class="n">${nf(invSum(i), 0)}</td>`).join('')}<td class="n">${nf(all, 0)}</td></tr>
+    <tr><td class="mut">المستحق صرفه</td>${I.map(i => `<td class="n mut">${nf(invPay(i).net, 0)}</td>`).join('')}<td class="n mut">${nf(paidNet, 0)}</td></tr></tbody></table></div></div>` : '<div class="note">لسه مفيش مستخلصات للمشروع ده.</div>'}
+  <div class="ivlist">${[...I].reverse().map(i => { const p = invPay(i); return `<a href="#" class="ivcard" data-iv="${i.id}"><div class="ivno">${i.no}</div><div style="flex:1;min-width:0"><b>${esc(i.title || 'مستخلص جاري ' + i.no)}</b> <span class="st ${IST[i.status][0]}">${IST[i.status][1]}</span><div class="mut" style="font-size:12px">${i.inv_date ? fmtD(i.inv_date) : 'بدون تاريخ'}${i.legacy ? ' · مستخلص سابق (إجماليات بس)' : ''}</div></div><div style="text-align:left"><div class="mut" style="font-size:11px">الأعمال ${nf(p.works, 0)}</div><b>${nf(p.net, 0)}</b><div class="mut" style="font-size:11px">مستحق صرفه</div></div></a>`; }).join('')}</div>`;
+  $('#main').onclick = e => { const a = e.target.closest('[data-iv]'); if (!a) return; e.preventDefault(); V.id = a.dataset.iv; V.tab = 'summary'; V.edit = false; renderInv(); };
+  $('#ivNew') && ($('#ivNew').onclick = async () => {
+    const no = (last?.no || 0) + 1; $('#ivNew').disabled = true;
+    const { data: nw, error } = await S.sb.from('owner_invoices').insert({ project_id: P.id, no, title: 'مستخلص جاري ' + no, inv_date: today(), period_from: last?.period_to || last?.inv_date || null, period_to: today(), pay_pct: last?.pay_pct ?? 0.5, fee_pct: last?.fee_pct ?? 0.15, status: 'draft' }).select().single();
+    if (error) { $('#ivNew').disabled = false; return toast(error.message); }
+    if (last) { const { data: LL } = await S.sb.from('owner_invoice_lines').select('*').eq('invoice_id', last.id).order('sort');
+      const rows = (LL || []).filter(l => ICUM(l.cat)).map(l => ({ invoice_id: nw.id, cat: l.cat, kind: l.kind, name: l.name, description: l.description, unit: l.unit, rate: l.rate, prev_qty: +l.prev_qty + +l.cur_qty, cur_qty: 0, pct: l.pct, prev_value: lnVal(l), notes: null, item_id: l.item_id, line_key: l.line_key, sort: l.sort }));
+      for (let k = 0; k < rows.length; k += 300) { const { error: e2 } = await S.sb.from('owner_invoice_lines').insert(rows.slice(k, k + 300)); if (e2) toast(e2.message); }
+      toast(rows.length ? `اتعمل مستخلص ${no} واتنقلت ${rows.filter(r => r.kind === 'line').length} بند من مستخلص ${last.no}` : `اتعمل مستخلص ${no}`); }
+    V.id = nw.id; V.tab = 'contract'; V.edit = true; renderInv(); });
+}
+async function renderInvOne() {
+  const P = S.P, V = S.iv, ed = can('invEdit', P.id);
+  const [{ data: inv, error }, { data: LL }] = await Promise.all([S.sb.from('owner_invoices').select('*').eq('id', V.id).single(), S.sb.from('owner_invoice_lines').select('*').eq('invoice_id', V.id).order('sort').order('id')]);
+  if (error) { V.id = null; return toast(error.message); }
+  const lock = inv.status !== 'draft', canEd = ed && !lock;
+  if (!V.L || V.loaded !== V.id) { V.L = (LL || []).map(l => ({ ...l })); V.loaded = V.id; V.del = []; }
+  const L = V.L, T = invTot(L), useLines = L.length > 0 || !inv.legacy;
+  const amt = k => useLines ? T[k] : +inv['amt_' + k], works = Object.keys(ICAT).reduce((s, k) => s + amt(k), 0), pay = works * +inv.pay_pct, fee = works * +inv.fee_pct;
+  const E = V.edit && canEd, inp = (l, f, w = 90, ty = 'number') => E ? `<input data-l="${l._i}" data-f="${f}" type="${ty}" step="any" value="${esc(l[f] ?? '')}" style="width:${w}px">` : '';
+  L.forEach((l, k) => l._i = k);
+  const catTable = c => { const R = L.filter(l => l.cat === c), cum = ICUM(c);
+    const row = l => l.kind !== 'line' ? `<tr class="${l.kind}"><td colspan="${cum ? 10 : 8}">${E ? `<input data-l="${l._i}" data-f="name" value="${esc(l.name)}" style="width:70%;font-weight:700"> <button type="button" class="danger xs" data-ldel="${l._i}">✕</button>` : esc(l.name)}</td></tr>`
+      : `<tr><td>${E ? `<textarea data-l="${l._i}" data-f="name" rows="1" style="width:100%;min-width:220px">${esc(l.name)}</textarea>` : esc(l.name)}${!E && l.item_id ? ` <span class="tag">${esc(P.items.find(i => i.id === l.item_id)?.code || '')}</span>` : ''}${E && c === 'contract' ? `<select data-l="${l._i}" data-f="item_id" class="isel"><option value="">— ربط ببند مقايسة —</option>${P.items.map(i => `<option value="${esc(i.id)}"${i.id === l.item_id ? ' selected' : ''}>${esc(i.code + ' ' + i.name.slice(0, 50))}</option>`).join('')}</select>` : ''}</td>
+        <td>${E ? inp(l, 'unit', 60, 'text') : esc(l.unit || '')}</td><td class="n">${E ? inp(l, 'rate', 95) : nf(l.rate)}</td>
+        ${cum ? `<td class="n">${E ? inp(l, 'prev_qty', 80) : nf(l.prev_qty)}</td>` : ''}<td class="n cur">${E ? inp(l, 'cur_qty', 80) : (+l.cur_qty ? nf(l.cur_qty) : '–')}</td>${cum ? `<td class="n">${nf(+l.prev_qty + +l.cur_qty)}</td>` : ''}
+        <td class="n">${E ? `<input data-l="${l._i}" data-f="pct" type="number" step="any" value="${Math.round(l.pct * 1000) / 10}" style="width:62px">%` : Math.round(l.pct * 100) + '%'}</td><td class="n" id="lv${l._i}"><b>${nf(lnVal(l), 0)}</b>${cum && Math.abs(lnCur(l)) > 0.5 ? `<div class="cur" style="font-size:11px">الحالي ${nf(lnCur(l), 0)}</div>` : ''}</td>
+        <td>${E ? inp(l, 'notes', 130, 'text') : esc(l.notes || '')}</td>${E ? `<td><button type="button" class="danger xs" data-ldel="${l._i}">✕</button></td>` : ''}</tr>`;
+    return `<div class="scroll"><table class="ivt"><thead><tr><th>البند</th><th>الوحدة</th><th class="n">الفئة</th>${cum ? '<th class="n">السابق</th>' : ''}<th class="n">الحالي</th>${cum ? '<th class="n">إجمالي الكميات</th>' : ''}<th class="n">${cum ? 'نسبة الإنجاز' : 'نسبة الصرف'}</th><th class="n">قيمة الصرف</th><th>ملاحظات</th>${E ? '<th></th>' : ''}</tr></thead><tbody>${R.map(row).join('') || `<tr><td colspan="10" class="mut">مفيش بنود.</td></tr>`}</tbody></table></div>
+      <div class="ivfoot">${cum ? `<span>الإجمالي التراكمي <b>${nf(c === 'contract' ? T.cumContract : T.cumDesign, 0)}</b></span><span>السابق <b>${nf(c === 'contract' ? T.prevContract : T.prevDesign, 0)}</b></span>` : ''}<span class="cur">الحالي <b id="ivCurT">${nf(T[c], 0)}</b></span></div>
+      ${E ? `<div class="acts"><button type="button" data-add="line|${c}">+ بند</button><button type="button" data-add="head1|${c}">+ عنوان رئيسي</button><button type="button" data-add="head2|${c}">+ عنوان فرعي</button>${c === 'contract' ? '<button type="button" id="ivPull">⬇ الكميات الحالية من التقارير المعتمدة</button>' : ''}${c === 'supply' || c === 'extra' ? '<button type="button" id="ivLedger">⬇ من قيود الحسابات</button>' : ''}</div>` : ''}`; };
+  const summary = `<div class="ivpay card"><table><tbody>${Object.entries(ICAT).map(([k, l]) => `<tr><td>${l}</td><td class="n">${nf(amt(k), 0)}</td></tr>`).join('')}<tr class="tot"><td>إجمالي الأعمال عن ${esc(inv.title || '')}</td><td class="n">${nf(works, 0)}</td></tr>
+    <tr><td>نسبة الصرف من الأعمال ${E ? `<input id="ivPay" type="number" step="any" value="${Math.round(inv.pay_pct * 100)}" style="width:70px">%` : `<b>${Math.round(inv.pay_pct * 100)}%</b>`} <span class="mut" style="font-size:12px">(الباقي مخصوم من الدفعة المقدمة)</span></td><td class="n">${nf(pay, 0)}</td></tr>
+    <tr><td>نسبة الشركة ${E ? `<input id="ivFee" type="number" step="any" value="${Math.round(inv.fee_pct * 1000) / 10}" style="width:70px">%` : `<b>${Math.round(inv.fee_pct * 1000) / 10}%</b>`} من الأعمال – تُصرف 100%</td><td class="n">${nf(fee, 0)}</td></tr>
+    <tr class="net"><td>المستحق صرفه</td><td class="n">${nf(pay + fee, 0)}</td></tr></tbody></table>
+    ${inv.legacy && !L.length ? `<p class="mut" style="margin:8px 0 0;font-size:13px">ده مستخلص سابق متسجل بالإجماليات بس. عشان المستخلص الجاي يكمّل الكميات تلقائياً لازم بنوده التفصيلية تتسجل، ممكن ترفع إكسل المستخلص.</p>` : ''}</div>`;
+  const tabs = [['summary', 'الملخص'], ...Object.entries(ICAT).map(([k, l]) => [k, `${l} <small>(${nf(amt(k) / 1000, 0)} ألف)</small>`])];
+  $('#main').innerHTML = `<div class="sthead"><div><a href="#" id="ivBack" class="mut" style="font-size:13px">← كل المستخلصات</a><h2 style="margin:2px 0">${E ? `<input id="ivTitle" value="${esc(inv.title || '')}" style="font-size:20px;font-weight:700;max-width:320px">` : esc(inv.title || 'مستخلص ' + inv.no)} <span class="st ${IST[inv.status][0]}">${IST[inv.status][1]}</span></h2>
+    <div class="mut" style="font-size:13px">${E ? `التاريخ <input id="ivDate" type="date" value="${inv.inv_date || ''}" style="width:auto"> · الفترة من <input id="ivFrom" type="date" value="${inv.period_from || ''}" style="width:auto"> لـ <input id="ivTo" type="date" value="${inv.period_to || ''}" style="width:auto">` : `${inv.inv_date ? fmtD(inv.inv_date) : ''}${inv.period_from ? ' · الفترة ' + fmtD(inv.period_from) + ' – ' + fmtD(inv.period_to) : ''}`}</div></div>
+    <div class="acts" style="margin:0">${canEd && !V.edit ? '<button id="ivEd" class="p">تعديل</button>' : ''}${E ? '<button id="ivSave" class="p">حفظ</button><button id="ivCancel">إلغاء</button>' : ''}${!E ? '<button id="ivPrint">🖨 طباعة / PDF</button><button id="ivXls">⬇ Excel</button>' : ''}${ed && !E ? `<select id="ivSt" style="width:auto">${Object.entries(IST).map(([k, [, l]]) => `<option value="${k}"${k === inv.status ? ' selected' : ''}>${l}</option>`).join('')}</select>` : ''}${E ? '<label class="btn" style="margin:0">⬆ استيراد إكسل<input id="ivImp" type="file" accept=".xlsx,.xls" hidden></label>' : ''}</div></div>
+  ${lock && ed ? '<div class="note" style="margin-top:8px">المستخلص اتقدّم – عشان تعدّل فيه رجّع حالته لـ"مسودة".</div>' : ''}
+  <div class="sttabs"><div class="seg">${tabs.map(([k, l]) => `<button type="button" data-tab="${k}" class="${V.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>
+  <div style="margin-top:12px">${V.tab === 'summary' ? summary : catTable(V.tab)}</div>`;
+  const keep = () => { document.querySelectorAll('[data-l][data-f]').forEach(x => { const l = L[+x.dataset.l]; if (!l) return; const f = x.dataset.f; l[f] = ['rate', 'prev_qty', 'cur_qty'].includes(f) ? (x.value === '' ? 0 : +x.value) : f === 'pct' ? (x.value === '' ? 1 : +x.value / 100) : f === 'item_id' ? x.value || null : x.value; }); };
+  const meta = () => { const g = id => $('#' + id)?.value; const m = {}; if ($('#ivTitle')) m.title = g('ivTitle'); if ($('#ivDate')) { m.inv_date = g('ivDate') || null; m.period_from = g('ivFrom') || null; m.period_to = g('ivTo') || null; } if ($('#ivPay')) m.pay_pct = (+g('ivPay') || 0) / 100; if ($('#ivFee')) m.fee_pct = (+g('ivFee') || 0) / 100; return m; };
+  if (E) { V.meta = { ...(V.meta || {}), ...{} }; }
+  const re = () => { keep(); Object.assign(inv, meta()); V.metaPend = { ...(V.metaPend || {}), ...meta() }; renderInvOne(); };
+  document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { if (E) keep(); V.metaPend = { ...(V.metaPend || {}), ...meta() }; V.tab = b.dataset.tab; renderInvOne(); });
+  $('#ivBack').onclick = e => { e.preventDefault(); if (E && !confirm('في تعديلات مش محفوظة. تخرج من غير حفظ؟')) return; V.id = null; V.L = null; V.edit = false; V.metaPend = null; renderInv(); };
+  $('#ivEd') && ($('#ivEd').onclick = () => { V.edit = true; renderInvOne(); });
+  $('#ivCancel') && ($('#ivCancel').onclick = () => { V.edit = false; V.L = null; V.metaPend = null; renderInvOne(); });
+  if (E && V.metaPend) { const m = V.metaPend; if ('title' in m && $('#ivTitle')) $('#ivTitle').value = m.title; if (m.inv_date !== undefined && $('#ivDate')) { $('#ivDate').value = m.inv_date || ''; $('#ivFrom').value = m.period_from || ''; $('#ivTo').value = m.period_to || ''; } if ('pay_pct' in m && $('#ivPay')) $('#ivPay').value = Math.round(m.pay_pct * 100); if ('fee_pct' in m && $('#ivFee')) $('#ivFee').value = Math.round(m.fee_pct * 1000) / 10; }
+  $('#main').onclick = async e => {
+    const ad = e.target.closest('[data-add]'); if (ad) { keep(); const [kind, cat] = ad.dataset.add.split('|'); const mx = Math.max(0, ...L.filter(l => l.cat === cat).map(l => l.sort)); L.push({ cat, kind, name: kind === 'line' ? '' : (kind === 'head1' ? 'عنوان رئيسي' : 'عنوان فرعي'), unit: ICUM(cat) ? 'م3' : 'مقطوعية', rate: 0, prev_qty: 0, cur_qty: ICUM(cat) ? 0 : 1, pct: 1, prev_value: 0, sort: mx + 10, _new: true }); return renderInvOne(); }
+    const dl = e.target.closest('[data-ldel]'); if (dl) { keep(); const l = L[+dl.dataset.ldel]; if (l.id) V.del.push(l.id); L.splice(+dl.dataset.ldel, 1); return renderInvOne(); }
+  };
+  $('#main').oninput = e => { if (e.target.matches('[data-l][data-f]') && ['rate', 'prev_qty', 'cur_qty', 'pct'].includes(e.target.dataset.f)) { /* live total on blur */ } };
+  $('#main').onchange = e => { if (!E) return; if (e.target.matches('#ivPay, #ivFee')) return re();
+    if (e.target.matches('[data-l][data-f]')) { keep(); const l = L[+e.target.dataset.l], c = $('#lv' + l._i); if (c) c.innerHTML = `<b>${nf(lnVal(l), 0)}</b>${ICUM(l.cat) && Math.abs(lnCur(l)) > 0.5 ? `<div class="cur" style="font-size:11px">الحالي ${nf(lnCur(l), 0)}</div>` : ''}`; const t = $('#ivCurT'); if (t) t.textContent = nf(invTot(L)[l.cat], 0); } };
+  $('#ivPull') && ($('#ivPull').onclick = async () => { keep(); const ids = [...new Set(L.filter(l => l.cat === 'contract' && l.item_id).map(l => l.item_id))]; if (!ids.length) return toast('اربط بنود المستخلص ببنود المقايسة الأول');
+    const { data: pe } = await S.sb.from('progress_entries').select('item_id,qty').in('item_id', ids); const ex = {}; (pe || []).forEach(x => ex[x.item_id] = (ex[x.item_id] || 0) + +x.qty);
+    const grp = {}; L.filter(l => l.cat === 'contract' && l.item_id && l.kind === 'line').forEach(l => (grp[l.item_id] ||= []).push(l)); let n = 0;
+    Object.entries(grp).forEach(([id, ls]) => { if (ls.length !== 1) return; const l = ls[0], c = Math.max(0, (ex[id] || 0) - +l.prev_qty); if (Math.abs(c - +l.cur_qty) > 1e-6) { l.cur_qty = Math.round(c * 1000) / 1000; n++; } });
+    toast(n ? `اتحدّث الحالي في ${n} بند من المنفذ المعتمد` : 'مفيش كميات جديدة في التقارير المعتمدة'); renderInvOne(); });
+  $('#ivLedger') && ($('#ivLedger').onclick = async () => { keep(); const cat = V.tab, m = { ...inv, ...meta() }; if (!m.period_from && !m.period_to) return toast('حدد فترة المستخلص الأول');
+    let q = S.sb.from('ledger_entries').select('*').eq('project_id', P.id).gt('expense', 0); if (m.period_from) q = q.gt('entry_date', m.period_from); if (m.period_to) q = q.lte('entry_date', m.period_to);
+    const { data: le, error: er } = await q.order('entry_date'); if (er) return toast(er.message); if (!le?.length) return toast('مفيش قيود مصروفات في الفترة دي');
+    const mx = Math.max(0, ...L.filter(l => l.cat === cat).map(l => l.sort)); le.forEach((x, k) => L.push({ cat, kind: 'line', name: x.description || x.supplier || 'مصروف', unit: 'مقطوعية', rate: +x.expense, prev_qty: 0, cur_qty: 1, pct: 1, prev_value: 0, notes: [x.supplier, x.entry_date && fmtD(x.entry_date)].filter(Boolean).join(' · '), sort: mx + 10 * (k + 1) }));
+    toast(`اتضاف ${le.length} قيد – راجعهم واحذف اللي مش تبع المستخلص`); renderInvOne(); });
+  $('#ivSave') && ($('#ivSave').onclick = async () => { keep(); const b = $('#ivSave'); b.disabled = true; const t = invTot(L);
+    const head = { ...meta(), amt_design: t.design, amt_contract: t.contract, amt_supply: t.supply, amt_extra: t.extra, updated_at: new Date().toISOString() };
+    if (inv.legacy && !L.length) { delete head.amt_design; delete head.amt_contract; delete head.amt_supply; delete head.amt_extra; }
+    let { error: er } = await S.sb.from('owner_invoices').update(head).eq('id', inv.id);
+    if (!er && V.del.length) ({ error: er } = await S.sb.from('owner_invoice_lines').delete().in('id', V.del));
+    const clean = l => { const o = { invoice_id: inv.id }; ['cat', 'kind', 'name', 'description', 'unit', 'rate', 'prev_qty', 'cur_qty', 'pct', 'prev_value', 'notes', 'item_id', 'sort'].forEach(k => o[k] = l[k] ?? (k === 'name' ? '' : null)); ['rate', 'prev_qty', 'cur_qty', 'prev_value'].forEach(k => o[k] = +o[k] || 0); o.pct = o.pct == null ? 1 : +o.pct; o.sort = +o.sort || 0; if (l.line_key) o.line_key = l.line_key; return o; };
+    const up = L.filter(l => l.id).map(l => ({ id: l.id, ...clean(l) })), ins = L.filter(l => !l.id).map(clean);
+    for (let k = 0; k < up.length && !er; k += 300) ({ error: er } = await S.sb.from('owner_invoice_lines').upsert(up.slice(k, k + 300)));
+    for (let k = 0; k < ins.length && !er; k += 300) ({ error: er } = await S.sb.from('owner_invoice_lines').insert(ins.slice(k, k + 300)));
+    if (er) { b.disabled = false; return toast('مقدرتش أحفظ: ' + er.message); } toast('اتحفظ المستخلص'); V.edit = false; V.L = null; V.metaPend = null; renderInvOne(); });
+  $('#ivSt') && ($('#ivSt').onchange = async e => { const { error: er } = await S.sb.from('owner_invoices').update({ status: e.target.value, updated_at: new Date().toISOString() }).eq('id', inv.id); if (er) return toast(er.message); toast('اتغيرت الحالة'); renderInvOne(); });
+  $('#ivPrint') && ($('#ivPrint').onclick = async () => { const { data: all } = await S.sb.from('owner_invoices').select('*').eq('project_id', P.id).lte('no', inv.no).order('no'); printInv(inv, L, all || [inv]); });
+  $('#ivXls') && ($('#ivXls').onclick = () => exportInv(inv, L));
+  $('#ivImp') && ($('#ivImp').onchange = async e => { const f = e.target.files[0]; if (!f) return; keep(); const n = await importInvXlsx(f, L); if (n) { toast(`اتقرى ${n} سطر من الإكسل – راجعهم واضغط حفظ`); renderInvOne(); } });
+}
+function invHeadHtml(inv, sub) { const p = S.P.proj; return `<div class="ph"><table class="meta"><tr><td>المشروع :</td><td>${esc(p.name)}</td></tr><tr><td>اسم المالك :</td><td>${esc(p.owner_name || '')}</td></tr><tr><td>الموقع :</td><td>${esc(p.place || '')}</td></tr><tr><td>التاريخ :</td><td>${inv.inv_date ? new Date(inv.inv_date + 'T12:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}</td></tr></table>${LOGO()}</div><h2 class="ttl">${sub}</h2>`; }
+function printInv(inv, L, all) {
+  const P = S.P, p = P.proj, T = invTot(L), useLines = L.length > 0;
+  const amt = k => useLines ? T[k] : +inv['amt_' + k], works = Object.keys(ICAT).reduce((s, k) => s + amt(k), 0);
+  const sig = '<div class="sig"><span>ممثل المقاول</span><span>ممثل الاستشاري</span><span>مسئول حسابات</span></div>';
+  const hist = all.map(i => i.id === inv.id ? { ...i, amt_design: amt('design'), amt_contract: amt('contract'), amt_supply: amt('supply'), amt_extra: amt('extra') } : i);
+  const tot = k => hist.reduce((s, i) => s + +i['amt_' + k], 0);
+  const sheet = c => { const R = L.filter(l => l.cat === c), cum = ICUM(c); if (!R.length) return '';
+    return `<section>${invHeadHtml(inv, `${esc(inv.title || '')} – ${ICAT[c]}${c === 'contract' ? ' <span class="red">(مصاريف تراكمية)</span>' : ''}`)}<table class="g"><thead><tr><th>م</th><th>البند</th><th>الوحدة</th><th>الفئة</th>${cum ? '<th>السابق</th>' : ''}<th>الحالي</th>${cum ? '<th>إجمالي الكميات</th><th>نسبة الإنجاز</th>' : '<th>نسبة الصرف</th>'}<th>قيمة الصرف</th><th>ملاحظات</th></tr></thead><tbody>
+      ${(() => { let n = 0; return R.map(l => l.kind !== 'line' ? `<tr class="${l.kind}"><td></td><td colspan="${cum ? 9 : 7}">${esc(l.name)}</td></tr>` : `<tr class="${+l.cur_qty && cum ? 'hl' : ''}"><td>${++n}</td><td class="nm">${esc(l.name)}</td><td>${esc(l.unit || '')}</td><td>${nf(l.rate)}</td>${cum ? `<td>${nf(l.prev_qty)}</td>` : ''}<td class="red">${+l.cur_qty ? nf(l.cur_qty) : '-'}</td>${cum ? `<td>${nf(+l.prev_qty + +l.cur_qty)}</td>` : ''}<td>${Math.round(l.pct * 100)}%</td><td><b>${nf(lnVal(l), 0)}</b></td><td class="nt">${esc(l.notes || '')}</td></tr>`).join(''); })()}
+      </tbody></table><table class="tt"><tr><th>إجمالي ${ICAT[c]}</th><td>${nf(cum ? (c === 'contract' ? T.cumContract : T.cumDesign) : T[c], 0)}</td></tr>${cum ? `<tr><th class="red">إجمالي الأعمال السابقة</th><td class="red">${nf(c === 'contract' ? T.prevContract : T.prevDesign, 0)}</td></tr><tr><th class="red">إجمالي الأعمال الحالية</th><td class="red">${nf(T[c], 0)}</td></tr>` : ''}</table>${sig}</section>`; };
+  const html = `<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>${esc(p.name)} – ${esc(inv.title || '')}</title><base href="${location.href.split('#')[0]}"><style>
+  @page{size:A3 landscape;margin:12mm}body{font-family:"Segoe UI",Tahoma,Arial,sans-serif;color:#111;margin:0;font-size:12px}section{page-break-after:always;padding:4mm}
+  .logo .lk{display:none}.logo img{height:46px}.ph{display:flex;justify-content:space-between;align-items:flex-start}.meta td{padding:1px 6px;font-size:13px}.meta td:first-child{font-weight:700}
+  .ttl{text-align:center;font-size:17px;margin:6px 0 10px;text-decoration:underline}.red{color:#c00}
+  table.g{width:100%;border-collapse:collapse}table.g th{background:#203864;color:#fff;padding:6px 4px;font-size:12px;border:1px solid #203864}table.g td{border:1px solid #999;padding:3px 5px;text-align:center}
+  table.g td.nm{text-align:right;white-space:pre-wrap;max-width:520px}table.g td.nt{text-align:right;font-size:11px}table.g tr.head1 td{background:#fbe5d6;font-weight:700;text-align:right;font-size:13px}table.g tr.head2 td{background:#d9d9d9;font-weight:700;text-align:right}table.g tr.hl td{background:#dce6f1}
+  table.tt{margin-top:6px;border-collapse:collapse}table.tt th{background:#203864;color:#fff;padding:4px 10px;text-align:right}table.tt th.red,table.tt td.red{background:none;color:#c00}table.tt td{padding:4px 10px;font-weight:700}
+  .sig{display:flex;justify-content:space-around;margin-top:22px;font-weight:700}.cover{display:flex;flex-direction:column;justify-content:center;height:250mm}.cover table{margin:0 auto;font-size:28px;font-weight:700}.cover td{padding:12px 40px}
+  table.sm{width:100%;border-collapse:collapse;margin-top:30mm}table.sm th{background:#203864;color:#fff;padding:5px;border:1px solid #fff}table.sm td{border:1px solid #333;padding:5px;text-align:center}table.sm td:first-child{text-align:right}table.sm tr.tot td{font-weight:700}table.sm tr.tot td:first-child{color:#c00}
+  table.pay{margin:14px 0 0 auto;border-collapse:collapse;font-size:14px}table.pay th{background:#203864;color:#fff;padding:5px 10px}table.pay td{border:1px solid #333;padding:5px 12px;text-align:center}table.pay td:first-child{text-align:right;font-weight:700}table.pay tr.net td{background:#b4c6e7;color:#c00;font-size:18px;font-weight:700}
+  </style></head><body>
+  <section class="cover"><table><tr><td>المشروع</td><td>${esc(p.name)}</td></tr><tr><td>الموقع</td><td>${esc(p.place || '')}</td></tr><tr><td>المالك</td><td>${esc(p.owner_name || '')}</td></tr><tr><td>الإستشاري</td><td>${esc(p.consultant_name || '')}</td></tr><tr><td>المقاول</td><td>${esc(p.contractor_name || 'شركة ريسان')}</td></tr><tr><td>المستخلص</td><td>${esc(inv.title || '')}</td></tr></table></section>
+  <section>${invHeadHtml(inv, `إجمالي المنصرف ${esc(inv.title || '')} – مشروع ${esc(p.name)}`)}<table class="sm"><thead><tr><th>وصف البند</th>${hist.map(i => `<th>مستخلص ${i.no}<br>(جنيه)</th>`).join('')}<th>إجمالي<br>(جنيه)</th></tr></thead><tbody>
+    ${Object.entries(ICAT).map(([k, l]) => `<tr><td>إجمالي ${l}${ICUM(k) ? ' <span class="red">(مصاريف تراكمية)</span>' : ''}</td>${hist.map(i => `<td>${nf(i['amt_' + k], 0)}</td>`).join('')}<td>${nf(tot(k), 0)}</td></tr>`).join('')}
+    <tr class="tot"><td>إجمالي الأعمال</td>${hist.map(i => `<td>${nf(invSum(i), 0)}</td>`).join('')}<td>${nf(hist.reduce((s, i) => s + invSum(i), 0), 0)}</td></tr></tbody></table>
+    <table class="pay"><tr><th></th><th>نسبة الصرف</th><th>القيمة</th><th>إجمالي المستحق صرفه</th></tr><tr><td>إجمالي الأعمال عن ${esc(inv.title || '')}</td><td>${Math.round(inv.pay_pct * 100)}%</td><td>${nf(works, 0)}</td><td>${nf(works * inv.pay_pct, 0)}</td></tr><tr><td>نسبة الشركة عن ${esc(inv.title || '')}</td><td>100%</td><td>${nf(works * inv.fee_pct, 0)}</td><td>${nf(works * inv.fee_pct, 0)}</td></tr><tr class="net"><td colspan="3">المستحق صرفه</td><td>${nf(works * inv.pay_pct + works * inv.fee_pct, 0)}</td></tr></table></section>
+  ${['design', 'contract', 'supply', 'extra'].map(sheet).join('')}
+  <script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script></body></html>`;
+  const w = window.open('', '_blank'); if (!w) return toast('المتصفح منع فتح نافذة الطباعة، اسمح بالنوافذ المنبثقة'); w.document.write(html); w.document.close();
+}
+function exportInv(inv, L) {
+  if (!window.XLSX) return toast('مكتبة الإكسل لسه ماحمّلتش');
+  const wb = XLSX.utils.book_new();
+  Object.entries(ICAT).forEach(([c, nm]) => { const cum = ICUM(c), R = L.filter(l => l.cat === c); if (!R.length) return;
+    const rows = [['النوع', 'البند', 'الوحدة', 'الفئة', ...(cum ? ['السابق'] : []), 'الحالي', ...(cum ? ['إجمالي الكميات'] : []), cum ? 'نسبة الإنجاز' : 'نسبة الصرف', 'قيمة الصرف', 'ملاحظات', 'كود المقايسة']];
+    R.forEach(l => rows.push([l.kind === 'line' ? '' : l.kind === 'head1' ? 'عنوان' : 'فرعي', l.name, l.unit || '', +l.rate, ...(cum ? [+l.prev_qty] : []), +l.cur_qty, ...(cum ? [+l.prev_qty + +l.cur_qty] : []), +l.pct, Math.round(lnVal(l)), l.notes || '', l.item_id ? (S.P.items.find(i => i.id === l.item_id)?.code || '') : '']));
+    const ws = XLSX.utils.aoa_to_sheet(rows); ws['!cols'] = [{ wch: 7 }, { wch: 60 }, { wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 9 }, { wch: 12 }, { wch: 22 }, { wch: 10 }]; ws['!views'] = [{ RTL: true }];
+    XLSX.utils.book_append_sheet(wb, ws, nm.slice(0, 30)); });
+  if (!wb.SheetNames.length) return toast('المستخلص مفيهوش بنود'); XLSX.writeFile(wb, `${S.P.proj.name} - ${inv.title || 'مستخلص'}.xlsx`);
+}
+async function importInvXlsx(file, L) {
+  if (!window.XLSX) { toast('مكتبة الإكسل لسه ماحمّلتش'); return 0; }
+  const wb = XLSX.read(await file.arrayBuffer()), T = v => String(v ?? '').trim(), N = v => typeof v === 'number' ? v : +String(v).replace(/[,%\s]/g, '') || 0; let n = 0;
+  const catOf = (sn, A) => { const t = sn + ' ' + A.slice(0, 8).flat().map(T).join(' '); return /تصميم/.test(t) ? 'design' : /توريد|مشتريات/.test(t) ? 'supply' : /اضاف|إضاف|أخرى|اخرى/.test(t) ? 'extra' : /تعاقد/.test(t) ? 'contract' : null; };
+  for (const sn of wb.SheetNames) {
+    const A = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' }); let hi = -1;
+    for (let i = 0; i < Math.min(A.length, 25); i++) { const r = A[i].map(T); if (r.includes('البند') && r.some(x => /الفئة|الفئه/.test(x)) && r.some(x => /الحالي|الحالى/.test(x))) { hi = i; break; } }
+    if (hi < 0) continue; const cat = catOf(sn, A); if (!cat) continue;
+    const H = A[hi].map(T), c = re => H.findIndex(x => re.test(x)), cN = H.indexOf('البند'), cU = c(/الوحدة|الوحده/), cR = c(/الفئة|الفئه/), cP = c(/السابق/), cC = c(/الحالي|الحالى/), cX = c(/نسبة/), cNo = c(/ملاحظات/), cNum = c(/رقم البند/);
+    let mx = Math.max(0, ...L.filter(l => l.cat === cat).map(l => l.sort)), desc = '';
+    A.slice(hi + 1).forEach(r => { const name = T(r[cN]); if (!name) return; if (/^اجما|^أجما|^إجما/.test(name)) return; const rate = N(r[cR]), prev = cP >= 0 ? N(r[cP]) : 0, cur = cC >= 0 ? N(r[cC]) : 0, unit = cU >= 0 ? T(r[cU]) : '';
+      let pct = cX >= 0 ? N(r[cX]) : 1; if (pct > 1) pct /= 100; if (!pct && (rate || prev || cur)) pct = 1;
+      if (!rate && !prev && !cur && !unit) { if (name.length > 70) { desc = name; return; } L.push({ cat, kind: T(r[cNum]) ? 'head1' : 'head2', name, rate: 0, prev_qty: 0, cur_qty: 0, pct: 1, prev_value: 0, sort: (mx += 10) }); n++; return; }
+      const l = { cat, kind: 'line', name: desc && name.length < 60 ? name : name, description: desc || null, unit, rate, prev_qty: ICUM(cat) ? prev : 0, cur_qty: cur, pct, prev_value: 0, notes: cNo >= 0 ? T(r[cNo]) || null : null, sort: (mx += 10) };
+      if (ICUM(cat)) l.prev_value = prev * rate * pct; if (desc && l.kind === 'line' && !L.some(x => x.description === desc)) L.push({ cat, kind: 'head2', name: desc, rate: 0, prev_qty: 0, cur_qty: 0, pct: 1, prev_value: 0, sort: l.sort - 5 }); L.push(l); n++; });
+  }
+  if (!n) toast('مش لاقي في الملف جداول بأعمدة البند والفئة والحالي'); return n;
 }
 
 /* ---------------- documents ---------------- */

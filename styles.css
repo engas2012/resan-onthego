@@ -343,3 +343,13 @@ a.vlink{text-decoration:none;font-size:12px;background:var(--bg);border-radius:6
 .vcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:4px}
 .vcard.s-approved{border-right:4px solid var(--ok)}.vcard.s-blocked{opacity:.55}
 .rbar .rt u{float:right}
+/* invoices */
+.ivsum{min-width:100%}.ivsum th,.ivsum td{white-space:nowrap;font-size:13px}.ivsum tr.tot td{font-weight:700;border-top:2px solid var(--ink)}
+.ivlist{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.ivcard{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;color:inherit;text-decoration:none}
+.ivno{width:42px;height:42px;flex:0 0 42px;border-radius:10px;background:var(--acc2);color:var(--acc);display:grid;place-items:center;font-weight:700;font-size:18px}
+.ivt{min-width:100%}.ivt td,.ivt th{font-size:13px;vertical-align:top}.ivt tr.head1 td{background:var(--acc2);font-weight:700}.ivt tr.head2 td{background:var(--bg);font-weight:700}
+.ivt input,.ivt textarea,.ivt select{min-height:34px;padding:3px 6px;font-size:13px}.ivt .isel{display:block;margin-top:4px;max-width:340px;font-size:12px}
+.cur{color:var(--acc)}.ivfoot{display:flex;gap:18px;justify-content:flex-end;flex-wrap:wrap;margin-top:8px;font-size:14px}
+.ivpay table{width:100%;max-width:640px}.ivpay td{padding:8px 6px;border-bottom:1px solid var(--line)}.ivpay tr.tot td{font-weight:700}.ivpay tr.net td{font-size:20px;font-weight:700;color:var(--acc);border-bottom:0}
+.ivpay input{min-height:32px;padding:2px 6px}
