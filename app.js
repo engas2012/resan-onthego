@@ -52,7 +52,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 2.4.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 2.5.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -89,7 +89,7 @@ const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', '
 function shell(pid, view) {
   const p = pid && S.projects.find(x => x.id === pid);
   return `<header><div class="hbar"><a class="brandlink" href="#home" title="الصفحة الرئيسية">${LOGO()}<span class="otg">On the go</span></a>
-  <div class="who2"><a class="homeb${!p && view !== 'admin' && view !== 'staff' ? ' on' : ''}" href="#home"><svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M5.5 9.5V20h5v-6h3v6h5V9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>الرئيسية</a>${p ? `<span class="roleTag">${ROLE[role(pid)] || ''}</span>` : ''}<span class="uname">${esc(S.profile.full_name || S.profile.email)}</span>${S.admin ? '<a href="#staff" class="adm">فريق العمل</a><a href="#admin" class="adm">المستخدمين</a>' : ''}<button id="out">خروج</button></div></div>
+  <div class="who2"><a class="bell${view === 'alerts' ? ' on' : ''}" href="#alerts" title="التنبيهات"><svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span class="badge" id="bellN" hidden></span></a><a class="homeb${!p && !['admin', 'staff', 'alerts'].includes(view) ? ' on' : ''}" href="#home"><svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M5.5 9.5V20h5v-6h3v6h5V9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>الرئيسية</a>${p ? `<span class="roleTag">${ROLE[role(pid)] || ''}</span>` : ''}<span class="uname">${esc(S.profile.full_name || S.profile.email)}</span>${S.admin ? '<a href="#staff" class="adm">فريق العمل</a><a href="#admin" class="adm">المستخدمين</a>' : ''}<button id="out">خروج</button></div></div>
   ${p ? `<div class="ptitle"><h1>${esc(p.name + ' – ' + p.place)}</h1><p>المالك: ${esc(p.owner_name)} · المقاول العام: ${esc(p.contractor_name)} · الاستشاري: ${esc(p.consultant_name)}</p></div>` : '<div class="ptitle"><h1>متابعة مشروعات الغردقة</h1></div>'}
   <nav>${p ? VIEWS.filter(v => !v[2] || can(v[2], pid)).map(([v, l]) => `<a href="#p/${pid}/${v}" class="${v === view ? 'on' : ''}">${l}${v === 'review' ? ' <span class="badge" id="pendN" hidden></span>' : ''}${v === 'tasks' ? ' <span class="badge" id="taskN" hidden></span>' : ''}</a>`).join('') : ''}</nav></header><main id="main"><p class="mut">جاري التحميل…</p></main>`;
 }
@@ -112,9 +112,10 @@ async function route() {
   $('#app').innerHTML = shell(null, h); bindOut();
   if (h === 'admin' && S.admin) return renderAdmin();
   if (h === 'staff' && S.admin) return renderStaff();
+  if (h === 'alerts') return renderAlerts();
   renderHome();
 }
-const bindOut = () => { $('#out').onclick = () => S.sb.auth.signOut(); };
+const bindOut = () => { $('#out').onclick = () => S.sb.auth.signOut(); updateBell(); };
 
 /* ---------------- data ---------------- */
 async function loadProject(pid) {
@@ -1156,6 +1157,42 @@ function exportXlsx() {
   if (P.reports.length) X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([['التاريخ', 'الحالة', 'المبنى', 'التخصص', 'الأعمال', '%'], ...P.reports.flatMap(r => (r.body.acts || []).map(a => [r.report_date, r.imported ? 'مُرحّل' : ST[r.status][1], a.building, a.discipline, a.work, a.progress]))]), 'المتابعة اليومية');
   wb.Workbook = { Views: [{ RTL: true }] }; X.writeFile(wb, 'موقف تنفيذي ' + p.name + ' ' + today() + '.xlsx');
 }
+
+
+/* ---------------- notifications, PWA install & web push ---------------- */
+async function updateBell() {
+  if (!S.sb?.from) return; const { count } = await S.sb.from('notifications').select('id', { count: 'exact', head: true }).is('read_at', null);
+  const b = $('#bellN'); if (b) { b.hidden = !count; b.textContent = count > 99 ? '99+' : count; }
+  try { navigator.setAppBadge && (count ? navigator.setAppBadge(count) : navigator.clearAppBadge()); } catch { }
+}
+const NK = { report_missing: '📝', report_returned: '↩️', review_waiting: '🧾', checklist_overdue: '📐', consultant_waiting: '✍️', digest: '📊' };
+const b64u = s => { const p = '='.repeat((4 - s.length % 4) % 4), r = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from([...r].map(c => c.charCodeAt(0))); };
+async function enablePush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return toast(/iphone|ipad/i.test(navigator.userAgent) ? 'على الآيفون: ضيف التطبيق للشاشة الرئيسية الأول، وافتحه من الأيقونة' : 'المتصفح ده مابيدعمش الإشعارات');
+  const perm = await Notification.requestPermission(); if (perm !== 'granted') return toast('الإشعارات اترفضت. تقدر تسمح بيها من إعدادات المتصفح');
+  const reg = (await navigator.serviceWorker.getRegistration()) || await navigator.serviceWorker.register('sw.js'), { data: key } = await S.sb.rpc('vapid_public_key'); await navigator.serviceWorker.ready;
+  const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(key) });
+  const j = sub.toJSON(), { error } = await S.sb.from('push_subscriptions').upsert({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, ua: navigator.userAgent.slice(0, 200) });
+  if (error) return toast('مقدرتش أسجل الجهاز: ' + error.message); toast('✓ الإشعارات اتفعّلت على الجهاز ده'); renderAlerts();
+}
+async function pushState() { try { if (!('serviceWorker' in navigator) || !('PushManager' in window)) return 'unsupported'; if (Notification.permission === 'denied') return 'denied'; const reg = await navigator.serviceWorker.getRegistration(); if (!reg) return 'off'; const s = await reg.pushManager.getSubscription(); return s ? 'on' : 'off'; } catch { return 'off'; } }
+async function renderAlerts() {
+  const [{ data }, st] = await Promise.all([S.sb.from('notifications').select('*').order('created_at', { ascending: false }).limit(80), pushState()]);
+  const L = data || [], standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone, ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const pj = id => S.projects.find(p => p.id === id)?.name || '';
+  $('#main').innerHTML = `<h2>التنبيهات</h2>
+  <div class="card pushcard">${st === 'on' ? '<b>🔔 الإشعارات شغالة على الجهاز ده</b><span class="mut">هيوصلك ملخص الساعة 10 الصبح و6 بالليل لو فيه حاجة متأخرة تخصك.</span>' : st === 'denied' ? '<b>الإشعارات مقفولة من المتصفح</b><span class="mut">افتح إعدادات الموقع في المتصفح واسمح بالإشعارات.</span>' : st === 'unsupported' && ios && !standalone ? '<b>عشان توصلك إشعارات على الآيفون</b><span class="mut">اضغط زرار المشاركة ⬆️ تحت، واختار "إضافة إلى الشاشة الرئيسية"، وافتح التطبيق من الأيقونة، وارجع للصفحة دي.</span>' : `<b>فعّل الإشعارات على الجهاز ده</b><span class="mut">عشان يوصلك تنبيه لو فيه تقرير متأخر أو اعتماد مستني أو نشاط متأخر.</span><button class="p" id="pushOn">تفعيل الإشعارات</button>`}
+  ${!standalone ? `<div class="mut" style="margin-top:6px">${S.installEvt ? '<button id="instBtn">⬇️ تثبيت التطبيق على الجهاز</button>' : ios ? 'لتثبيت التطبيق: زرار المشاركة ⬆️ ← إضافة إلى الشاشة الرئيسية.' : 'لتثبيت التطبيق: من قائمة المتصفح ← تثبيت التطبيق / إضافة للشاشة الرئيسية.'}</div>` : ''}</div>
+  <div class="acts" style="margin-top:6px">${L.some(n => !n.read_at) ? '<button id="allRead">تعليم الكل كمقروء</button>' : ''}</div>
+  <div class="nlist">${L.length ? L.map(n => `<a href="${esc(n.url || '#home')}" class="nrow${n.read_at ? '' : ' un'}" data-nid="${n.id}"><i>${NK[n.kind] || '🔔'}</i><div><b>${esc(n.title)}</b>${n.project_id ? ` <span class="mut">· ${esc(pj(n.project_id))}</span>` : ''}<div>${esc(n.body || '')}</div><small class="mut">${fmtD(n.day)}</small></div></a>`).join('') : '<p class="mut">مفيش تنبيهات. كل حاجة ماشية في ميعادها 👌</p>'}</div>`;
+  $('#pushOn') && ($('#pushOn').onclick = enablePush);
+  $('#instBtn') && ($('#instBtn').onclick = async () => { S.installEvt.prompt(); await S.installEvt.userChoice; S.installEvt = null; renderAlerts(); });
+  $('#allRead') && ($('#allRead').onclick = async () => { await S.sb.from('notifications').update({ read_at: new Date().toISOString() }).is('read_at', null); renderAlerts(); updateBell(); });
+  $('#main').querySelector('.nlist').onclick = async e => { const a = e.target.closest('[data-nid]'); if (a && a.classList.contains('un')) S.sb.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', a.dataset.nid).then(updateBell); };
+}
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); S.installEvt = e; });
+if ('serviceWorker' in navigator && !window.__SB_MOCK__ && !window.__MOCKDATA__) navigator.serviceWorker.register('sw.js').catch(() => { });
+addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S.user) updateBell(); });
 
 addEventListener('beforeunload', e => { if (S.bq?.pend?.size) { e.preventDefault(); e.returnValue = ''; } });
 boot();
