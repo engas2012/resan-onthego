@@ -49,7 +49,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 1.6.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 1.7.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -149,8 +149,8 @@ function liveWork(p, work, upd) {
   const ago = days == null ? '' : days <= 0 ? 'النهارده' : days === 1 ? 'امبارح' : `من ${days} يوم`;
   if (!acts.length && !work.length) return `<div class="live idle"><div class="lh">${CRANE}<div><b>جاري التنفيذ</b><span class="mut">مفيش تقارير معتمدة لسه</span></div></div></div>`;
   const fresh = days != null && days <= 10;
-  const actHtml = acts.map(a => { const pr = Math.max(0, Math.min(+a.progress || 0, 100)), d = pr - (pm[key(a)] ?? pr);
-    return `<li><div class="lt">${a.building ? `<span class="chip">${esc(a.building)}</span>` : ''}<span class="lw">${esc(a.work)}</span>${d > 0 ? `<span class="up">+${d}%</span>` : ''}</div><div class="lbar${pr >= 100 ? ' done' : ''}"><u style="--w:${pr}%"></u></div><em>${pr}%</em></li>`; }).join('');
+  const actHtml = acts.map(a => { const has = a.progress != null && a.progress !== '', pr = Math.max(0, Math.min(+a.progress || 0, 100)), d = has ? pr - (pm[key(a)] ?? pr) : 0;
+    return `<li><div class="lt">${a.building ? `<span class="chip">${esc(a.building)}</span>` : ''}<span class="lw">${esc(a.work)}</span>${d > 0 ? `<span class="up">+${d}%</span>` : ''}</div>${has ? `<div class="lbar${pr >= 100 ? ' done' : ''}"><u style="--w:${pr}%"></u></div><em>${pr}%</em>` : '<div class="lbar ind"><u></u></div><em class="mut">جاري</em>'}</li>`; }).join('');
   const itemHtml = work.map(w => { const pc = Math.round(+w.pct * 100);
     return `<li><a class="lt" href="#p/${p.id}/status" title="${esc(w.name)}">${w.building ? `<span class="chip">${esc(w.building)}</span>` : ''}<span class="lw">${esc(w.code)} · ${esc(w.name.length > 46 ? w.name.slice(0, 46) + '…' : w.name)}</span>${+w.recent_qty > 0 ? `<span class="up">+${nf(w.recent_qty, 1)} ${esc(w.unit || '')}</span>` : ''}</a><div class="lbar"><u style="--w:${pc}%"></u></div><em>${pc}%</em></li>`; }).join('');
   return `<div class="live${fresh ? '' : ' stale'}"><div class="lh">${CRANE}<div><b><i class="dot"></i>جاري التنفيذ الآن</b><span class="mut">${cur ? `آخر تقرير معتمد ${ago} · ${fmtD(cur.report_date)}${cur.labor ? ` · ${cur.labor} عامل` : ''}` : 'من بنود المقايسة'}</span></div>
@@ -276,11 +276,11 @@ const itemName = id => { const i = S.P.items.find(x => x.id === id); return i ? 
 const mini = (rows, cols) => rows && rows.length ? `<div class="scroll"><table><thead><tr>${cols.map(c => `<th${c[2] ? ' class="n"' : ''}>${c[1]}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${cols.map(c => `<td${c[2] ? ' class="n"' : ''}>${c[3] ? esc(itemName(r[c[0]])) : c[2] ? nf(r[c[0]]) : esc(r[c[0]] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : '';
 function details(r, withQty = true) {
   const b = r.body || {}, A = b.acts || [];
-  return `<b>الأعمال</b>${mini(A.map(a => ({ ...a, progress: a.progress ?? '' })), [...(A.some(a => a.building) ? [['building', 'المبنى']] : []), ['discipline', 'التخصص'], ['work', 'الأعمال'], ['progress', '%']])}
+  return `${b.arrival ? `<p style="margin:0 0 6px"><b>موعد الوصول:</b> ${esc(b.arrival)}</p>` : ''}<b>الأعمال</b>${mini(A.map(a => ({ ...a, progress: a.progress ?? '' })), [...(A.some(a => a.building) ? [['building', 'المبنى']] : []), ['discipline', 'التخصص'], ['work', 'الأعمال'], ['progress', '%']])}
   ${b.obstacles ? `<p><b>المعوقات:</b> ${esc(b.obstacles)}</p>` : ''}${b.action ? `<p><b>الإجراء:</b> ${esc(b.action)}</p>` : ''}${b.notes ? `<p><b>ملاحظات:</b> ${esc(b.notes)}</p>` : ''}
   ${withQty && b.qty?.length ? '<b>الكميات</b>' + mini(b.qty, [['item', 'البند', 0, 1], ['qty', 'الكمية', 1]]) : ''}${b.pours?.length ? '<b>صبات الخرسانة</b>' + mini(b.pours, [['element', 'العنصر'], ['vol', 'م3', 1], ['supplier', 'المحطة']]) : ''}
   ${b.labor?.length ? `<b>العمالة (${b.labor.reduce((s, l) => s + (+l.count || 0), 0)} فرد)</b>` + mini(b.labor, [['building', 'المبنى'], ['trade', 'التخصص'], ['count', 'العدد', 1], ['contractor', 'المقاول']]) : ''}
-  ${b.equip?.length ? '<b>المعدات</b>' + mini(b.equip, [['name', 'المعدة'], ['count', 'العدد', 1], ['hours', 'ساعات', 1]]) : ''}${b.supply?.length ? '<b>التوريدات</b>' + mini(b.supply, [['item', 'الصنف'], ['unit', 'الوحدة'], ['req', 'المطلوب', 1], ['got', 'المورّد', 1], ['supplier', 'المورد']]) : ''}`;
+  ${b.equip?.length ? '<b>المعدات</b>' + mini(b.equip, [['name', 'المعدة'], ['count', 'العدد', 1], ['hours', 'ساعات', 1]]) : ''}${b.supply?.length ? '<b>التوريدات</b>' + mini(b.supply, [['item', 'الصنف'], ['unit', 'الوحدة'], ['req', 'المطلوب', 1], ['got', 'المورّد', 1], ['supplier', 'المورد']]) : ''}${b.wa ? `<details class="wa"><summary class="mut">رسالة الواتساب الأصلية · ${esc(b.wa.from || '')} · ${esc(b.wa.posted || '')}</summary><pre>${esc(b.wa.text || '')}</pre></details>` : ''}`;
 }
 function renderReview() {
   const P = S.P, L = P.reports.filter(r => r.status === 'submitted').sort((a, b) => a.report_date.localeCompare(b.report_date));
@@ -301,13 +301,124 @@ function renderReview() {
 /* ---------------- log ---------------- */
 function renderLog() {
   const P = S.P;
-  $('#main').innerHTML = `<h2>سجل التقارير اليومية</h2><div class="filters"><select id="lState"><option value="">كل الحالات</option><option value="submitted">بانتظار المراجعة</option><option value="approved">معتمد</option><option value="returned">مرتجع</option></select><input id="lSearch" type="search" placeholder="بحث في الأعمال"></div><div id="logList"></div>`;
+  $('#main').innerHTML = `<h2>سجل التقارير اليومية</h2>${can('review', P.id) ? `<div class="acts" style="margin-top:0"><label class="btn">استيراد من جروب واتساب<input type="file" id="waF" accept=".txt,.zip" hidden></label></div><p class="mut" style="margin-top:-4px">من الجروب: ⋮ ← المزيد ← تصدير الدردشة ← بدون وسائط. ارفع الملف (zip أو txt) كما هو.</p><div id="waBox"></div>` : ''}<div class="filters"><select id="lState"><option value="">كل الحالات</option><option value="submitted">بانتظار المراجعة</option><option value="approved">معتمد</option><option value="returned">مرتجع</option></select><input id="lSearch" type="search" placeholder="بحث في الأعمال"></div><div id="logList"></div>`;
   const draw = () => { const st = $('#lState').value, q = $('#lSearch').value.trim();
     const L = P.reports.filter(r => (!st || r.status === st) && (!q || JSON.stringify(r.body.acts || []).includes(q))).slice(0, 150);
-    $('#logList').innerHTML = L.length ? L.map(r => { const [cls, lbl] = r.imported ? ['imp', 'مُرحّل من الإكسل'] : ST[r.status]; const w = (r.body.acts || []).map(a => (a.building ? a.building + ': ' : '') + a.work).join(' — ');
+    $('#logList').innerHTML = L.length ? L.map(r => { const [cls, lbl] = r.imported ? ['imp', r.body?.source === 'whatsapp' ? 'مُرحّل من واتساب' : r.body?.wa ? 'إكسل + واتساب' : 'مُرحّل من الإكسل'] : ST[r.status]; const w = (r.body.acts || []).map(a => (a.building ? a.building + ': ' : '') + a.work).join(' — ');
       return `<details class="rep"><summary><b>${r.report_date}</b><span class="w">${esc(w)}</span><span class="st ${cls}">${lbl}</span></summary><div class="body">${r.status === 'returned' ? `<div class="note">سبب الإرجاع: ${esc(r.review_comment)}</div>` : ''}${details(r)}<p class="mut">${r.created_by ? 'كتبه: ' + esc(S.names[r.created_by] || '') : ''}${r.reviewed_by && r.status === 'approved' ? ' · اعتمده: ' + esc(S.names[r.reviewed_by] || '') + ' ' + (r.reviewed_at || '').slice(0, 10) : ''}</p>${can('report', P.id) ? `<div class="acts"><button data-e="${r.id}">فتح في النموذج</button></div>` : ''}</div></details>`; }).join('') : '<p class="mut">مفيش تقارير.</p>'; };
   draw(); $('#lState').onchange = draw; $('#lSearch').oninput = draw;
+  $('#waF') && ($('#waF').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) importWhatsApp(f); });
   $('#logList').onclick = e => { const b = e.target.closest('[data-e]'); if (!b) return; history.replaceState(null, '', `#p/${P.id}/report`); document.querySelectorAll('nav a').forEach(a => a.classList.toggle('on', a.getAttribute('href') === `#p/${P.id}/report`)); renderReport(P.reports.find(r => r.id === b.dataset.e)); };
+}
+
+// WhatsApp chat export → daily report drafts (rule-based, tolerant of the formats used in the RESAN groups)
+const AR = s => String(s).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
+function waMessages(text) {
+  const out = [], re = /^‎?\[?(\d{1,2})\/(\d{1,2})\/(\d{2,4}),? (\d{1,2}:\d{2})(?::\d{2})?\s?([apAP]\.?[mM]\.?|ص|م)?\]? (?:- )?([^:]+?): ([\s\S]*)$/;
+  for (const line of text.split(/\r?\n/)) {
+    const m = re.exec(line);
+    if (m) { const y = m[3].length === 2 ? '20' + m[3] : m[3]; out.push({ date: `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`, time: m[4] + (m[5] ? ' ' + m[5] : ''), from: m[6].trim(), text: m[7] }); }
+    else if (out.length && !/^‎?\[?\d{1,2}\/\d{1,2}\/\d{2,4}, /.test(line)) out[out.length - 1].text += '\n' + line;
+  }
+  return out.map(m => ({ ...m, text: m.text.replace(/<This message was edited>|<تم تعديل هذه الرسالة>/g, '').trim() }));
+}
+const WA_SG = /لاند|land|ف[يى]لا|ڤيلا|سهل ?جيت|مجاويش|سيلز|السور|شخشيخ/gi, WA_SH = /شير[اي]?تون|المول|غرفة الكهرباء|الدور (الرابع|الخامس|السادس)|البدروم (السفلي|العلوي)/gi;
+const WA_TRADE = /^(?:عدد\s+)?(العمال(ة)?( بالموقع)?|صنايع|نجار|حداد|عامل|عمال|بنا|بنّا|فني|فنيين|سباك|مساح|كهربائ|مبيض|مُبيض|سواق|نقاش|مبلط|لحام)/;
+const WA_BLD = /^(?:(لاند|land)\s*0?([0-9]+)|(السور(?: امام الكر[فڤ]ان)?|سور الفيلات|سيلز ?اوفيس|السيلز ?اوفيس|sales office|الموقع العام|غرفة الكهرباء|البوابة))\s*[:：]?\s*$/i;
+const waDisc = w => /كهرب|كابل/.test(w) ? 'كهرباء' : /سباك|صرف صحي|تغذية|تكييف/.test(w) ? 'ميكانيكا / صحي' : /مبان|مبانى|محار|بياض/.test(w) ? 'مباني' : /دهان|سيراميك|رخام|بلاط/.test(w) ? 'معماري / تشطيبات' : /واجه/.test(w) ? 'واجهات' : /زراع|لاندسكيب/.test(w) ? 'لاندسكيب' : /نظاف|تحميل|مخلفات|تشوين/.test(w) ? 'عام' : 'انشائي';
+function waParse(m, defaults) {
+  const raw = AR(m.text), lines = raw.split('\n').map(l => l.replace(/\*/g, '').replace(/[‎‏⁦-⁩️]/g, '').replace(/^[\u{1F300}-\u{1FAFF}☀-➿]+\s*/u, '').trim()).filter(Boolean);
+  const head = lines[0] || ''; if (!/تقرير/.test(head) || raw.length < 100 || !/(موقف|نجار|حداد|عمال|وصول|الاعمال|الأعمال|جار[يى])/.test(raw)) return null;
+  let date = m.date; const d = /(\d{1,2})\s*[-/.]\s*(\d{1,2})\s*[-/.]\s*(\d{4})/.exec(raw.slice(0, 160));
+  if (d) { const hd = `${d[3]}-${d[2].padStart(2, '0')}-${d[1].padStart(2, '0')}`, diff = (Date.parse(m.date) - Date.parse(hd)) / 864e5; if (diff >= -1 && diff <= 4) date = hd; }
+  const sg = (raw.match(WA_SG) || []).length, sh = (raw.match(WA_SH) || []).length;
+  let project = sg > sh ? 'sahlgate' : sh > sg ? 'sheraton' : defaults[m.from] || null, sure = sg !== sh;
+  if (/شير[اي]?تون/.test(head)) { project = 'sheraton'; sure = true; } else if (/سهل ?جيت|مجاويش/.test(head)) { project = 'sahlgate'; sure = true; }
+  let arrival = null; const a = /(?:وصول|الوصول)[^0-9\n]{0,15}\n?\s*([0-9]{1,2})[.:]([0-9]{2})/.exec(raw); if (a) arrival = a[1].padStart(2, '0') + ':' + a[2];
+  const labor = [], equip = [], acts = [], notes = [], obst = [], plan = []; let sec = 'labor', bld = '', total = null, eqTotal = null;
+  const after = l => l.split(/[:：]/).slice(1).join(':').trim(), none = s => /^لا ?يوجد\.?$/.test(s);
+  const addEq = s => s.split(/\s+-\s+|،|\+/).map(x => x.trim()).filter(x => x && !none(x)).forEach(x => { const p = /^(\d{1,2})\s*(.+)$/.exec(x), q = /^(.+?)\s*[:\-]?\s*(\d{1,2})$/.exec(x); equip.push(p ? { building: '', name: p[2], count: +p[1], hours: 8 } : q && !/^\d/.test(q[1]) ? { building: '', name: q[1], count: +q[2], hours: 8 } : { building: '', name: x, count: 1, hours: 8 }); });
+  const laborLine = l => { const n = /^(.+?)\s*[:：\-]?\s*(\d{1,3})(?:\s+(.*))?$/.exec(l); if (!n || !WA_TRADE.test(n[1]) || /سقف|اعمد|أعمد|الدور|فيلا|لاند|land/i.test(n[1])) return false;
+    const w = n[1].replace(/\s*تبع\s*/g, ' ').replace(/^عدد\s+/, '').trim().split(/\s+/); let trade = w.shift(); if (/صنايع/.test(trade) && w.length > 1) trade = ({ 'النجارة': 'نجارين', 'الحدادة': 'حدادين', 'المباني': 'بنايين' })[w[0]] || w[0], w.shift(); labor.push({ building: '', trade, count: +n[2], hours: 8, contractor: w.join(' ').replace(/^(الحج|حج|م\.?|ا\.?)\s+/, '').replace(/[.،,]+$/, '').trim() }); return true; };
+  for (let i = 1; i < lines.length; i++) {
+    let l = lines[i];
+    if (/موقف ال[اأ]عمال|^ال[اأ]عمال(\s+المنفذة|\s+اليوم)?\s*[:：]?\s*$|^[اأ]عمال اليوم/.test(l)) { sec = 'acts'; l = after(l); if (!l) continue; }
+    else if (/^(عدد )?(ال)?معدات/.test(l)) { const r = after(l); if (/^\d+$/.test(r)) { eqTotal = +r; sec = 'equip'; continue; } sec = 'equip'; if (r) addEq(r); continue; }
+    else if (/^(ال)?معوقات|المعوقات أو|^المشاكل/.test(l)) { sec = 'obst'; const r = after(l); if (r && !none(r)) obst.push(r); continue; }
+    else if (/^(احتياجات|خطة العمل|خطة الغد|المطلوب)/.test(l)) { sec = 'plan'; const r = after(l); if (r) plan.push(r); continue; }
+    else if (/^(ال)?ملاحظات/.test(l)) { sec = 'notes'; const r = after(l); if (r && !none(r)) notes.push(r); continue; }
+    else if (/عدد الف?ني/.test(l) && /\d/.test(l)) { total = +/(\d{1,3})/.exec(l)[1]; continue; }
+    if (/موعد الوصول|^وصول|^الحضور/.test(l) || /^[0-9]{1,2}[.:][0-9]{2}\s*(ص|صباح[اًا]?|م|مساء)?$/.test(l)) continue;
+    l = l.replace(/^[.\-–•·]+\s*|^\d{1,2}\s*[.)]\s*/, '').trim(); if (!l) continue;
+    if (sec === 'labor' || sec === 'equip') { if (laborLine(l)) continue; }
+    if (sec === 'labor') { if (/جار[يى]|^تم |تسليم|نجارة|حدادة|صب |ردم|فك /.test(l) || WA_BLD.test(l)) { sec = 'acts'; i--; } continue; }
+    if (sec === 'equip') { if (WA_BLD.test(l) || /جار[يى]|^تم |تسليم/.test(l)) { sec = 'acts'; i--; continue; } addEq(l); continue; }
+    if (sec === 'obst') { if (!none(l)) obst.push(l); continue; }
+    if (sec === 'plan') { plan.push(l); continue; }
+    if (sec === 'notes') { if (!none(l)) notes.push(l); continue; }
+    if (sec === 'acts') {
+      if (!acts.length && laborLine(l)) continue;
+      const b = WA_BLD.exec(l); if (b) { bld = b[1] ? 'لاند ' + b[2] : b[3].replace(/^السيلز/, 'سيلز').replace(/sales office/i, 'سيلز اوفيس'); continue; }
+      const bi = /^(لاند|land)\s*0?(\d+)\s*[:\-–]\s*(.+)$/i.exec(l); let b2 = bld; if (bi) { b2 = bld = 'لاند ' + bi[2]; l = bi[3]; }
+      const inl = /(?:لاند|land)\s*0?(\d)/i.exec(l); if (inl && !bi) b2 = 'لاند ' + inl[1];
+      acts.push({ building: b2, discipline: waDisc(l), work: l, progress: null });
+    }
+  }
+  if (!labor.length && total) labor.push({ building: '', trade: 'فنيين', count: total, hours: 8, contractor: '' });
+  if (!equip.length && eqTotal) equip.push({ building: '', name: 'معدات', count: eqTotal, hours: 8 });
+  if (!acts.length && !labor.length) return null;
+  return { project, sure, date, from: m.from, body: { acts, labor, equip, arrival, obstacles: obst.join('\n'), action: plan.join('\n'), notes: notes.join('\n'), qty: [], pours: [], supply: [], source: 'whatsapp', wa: { from: m.from, posted: m.date + ' ' + m.time, text: m.text.slice(0, 4000) } } };
+}
+function waReports(text, defaults = {}) {
+  const by = {};
+  waMessages(text).map(m => waParse(m, defaults)).filter(Boolean).forEach(r => { const k = (r.project || '?') + '|' + r.date; if (!by[k] || r.body.wa.text.length >= by[k].body.wa.text.length * 0.6) by[k] = r; });
+  return Object.values(by).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+async function unzipText(buf, pick = n => /\.txt$/i.test(n)) {
+  const u = new Uint8Array(buf), dv = new DataView(buf); let e = -1;
+  for (let i = u.length - 22; i >= Math.max(0, u.length - 66000); i--) if (dv.getUint32(i, true) === 0x06054b50) { e = i; break; }
+  if (e < 0) throw new Error('ملف zip غير صالح');
+  let p = dv.getUint32(e + 16, true); const n = dv.getUint16(e + 10, true), dec = new TextDecoder();
+  for (let k = 0; k < n; k++) {
+    const meth = dv.getUint16(p + 10, true), cs = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true), xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), lo = dv.getUint32(p + 42, true), name = dec.decode(u.subarray(p + 46, p + 46 + nl));
+    p += 46 + nl + xl + cl;
+    if (!pick(name)) continue;
+    const ds = lo + 30 + dv.getUint16(lo + 26, true) + dv.getUint16(lo + 28, true), data = u.subarray(ds, ds + cs);
+    if (meth === 0) return dec.decode(data);
+    const out = await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer(); return dec.decode(out);
+  }
+  throw new Error('مفيش ملف محادثة txt جوه الـ zip');
+}
+
+/* ---------------- WhatsApp import ---------------- */
+async function importWhatsApp(file) {
+  const box = $('#waBox'); box.innerHTML = '<p class="mut">جاري قراءة المحادثة…</p>';
+  let text; try { text = /\.zip$/i.test(file.name) ? await unzipText(await file.arrayBuffer()) : await file.text(); } catch (e) { return box.innerHTML = `<div class="note">${esc(e.message)}</div>`; }
+  let R = waReports(text); const vote = {};
+  R.filter(r => r.sure && r.project).forEach(r => { (vote[r.from] ||= {})[r.project] = (vote[r.from][r.project] || 0) + 1; });
+  const defs = Object.fromEntries(Object.entries(vote).map(([k, v]) => [k, Object.entries(v).sort((a, b) => b[1] - a[1])[0][0]]));
+  R = waReports(text, defs).filter(r => S.projects.some(p => p.id === r.project) ? can('review', r.project) : true);
+  if (!R.length) return box.innerHTML = '<div class="note">مش لاقي تقارير موقع في الملف. التقرير لازم أول سطر فيه كلمة "تقرير".</div>';
+  const ex = {}; await Promise.all(S.projects.filter(p => can('review', p.id)).map(async p => { const { data } = await S.sb.from('daily_reports').select('report_date,imported').eq('project_id', p.id); ex[p.id] = Object.fromEntries((data || []).map(x => [x.report_date, x.imported])); }));
+  const fate = r => !r.project ? 'none' : !(r.date in (ex[r.project] || {})) ? 'new' : ex[r.project][r.date] ? 'merge' : 'skip';
+  const FT = { new: ['appr', 'جديد'], merge: ['pend', 'دمج مع الموجود'], skip: ['imp', 'فيه تقرير من النظام'], none: ['ret', 'حدد المشروع'] };
+  const draw = () => { const c = {}; R.forEach(r => { const k = (r.project || '?') + '|' + fate(r); c[k] = (c[k] || 0) + 1; });
+    box.innerHTML = `<div class="card"><b>${esc(file.name)}</b>: ${R.length} تقرير من ${R[0].date} لـ ${R[R.length - 1].date}
+    <div class="mut" style="margin:6px 0">${S.projects.map(p => { const n = k => c[p.id + '|' + k] || 0; return `${esc(p.name)}: ${n('new')} جديد · ${n('merge')} دمج · ${n('skip')} متساب`; }).join('<br>')}${c['?|none'] ? `<br><span style="color:var(--bad)">${c['?|none']} تقرير محتاج تحدد مشروعه</span>` : ''}</div>
+    <p class="mut">التقارير الجديدة بتدخل معتمدة كأرشيف (من غير كميات، فمش بتغيّر نسب الإنجاز). الأيام اللي فيها تقرير مُرحّل من الإكسل بيتضاف لها الوصول والعمالة والمعدات من الواتساب. التقارير اللي اتكتبت على النظام مش بتتلمس.</p>
+    <div class="scroll" style="max-height:340px;overflow:auto"><table><thead><tr><th>التاريخ</th><th>المشروع</th><th>كتبه</th><th>الوصول</th><th class="n">العمالة</th><th>الأعمال</th><th>الحالة</th></tr></thead><tbody>${R.map((r, k) => { const f = fate(r);
+      return `<tr><td>${r.date}</td><td><select data-wp="${k}" style="min-height:32px;padding:2px 6px;font-size:13px${r.sure ? '' : ';border-color:var(--warn)'}"><option value="">؟</option>${S.projects.map(p => `<option value="${p.id}"${p.id === r.project ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select></td><td class="mut">${esc(r.from.replace(/^Eng\s+/, '').replace(/\s+Resan.*$/, ''))}</td><td>${r.body.arrival || '–'}</td><td class="n">${r.body.labor.reduce((s, l) => s + (+l.count || 0), 0) || '–'}</td><td title="${esc(r.body.acts.map(a => a.work).join(' — '))}">${esc((r.body.acts[0]?.work || '').slice(0, 50))}${r.body.acts.length > 1 ? ` <span class="mut">+${r.body.acts.length - 1}</span>` : ''}</td><td><span class="st ${FT[f][0]}">${FT[f][1]}</span></td></tr>`; }).join('')}</tbody></table></div>
+    <div class="acts"><button class="ok" id="waGo">استيراد</button><button id="waNo">إلغاء</button></div></div>`;
+    box.querySelectorAll('[data-wp]').forEach(sel => sel.onchange = () => { R[+sel.dataset.wp].project = sel.value || null; R[+sel.dataset.wp].sure = true; draw(); });
+    $('#waNo').onclick = () => box.innerHTML = '';
+    $('#waGo').onclick = async () => { $('#waGo').disabled = true; $('#waGo').textContent = 'جاري الاستيراد…'; const tot = { inserted: 0, merged: 0, skipped: 0 }; let err = null;
+      for (const p of S.projects) { const L = R.filter(r => r.project === p.id && fate(r) !== 'skip').map(r => ({ date: r.date, body: r.body }));
+        for (let k = 0; k < L.length && !err; k += 40) { const { data, error } = await S.sb.rpc('import_whatsapp_reports', { p_project: p.id, p_rows: L.slice(k, k + 40) }); if (error) err = error; else Object.keys(tot).forEach(x => tot[x] += data?.[0]?.[x] || 0); } }
+      if (err) { $('#waGo').disabled = false; $('#waGo').textContent = 'استيراد'; return toast('الاستيراد وقف: ' + err.message); }
+      toast(`اتسجل ${tot.inserted} تقرير جديد واتدمج ${tot.merged}`); box.innerHTML = ''; await loadProject(S.P.id); renderLog(); };
+  };
+  draw();
 }
 
 /* ---------------- admin: members ---------------- */
