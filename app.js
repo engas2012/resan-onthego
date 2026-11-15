@@ -13,6 +13,8 @@ const CAN = {
   report: ['site', 'tech'],
   review: ['tech', 'management'],
   log: ['site', 'tech', 'management'],
+  docs: ['site', 'tech', 'finance', 'management'],
+  docsUp: ['site', 'tech', 'management'],
   editBoq: ['tech', 'management'],
   ledger: ['finance', 'management'],
   boq: ['tech', 'finance', 'management'],
@@ -49,7 +51,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 1.8.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 1.9.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -82,7 +84,7 @@ async function afterLogin(user) {
 }
 
 /* ---------------- layout & routing ---------------- */
-const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', 'الجدول الزمني', null], ['boq', 'المقايسة والتكلفة', 'boq'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة المكتب الفني', 'review'], ['log', 'سجل التقارير', 'log']];
+const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', 'الجدول الزمني', null], ['boq', 'المقايسة والتكلفة', 'boq'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة المكتب الفني', 'review'], ['log', 'سجل التقارير', 'log'], ['docs', 'المستندات', 'docs']];
 function shell(pid, view) {
   const p = pid && S.projects.find(x => x.id === pid);
   return `<header><div class="hbar"><a class="brandlink" href="#home" title="الصفحة الرئيسية">${LOGO()}<span class="otg">On the go</span></a>
@@ -102,6 +104,7 @@ async function route() {
     if (view === 'log' && can('log', pid)) return renderLog();
     if (view === 'boq' && can('boq', pid)) return renderBoq();
     if (view === 'schedule') return renderSchedule();
+    if (view === 'docs' && can('docs', pid)) return renderDocs();
     return renderStatus();
   }
   $('#app').innerHTML = shell(null, h); bindOut();
@@ -124,8 +127,9 @@ async function loadProject(pid) {
   P.showRates = ['tech', 'finance', 'management'].includes(role(pid));
   P.items = (it.data || []).map(i => { const q = +i.qty || 0, ex = +i.executed || 0, rate = rates[i.id] || 0; const pct = q > 0 ? ex / q : (i.pct_override != null ? +i.pct_override : 0); return { ...i, ex, rate, pct: Math.max(0, pct), rem: q - ex, val: q * rate, known: q > 0 || i.pct_override != null }; });
   P.reports = rp.data || [];
+  P.docs = can('docs', pid) ? ((await S.sb.from('documents').select('*').eq('project_id', pid).order('doc_date', { ascending: false }).order('created_at', { ascending: false })).data || []) : [];
   P.proj = S.projects.find(x => x.id === pid);
-  const ids = [...new Set(P.reports.flatMap(r => [r.created_by, r.reviewed_by]).filter(x => x && !(x in S.names)))];
+  const ids = [...new Set([...P.reports.flatMap(r => [r.created_by, r.reviewed_by]), ...P.docs.map(d => d.uploaded_by)].filter(x => x && !(x in S.names)))];
   if (ids.length) { const { data } = await S.sb.from('profiles').select('id,full_name,email').in('id', ids); (data || []).forEach(u => S.names[u.id] = u.full_name || u.email); }
   const pend = P.reports.filter(r => r.status === 'submitted').length, b = $('#pendN'); if (b) { b.hidden = !pend; b.textContent = pend; }
 }
@@ -247,6 +251,7 @@ function renderReport(r) {
   <h3>العمالة</h3><div class="rows" id="lRows"></div><button type="button" data-add="labor">+ إضافة عمالة</button>
   <h3>المعدات</h3><div class="rows" id="eRows"></div><button type="button" data-add="equip">+ إضافة معدة</button>
   <h3>التوريدات</h3><div class="rows" id="sRows"></div><button type="button" data-add="supply">+ إضافة توريد</button>
+  <h3>المرفقات</h3><p class="mut" style="margin-top:-6px">ملفات Excel أو PDF أو صور (لحد 25 ميجا للملف). بتترفع مع إرسال التقرير.</p><input type="file" id="fFiles" accept="${DOC_ACCEPT}" multiple>
   <div class="acts"><button class="p" type="submit" id="fSave">إرسال للمكتب الفني</button><button type="button" id="fNew">تقرير جديد</button></div></form>`;
   fill(r);
   $('#main').onclick = e => { const a = e.target.closest('[data-add]'); if (a) addRow(a.dataset.add); const x = e.target.closest('.row .x'); if (x) x.closest('.row').remove(); };
@@ -269,6 +274,8 @@ async function submitReport(e) {
   const ex = P.reports.find(x => x.report_date === d); $('#fSave').disabled = true;
   const { error } = ex ? await S.sb.from('daily_reports').update({ body }).eq('id', ex.id) : await S.sb.from('daily_reports').insert({ project_id: P.id, report_date: d, body });
   $('#fSave').disabled = false; if (error) return toast('مقدرتش أبعت: ' + error.message);
+  const files = [...($('#fFiles')?.files || [])];
+  if (files.length) { await loadProject(P.id); const rr = P.reports.find(x => x.report_date === d); if (rr) await uploadDocs(files, { kind: 'report', report_id: rr.id, doc_date: d }); }
   toast('التقرير اتبعت للمكتب الفني'); await loadProject(P.id); renderReport(P.reports.find(x => x.report_date === d));
 }
 
@@ -276,12 +283,12 @@ async function submitReport(e) {
 const itemName = id => { const i = S.P.items.find(x => x.id === id); return i ? i.code + ' ' + i.name + ((S.P.proj.buildings || []).length > 1 ? ' – ' + i.building : '') : id; };
 const mini = (rows, cols) => rows && rows.length ? `<div class="scroll"><table><thead><tr>${cols.map(c => `<th${c[2] ? ' class="n"' : ''}>${c[1]}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${cols.map(c => `<td${c[2] ? ' class="n"' : ''}>${c[3] ? esc(itemName(r[c[0]])) : c[2] ? nf(r[c[0]]) : esc(r[c[0]] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : '';
 function details(r, withQty = true) {
-  const b = r.body || {}, A = b.acts || [];
+  const b = r.body || {}, A = b.acts || [], att = (S.P?.docs || []).filter(d => d.report_id === r.id);
   return `${b.arrival ? `<p style="margin:0 0 6px"><b>موعد الوصول:</b> ${esc(b.arrival)}</p>` : ''}<b>الأعمال</b>${mini(A.map(a => ({ ...a, progress: a.progress ?? '' })), [...(A.some(a => a.building) ? [['building', 'المبنى']] : []), ['discipline', 'التخصص'], ['work', 'الأعمال'], ['progress', '%']])}
   ${b.obstacles ? `<p><b>المعوقات:</b> ${esc(b.obstacles)}</p>` : ''}${b.action ? `<p><b>الإجراء:</b> ${esc(b.action)}</p>` : ''}${b.notes ? `<p><b>ملاحظات:</b> ${esc(b.notes)}</p>` : ''}
   ${withQty && b.qty?.length ? '<b>الكميات</b>' + mini(b.qty, [['item', 'البند', 0, 1], ['qty', 'الكمية', 1]]) : ''}${b.pours?.length ? '<b>صبات الخرسانة</b>' + mini(b.pours, [['element', 'العنصر'], ['vol', 'م3', 1], ['supplier', 'المحطة']]) : ''}
   ${b.labor?.length ? `<b>العمالة (${b.labor.reduce((s, l) => s + (+l.count || 0), 0)} فرد)</b>` + mini(b.labor, [['building', 'المبنى'], ['trade', 'التخصص'], ['count', 'العدد', 1], ['contractor', 'المقاول']]) : ''}
-  ${b.equip?.length ? '<b>المعدات</b>' + mini(b.equip, [['name', 'المعدة'], ['count', 'العدد', 1], ['hours', 'ساعات', 1]]) : ''}${b.supply?.length ? '<b>التوريدات</b>' + mini(b.supply, [['item', 'الصنف'], ['unit', 'الوحدة'], ['req', 'المطلوب', 1], ['got', 'المورّد', 1], ['supplier', 'المورد']]) : ''}${b.wa ? `<details class="wa"><summary class="mut">رسالة الواتساب الأصلية · ${esc(b.wa.from || '')} · ${esc(b.wa.posted || '')}</summary><pre>${esc(b.wa.text || '')}</pre></details>` : ''}`;
+  ${b.equip?.length ? '<b>المعدات</b>' + mini(b.equip, [['name', 'المعدة'], ['count', 'العدد', 1], ['hours', 'ساعات', 1]]) : ''}${b.supply?.length ? '<b>التوريدات</b>' + mini(b.supply, [['item', 'الصنف'], ['unit', 'الوحدة'], ['req', 'المطلوب', 1], ['got', 'المورّد', 1], ['supplier', 'المورد']]) : ''}${att.length ? `<b>المرفقات</b><div class="dchips">${att.map(docChip).join('')}</div>` : ''}${b.wa ? `<details class="wa"><summary class="mut">رسالة الواتساب الأصلية · ${esc(b.wa.from || '')} · ${esc(b.wa.posted || '')}</summary><pre>${esc(b.wa.text || '')}</pre></details>` : ''}`;
 }
 function renderReview() {
   const P = S.P, L = P.reports.filter(r => r.status === 'submitted').sort((a, b) => a.report_date.localeCompare(b.report_date));
@@ -306,9 +313,11 @@ function renderLog() {
   const draw = () => { const st = $('#lState').value, q = $('#lSearch').value.trim();
     const L = P.reports.filter(r => (!st || r.status === st) && (!q || JSON.stringify(r.body.acts || []).includes(q))).slice(0, 150);
     $('#logList').innerHTML = L.length ? L.map(r => { const [cls, lbl] = r.imported ? ['imp', r.body?.source === 'whatsapp' ? 'مُرحّل من واتساب' : r.body?.wa ? 'إكسل + واتساب' : 'مُرحّل من الإكسل'] : ST[r.status]; const w = (r.body.acts || []).map(a => (a.building ? a.building + ': ' : '') + a.work).join(' — ');
-      return `<details class="rep"><summary><b>${r.report_date}</b><span class="w">${esc(w)}</span><span class="st ${cls}">${lbl}</span></summary><div class="body">${r.status === 'returned' ? `<div class="note">سبب الإرجاع: ${esc(r.review_comment)}</div>` : ''}${details(r)}<p class="mut">${r.created_by ? 'كتبه: ' + esc(S.names[r.created_by] || '') : ''}${r.reviewed_by && r.status === 'approved' ? ' · اعتمده: ' + esc(S.names[r.reviewed_by] || '') + ' ' + (r.reviewed_at || '').slice(0, 10) : ''}</p>${can('report', P.id) ? `<div class="acts"><button data-e="${r.id}">فتح في النموذج</button></div>` : ''}</div></details>`; }).join('') : '<p class="mut">مفيش تقارير.</p>'; };
+      return `<details class="rep"><summary><b>${r.report_date}</b><span class="w">${esc(w)}</span><span class="st ${cls}">${lbl}</span></summary><div class="body">${r.status === 'returned' ? `<div class="note">سبب الإرجاع: ${esc(r.review_comment)}</div>` : ''}${details(r)}<p class="mut">${r.created_by ? 'كتبه: ' + esc(S.names[r.created_by] || '') : ''}${r.reviewed_by && r.status === 'approved' ? ' · اعتمده: ' + esc(S.names[r.reviewed_by] || '') + ' ' + (r.reviewed_at || '').slice(0, 10) : ''}</p>${canUp(P.id, 'report') ? `<div class="acts" style="margin-bottom:0"><label class="btn">📎 إرفاق ملف<input type="file" data-att="${r.id}" accept="${DOC_ACCEPT}" multiple hidden></label></div>` : ''}${can('report', P.id) ? `<div class="acts"><button data-e="${r.id}">فتح في النموذج</button></div>` : ''}</div></details>`; }).join('') : '<p class="mut">مفيش تقارير.</p>'; };
   draw(); $('#lState').onchange = draw; $('#lSearch').oninput = draw;
   $('#waF') && ($('#waF').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) importWhatsApp(f); });
+  $('#logList').addEventListener('change', async e => { const i = e.target.closest('input[data-att]'); if (!i) return; const r = P.reports.find(x => x.id === i.dataset.att), files = [...i.files]; i.value = ''; if (await uploadDocs(files, { kind: 'report', report_id: r.id, doc_date: r.report_date })) { await loadProject(P.id); renderLog(); } });
+  $('#logList').addEventListener('click', docClick);
   $('#logList').onclick = e => { const b = e.target.closest('[data-e]'); if (!b) return; history.replaceState(null, '', `#p/${P.id}/report`); document.querySelectorAll('nav a').forEach(a => a.classList.toggle('on', a.getAttribute('href') === `#p/${P.id}/report`)); renderReport(P.reports.find(r => r.id === b.dataset.e)); };
 }
 
@@ -422,6 +431,69 @@ async function importWhatsApp(file) {
   draw();
 }
 
+
+
+/* ---------------- documents ---------------- */
+const DOC_ACCEPT = '.pdf,.xlsx,.xls,.xlsm,.csv,.docx,.doc,.jpg,.jpeg,.png,.webp';
+const DOC_MIME = { pdf: 'application/pdf', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', xls: 'application/vnd.ms-excel', xlsm: 'application/vnd.ms-excel.sheet.macroEnabled.12', csv: 'text/csv', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', doc: 'application/msword', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
+const DOC_KIND = { report: 'تقارير', boq: 'مقايسات', quote: 'عروض أسعار', other: 'أخرى' };
+const canUp = (pid, kind) => S.admin || (kind === 'report' ? can('docsUp', pid) : ['tech', 'management'].includes(role(pid)));
+const fsize = b => b > 1048576 ? nf(b / 1048576, 1) + ' MB' : nf(b / 1024, 0) + ' KB';
+const ftype = d => { const e = (d.file_name || d.path).split('.').pop().toLowerCase(); return /pdf/.test(e) ? ['PDF', 'pdf'] : /xls|csv/.test(e) ? ['XLS', 'xls'] : /doc/.test(e) ? ['DOC', 'doc'] : ['IMG', 'img']; };
+const docChip = d => { const [t, c] = ftype(d); return `<a href="#" class="dchip" data-open="${d.id}" title="${esc(d.file_name || '')}"><i class="fi ${c}">${t}</i>${esc(d.title)}</a>`; };
+async function uploadDocs(files, meta) {
+  const P = S.P; let ok = 0;
+  for (const f of files) {
+    const ext = (f.name.split('.').pop() || '').toLowerCase(), mime = DOC_MIME[ext];
+    if (!mime) { toast(`نوع الملف ${f.name} مش مسموح`); continue; } if (f.size > 25 * 1048576) { toast(`${f.name} أكبر من 25 ميجا`); continue; }
+    toast(`جاري رفع ${f.name}…`); const path = `${P.id}/${meta.kind}/${crypto.randomUUID()}.${ext}`;
+    const up = await S.sb.storage.from('docs').upload(path, f, { contentType: mime }); if (up.error) { toast('مقدرتش أرفع: ' + up.error.message); continue; }
+    const { error } = await S.sb.from('documents').insert({ project_id: P.id, path, file_name: f.name, mime, size: f.size, title: meta.title && files.length === 1 ? meta.title : f.name.replace(/\.[^.]+$/, ''), kind: meta.kind, doc_date: meta.doc_date || today(), report_id: meta.report_id || null, item_id: meta.item_id || null, supplier: meta.supplier || null, amount: meta.amount ?? null, notes: meta.notes || null });
+    if (error) { await S.sb.storage.from('docs').remove([path]); toast('مقدرتش أسجل الملف: ' + error.message); continue; } ok++;
+  }
+  if (ok) toast(ok === 1 ? 'اترفع الملف' : `اترفع ${ok} ملف`); return ok;
+}
+async function docClick(e) {
+  const o = e.target.closest('[data-open],[data-dl]'); if (!o) return; e.preventDefault(); const id = o.dataset.open || o.dataset.dl, d = S.P.docs.find(x => x.id === id); if (!d) return;
+  const w = o.dataset.open ? window.open('', '_blank') : null;
+  const { data, error } = await S.sb.storage.from('docs').createSignedUrl(d.path, 600, o.dataset.dl ? { download: d.file_name || true } : undefined);
+  if (error) { w?.close(); return toast('مقدرتش أفتح الملف: ' + error.message); }
+  if (w) w.location = data.signedUrl; else location.href = data.signedUrl;
+}
+function renderDocs() {
+  const P = S.P, F = (S.docF ||= { kind: '', q: '', item: '' }), up = ['report', 'boq', 'quote', 'other'].filter(k => canUp(P.id, k)), D = P.docs;
+  const itemOpt = (sel = '') => '<option value="">— من غير بند —</option>' + P.items.map(i => `<option value="${esc(i.id)}"${i.id === sel ? ' selected' : ''}>${esc(i.code + ' ' + (i.name.length > 60 ? i.name.slice(0, 60) + '…' : i.name) + (i.building ? ' – ' + i.building : ''))}</option>`).join('');
+  const L = D.filter(d => (!F.kind || d.kind === F.kind) && (!F.item || d.item_id === F.item) && (!F.q || (d.title + ' ' + (d.supplier || '') + ' ' + (d.file_name || '') + ' ' + (d.notes || '')).includes(F.q)));
+  const itemName = id => { const i = P.items.find(x => x.id === id); return i ? i.code + ' ' + (i.name.length > 40 ? i.name.slice(0, 40) + '…' : i.name) : ''; };
+  const quotesBy = {}; D.filter(d => d.kind === 'quote' && d.item_id && d.amount != null).forEach(d => (quotesBy[d.item_id] ||= []).push(d));
+  const cmp = Object.entries(quotesBy).filter(([, q]) => q.length > 1);
+  $('#main').innerHTML = `<h2>المستندات</h2><p class="mut">التقارير والمقايسات وعروض الأسعار وأي ملفات تانية للمشروع. عروض الأسعار بتظهر للمكتب الفني والماليات والإدارة بس.</p>
+  ${up.length ? `<details class="card"${D.length ? '' : ' open'}><summary><b>+ رفع مستند</b></summary><form id="dF" class="grid" style="margin-top:10px">
+    <label>النوع<select name="kind">${up.map(k => `<option value="${k}"${k === (F.kind || 'quote') ? ' selected' : ''}>${DOC_KIND[k]}</option>`).join('')}</select></label>
+    <label>العنوان<input name="title" placeholder="لو فاضي هياخد اسم الملف"></label><label>التاريخ<input type="date" name="date" value="${today()}"></label>
+    <label data-for="report">تقرير يوم<select name="report"><option value="">—</option>${P.reports.slice(0, 120).map(r => `<option value="${r.id}">${r.report_date}</option>`).join('')}</select></label>
+    <label data-for="quote boq" class="wide">بند المقايسة<select name="item">${itemOpt(F.item)}</select></label>
+    <label data-for="quote">المورد / المقاول<input name="supplier" list="supL"><datalist id="supL">${[...new Set(D.map(d => d.supplier).filter(Boolean))].map(x => `<option value="${esc(x)}">`).join('')}</datalist></label>
+    <label data-for="quote">قيمة العرض (ج.م)<input name="amount" type="number" step="any" inputmode="decimal"></label>
+    <label class="wide">ملاحظات<input name="notes"></label>
+    <label class="wide">الملفات<input type="file" name="files" accept="${DOC_ACCEPT}" multiple required></label>
+    <div class="acts" style="margin:0"><button class="p" id="dGo">رفع</button></div></form></details>` : ''}
+  <div class="filters" style="margin-top:14px"><div class="seg" style="flex:0 0 auto"><button type="button" data-k="" class="${!F.kind ? 'on' : ''}">الكل (${D.length})</button>${Object.entries(DOC_KIND).map(([k, l]) => { const n = D.filter(d => d.kind === k).length; return n || up.includes(k) ? `<button type="button" data-k="${k}" class="${F.kind === k ? 'on' : ''}">${l} (${n})</button>` : ''; }).join('')}</div><input id="dQ" type="search" placeholder="بحث بالعنوان أو المورد" value="${esc(F.q)}">${F.item ? `<button id="dXi">✕ ${esc(itemName(F.item))}</button>` : ''}</div>
+  ${cmp.length && (!F.kind || F.kind === 'quote') ? `<div class="card"><b>مقارنة عروض الأسعار</b>${cmp.map(([it, q]) => { const s2 = [...q].sort((a, b) => a.amount - b.amount), lo = s2[0].amount; return `<div style="margin-top:8px"><div class="mut">${esc(itemName(it))}</div><div class="scroll"><table><tbody>${s2.map((d, k) => `<tr><td>${k === 0 ? '<span class="st appr">الأقل</span> ' : ''}${esc(d.supplier || d.title)}</td><td class="n"><b>${nf(d.amount, 0)}</b>${k ? ` <small class="mut">(+${Math.round((d.amount - lo) / lo * 100)}%)</small>` : ''}</td><td>${fmtD(d.doc_date)}</td><td>${docChip(d)}</td></tr>`).join('')}</tbody></table></div></div>`; }).join('')}</div>` : ''}
+  <div class="dlist">${L.length ? L.map(d => { const [t, c] = ftype(d), r = d.report_id && P.reports.find(x => x.id === d.report_id), mine = d.uploaded_by === S.user.id || role(P.id) === 'management';
+    return `<div class="drow"><i class="fi ${c}">${t}</i><div class="dm"><a href="#" data-open="${d.id}"><b>${esc(d.title)}</b></a><div class="mut">${DOC_KIND[d.kind]} · ${fmtD(d.doc_date)}${d.supplier ? ' · ' + esc(d.supplier) : ''}${d.amount != null ? ' · <b>' + nf(d.amount, 0) + ' ج.م</b>' : ''}${r ? ' · تقرير ' + r.report_date : ''}${d.item_id ? ` · <a href="#" data-item="${esc(d.item_id)}">${esc(itemName(d.item_id))}</a>` : ''}${d.notes ? ' · ' + esc(d.notes) : ''}</div><div class="mut" style="font-size:12px">${esc(d.file_name || '')} · ${fsize(d.size || 0)}${S.names[d.uploaded_by] ? ' · رفعه ' + esc(S.names[d.uploaded_by]) : ''}</div></div>
+    <div class="da"><button data-dl="${d.id}">تحميل</button>${mine ? `<button class="danger" data-del="${d.id}">حذف</button>` : ''}</div></div>`; }).join('') : '<p class="mut">مفيش مستندات.</p>'}</div>`;
+  const f = $('#dF'); if (f) { const sync = () => f.querySelectorAll('[data-for]').forEach(x => x.hidden = !x.dataset.for.split(' ').includes(f.kind.value)); f.kind.onchange = sync; sync();
+    f.onsubmit = async e => { e.preventDefault(); const g = n => f[n].value, files = [...f.files.files]; if (!files.length) return; $('#dGo').disabled = true;
+      const n = await uploadDocs(files, { kind: g('kind'), title: g('title').trim(), doc_date: g('date'), report_id: g('kind') === 'report' ? g('report') || null : null, item_id: ['quote', 'boq'].includes(g('kind')) ? g('item') || null : null, supplier: g('kind') === 'quote' ? g('supplier').trim() : null, amount: g('kind') === 'quote' && g('amount') !== '' ? +g('amount') : null, notes: g('notes').trim() });
+      $('#dGo').disabled = false; if (n) { F.kind = g('kind'); await loadProject(P.id); renderDocs(); } }; }
+  document.querySelectorAll('[data-k]').forEach(b => b.onclick = () => { F.kind = b.dataset.k; renderDocs(); });
+  $('#dQ').onchange = e => { F.q = e.target.value.trim(); renderDocs(); }; $('#dXi') && ($('#dXi').onclick = () => { F.item = ''; renderDocs(); });
+  $('#main').onclick = async e => { const it = e.target.closest('[data-item]'); if (it) { e.preventDefault(); F.item = it.dataset.item; return renderDocs(); }
+    const del = e.target.closest('[data-del]'); if (del) { if (del.dataset.sure !== '1') { del.dataset.sure = '1'; del.textContent = 'متأكد؟'; return; } const d = P.docs.find(x => x.id === del.dataset.del);
+      const { error } = await S.sb.from('documents').delete().eq('id', d.id); if (error) return toast(error.message); await S.sb.storage.from('docs').remove([d.path]); toast('اتحذف'); await loadProject(P.id); return renderDocs(); }
+    docClick(e); };
+}
 
 /* ---------------- staff & attendance (admin only) ---------------- */
 const tmin = t => { if (!t) return null; const [h, m] = String(t).split(':').map(Number); return h * 60 + (m || 0); }, tfmt = m => m == null ? '–' : String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(Math.round(m % 60)).padStart(2, '0');
@@ -577,6 +649,7 @@ async function renderBoq() {
   $('#bqQ').onchange = e => set('q', e.target.value.trim()); $('#bqM').onchange = e => set('miss', e.target.checked);
   $('#bqSum').onclick = e => { const t = e.target.closest('tr[data-ph]'); if (!t) return; F.ph = F.ph === t.dataset.ph ? '' : t.dataset.ph; $('#bqPh').value = F.ph; boqSummary(); boqTable(); };
   $('#addF') && bindAddItem();
+  $('#bqT').addEventListener('click', e => { const a = e.target.closest('[data-docitem]'); if (a) { (S.docF ||= { kind: '', q: '', item: '' }).item = a.dataset.docitem; S.docF.kind = ''; } });
   $('#bqX').onclick = exportBoq; $('#bqF') && ($('#bqF').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) importBoq(f); });
   const bar = () => { const n = F.pend.size; if ($('#bqN')) $('#bqN').textContent = n ? `${n} بند متعدّل ومش محفوظ` : 'وضع التعديل: اكتب الكميات والأسعار وبعدين احفظ'; if ($('#bqS')) $('#bqS').disabled = !n; };
   const mode = on => { F.edit = on; if (!on) F.pend.clear(); $('#bqE') && ($('#bqE').hidden = on); $('#bqBar') && ($('#bqBar').hidden = !on); boqTable(); bar(); };
@@ -604,7 +677,7 @@ function boqTable() {
   const pv = (r, f) => { const pe = F.pend.get(r.id); return pe && f in pe ? pe[f] : (f === 'qty' ? +r.qty : r.rate); }, chg = (r, f) => F.pend.get(r.id) && f in F.pend.get(r.id);
   const cell = (r, f) => ed ? `<input type="number" step="any" inputmode="decimal" data-f="${f}" value="${pv(r, f) || ''}">` : ((f === 'qty' ? +r.qty : r.rate) ? nf(f === 'qty' ? r.qty : r.rate) : '–');
   $('#bqT').innerHTML = `<div class="scroll"><table class="stack it bq"><thead><tr><th>الكود</th><th>البند</th>${multi ? '<th>المبنى</th>' : ''}<th>الوحدة</th><th class="n">الكمية</th><th class="n">السعر</th><th class="n">الإجمالي</th></tr></thead><tbody>${keys.map(k => { const L = rows.filter(r => r.phase_n + '|' + r.group_name === k), [n, g] = [L[0].phase_n, L[0].group_name], sub = L.reduce((s, r) => s + r.val, 0);
-    return `<tr class="gh"><td colspan="${cols - 1}">${n}. ${esc(P.phaseProg.find(x => x.n === n)?.name || '')} – ${esc(g)} <span class="mut">(${L.length})</span></td><td class="n">${sub ? nf(sub, 0) : ''}</td></tr>` + L.map(r => `<tr data-id="${esc(r.id)}" class="${lacks(r) ? 'lack' : ''}"><td data-l="الكود">${esc(r.code)}</td><td data-l="البند" title="${esc(r.description || '')}">${esc(r.name)}${r.note ? `<div class="mut" style="font-size:12px">${esc(r.note)}</div>` : ''}</td>${multi ? `<td data-l="المبنى">${esc(r.building)}</td>` : ''}<td data-l="الوحدة">${esc(r.unit)}</td><td class="n${ed ? ' ed' : ''}${ed && chg(r, 'qty') ? ' chg' : ''}" data-l="الكمية">${cell(r, 'qty')}</td><td class="n${ed ? ' ed' : ''}${ed && chg(r, 'rate') ? ' chg' : ''}" data-l="السعر">${cell(r, 'rate')}</td><td class="n tot" data-l="الإجمالي">${(ed ? pv(r, 'qty') * pv(r, 'rate') : r.val) ? nf(ed ? pv(r, 'qty') * pv(r, 'rate') : r.val, 0) : '–'}</td></tr>`).join(''); }).join('')}</tbody></table></div>`;
+    return `<tr class="gh"><td colspan="${cols - 1}">${n}. ${esc(P.phaseProg.find(x => x.n === n)?.name || '')} – ${esc(g)} <span class="mut">(${L.length})</span></td><td class="n">${sub ? nf(sub, 0) : ''}</td></tr>` + L.map(r => `<tr data-id="${esc(r.id)}" class="${lacks(r) ? 'lack' : ''}"><td data-l="الكود">${esc(r.code)}</td><td data-l="البند" title="${esc(r.description || '')}">${esc(r.name)}${(() => { const n = (P.docs || []).filter(d => d.item_id === r.id).length; return n ? ` <a href="#p/${P.id}/docs" class="clip" data-docitem="${esc(r.id)}" title="مستندات وعروض أسعار البند">📎${n}</a>` : ''; })()}${r.note ? `<div class="mut" style="font-size:12px">${esc(r.note)}</div>` : ''}</td>${multi ? `<td data-l="المبنى">${esc(r.building)}</td>` : ''}<td data-l="الوحدة">${esc(r.unit)}</td><td class="n${ed ? ' ed' : ''}${ed && chg(r, 'qty') ? ' chg' : ''}" data-l="الكمية">${cell(r, 'qty')}</td><td class="n${ed ? ' ed' : ''}${ed && chg(r, 'rate') ? ' chg' : ''}" data-l="السعر">${cell(r, 'rate')}</td><td class="n tot" data-l="الإجمالي">${(ed ? pv(r, 'qty') * pv(r, 'rate') : r.val) ? nf(ed ? pv(r, 'qty') * pv(r, 'rate') : r.val, 0) : '–'}</td></tr>`).join(''); }).join('')}</tbody></table></div>`;
 }
 function addItemForm() {
   const P = S.P, bs = P.proj.buildings || [], grp = [...new Set(P.items.map(r => r.group_name))];

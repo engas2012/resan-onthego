@@ -229,3 +229,13 @@ tr.sdet>td{background:var(--bg)}.sdbox{padding:6px 2px}
 .otree{display:flex;flex-direction:column;gap:6px}.onode{position:relative}
 .onode .onode{border-inline-start:2px solid var(--line);padding-inline-start:12px;margin-top:6px}
 .ocard{display:inline-flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px 12px;min-width:200px}.ocard span{font-size:12px;color:var(--mut)}
+/* documents */
+.fi{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:38px;height:44px;border-radius:6px;font-style:normal;font-size:11px;font-weight:700;color:#fff;background:var(--mut)}
+.fi.pdf{background:#d6453d}.fi.xls{background:#1d7a4f}.fi.doc{background:#2f6fd6}.fi.img{background:#8a5cf6}
+.dlist{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.drow{display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.drow .dm{flex:1;min-width:0}.drow .dm a{color:inherit;text-decoration:none}.drow .dm a:hover{color:var(--acc)}.drow .dm .mut{font-size:13px}
+.drow .da{display:flex;gap:6px}.drow .da button{min-height:36px;padding:4px 12px;font-size:13px}
+.dchips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.dchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:9px;padding:3px 10px 3px 4px;color:inherit;text-decoration:none;font-size:13px;background:var(--card)}.dchip .fi{width:26px;height:30px;font-size:9px}
+a.clip{text-decoration:none;font-size:12px;white-space:nowrap}
+@media(max-width:600px){.drow{flex-wrap:wrap}.drow .da{width:100%}}
