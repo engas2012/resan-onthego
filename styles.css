@@ -221,3 +221,11 @@ details.wa{margin-top:8px}details.wa pre{white-space:pre-wrap;font:inherit;font-
 .lbar.ind u{width:40%;inset:0 auto 0 0;animation:indet 1.6s ease-in-out infinite,stripes 1s linear infinite}
 @keyframes indet{0%{transform:translateX(-110%)}100%{transform:translateX(260%)}}
 .live em.mut{font-weight:500;font-size:12px}
+/* staff */
+.dstrip{display:grid;grid-template-columns:repeat(30,1fr);gap:2px;min-width:180px}.dstrip i{height:16px;border-radius:3px;background:var(--conc)}
+.dstrip i.ok{background:var(--ok)}.dstrip i.lt{background:var(--warn)}.dstrip i.vl{background:var(--bad)}.dstrip i.lv{background:#5b8def}.dstrip i.no{opacity:.45}
+tr.sdet>td{background:var(--bg)}.sdbox{padding:6px 2px}
+.sedt input,.sedt select{min-height:36px;padding:4px 6px;font-size:13px;min-width:90px}
+.otree{display:flex;flex-direction:column;gap:6px}.onode{position:relative}
+.onode .onode{border-inline-start:2px solid var(--line);padding-inline-start:12px;margin-top:6px}
+.ocard{display:inline-flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px 12px;min-width:200px}.ocard span{font-size:12px;color:var(--mut)}

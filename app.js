@@ -49,7 +49,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 1.7.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 1.8.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -86,7 +86,7 @@ const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', '
 function shell(pid, view) {
   const p = pid && S.projects.find(x => x.id === pid);
   return `<header><div class="hbar"><a class="brandlink" href="#home" title="الصفحة الرئيسية">${LOGO()}<span class="otg">On the go</span></a>
-  <div class="who2"><a class="homeb${!p && view !== 'admin' ? ' on' : ''}" href="#home"><svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M5.5 9.5V20h5v-6h3v6h5V9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>الرئيسية</a>${p ? `<span class="roleTag">${ROLE[role(pid)] || ''}</span>` : ''}<span class="uname">${esc(S.profile.full_name || S.profile.email)}</span>${S.admin ? '<a href="#admin" class="adm">المستخدمين</a>' : ''}<button id="out">خروج</button></div></div>
+  <div class="who2"><a class="homeb${!p && view !== 'admin' && view !== 'staff' ? ' on' : ''}" href="#home"><svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M5.5 9.5V20h5v-6h3v6h5V9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>الرئيسية</a>${p ? `<span class="roleTag">${ROLE[role(pid)] || ''}</span>` : ''}<span class="uname">${esc(S.profile.full_name || S.profile.email)}</span>${S.admin ? '<a href="#staff" class="adm">فريق العمل</a><a href="#admin" class="adm">المستخدمين</a>' : ''}<button id="out">خروج</button></div></div>
   ${p ? `<div class="ptitle"><h1>${esc(p.name + ' – ' + p.place)}</h1><p>المالك: ${esc(p.owner_name)} · المقاول العام: ${esc(p.contractor_name)} · الاستشاري: ${esc(p.consultant_name)}</p></div>` : '<div class="ptitle"><h1>متابعة مشروعات الغردقة</h1></div>'}
   <nav>${p ? VIEWS.filter(v => !v[2] || can(v[2], pid)).map(([v, l]) => `<a href="#p/${pid}/${v}" class="${v === view ? 'on' : ''}">${l}${v === 'review' ? ' <span class="badge" id="pendN" hidden></span>' : ''}</a>`).join('') : ''}</nav></header><main id="main"><p class="mut">جاري التحميل…</p></main>`;
 }
@@ -106,6 +106,7 @@ async function route() {
   }
   $('#app').innerHTML = shell(null, h); bindOut();
   if (h === 'admin' && S.admin) return renderAdmin();
+  if (h === 'staff' && S.admin) return renderStaff();
   renderHome();
 }
 const bindOut = () => { $('#out').onclick = () => S.sb.auth.signOut(); };
@@ -419,6 +420,80 @@ async function importWhatsApp(file) {
       toast(`اتسجل ${tot.inserted} تقرير جديد واتدمج ${tot.merged}`); box.innerHTML = ''; await loadProject(S.P.id); renderLog(); };
   };
   draw();
+}
+
+
+/* ---------------- staff & attendance (admin only) ---------------- */
+const tmin = t => { if (!t) return null; const [h, m] = String(t).split(':').map(Number); return h * 60 + (m || 0); }, tfmt = m => m == null ? '–' : String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(Math.round(m % 60)).padStart(2, '0');
+function deriveAttendance(reports, staff) {
+  const out = {}, put = (st, r, arr, how) => { const k = st.id + '|' + r.report_date, m = tmin(arr); if (m == null) return; if (!out[k] || m < out[k].m) out[k] = { staff_id: st.id, date: r.report_date, m, project_id: r.project_id, how, src: 'report' }; };
+  const byWa = Object.fromEntries(staff.filter(x => x.wa_name).map(x => [x.wa_name, x]));
+  reports.forEach(r => { const b = r.body || {}; if (!b.arrival) return;
+    const txt = AR(b.wa?.text || ''), lines = txt.split('\n').map(l => l.replace(/\*/g, '').trim()), i = lines.findIndex(l => /وصول/.test(l)); let seg = '';
+    if (i >= 0) { seg = lines[i].replace(/.*وصول/, '').replace(/[0-9]{1,2}[.:][0-9]{2}\s*(ص|صباح[اً]?)?/, ' '); const nx = lines[i + 1] || ''; if (nx && !/\d/.test(nx) && nx.length < 45 && /(^|\s)(م|ا|أ)[.\/]?\s/.test(nx)) seg += ' ' + nx; }
+    const toks = [...seg.matchAll(/(?:^|\s)(?:م|ا|أ|مهندس|المهندس|استاذ|الاستاذ)\s*[.\/]?\s*([ء-ي]{3,}(?:\s+[ء-ي]{3,})?)/g)].map(x => x[1].trim());
+    let hit = staff.filter(st => st.active && (st.aliases || []).some(a => toks.some(t => t === a || t.split(/\s+/)[0] === a || (a.includes(' ') && seg.includes(a)))));
+    if (hit.length) hit.forEach(st => put(st, r, b.arrival, 'مذكور في سطر الوصول'));
+    else if (b.wa?.from && byWa[b.wa.from]) put(byWa[b.wa.from], r, b.arrival, 'كاتب التقرير'); });
+  return Object.values(out);
+}
+async function renderStaff() {
+  $('#main').innerHTML = '<p class="mut">جاري التحميل…</p>';
+  const [st, at, rp] = await Promise.all([S.sb.from('staff').select('*').order('sort'), S.sb.from('staff_attendance').select('*'), S.sb.from('daily_reports').select('id,project_id,report_date,body').gte('report_date', DS(TD(today()) - 200 * 864e5)).order('report_date')]);
+  if (st.error) return $('#main').innerHTML = `<div class="note">${esc(st.error.message)}</div>`;
+  S.staff = { list: st.data || [], manual: at.data || [], reports: rp.data || [], tab: S.staff?.tab || 'eval', range: S.staff?.range || 60, open: S.staff?.open || null };
+  drawStaff();
+}
+function staffRecords() {
+  const T = S.staff, auto = deriveAttendance(T.reports, T.list), man = Object.fromEntries(T.manual.map(x => [x.staff_id + '|' + x.work_date, x]));
+  const all = auto.filter(a => !man[a.staff_id + '|' + a.date]).concat(T.manual.map(x => ({ staff_id: x.staff_id, date: x.work_date, m: tmin(x.arrival), status: x.status, project_id: x.project_id, how: x.note || 'تسجيل يدوي', src: 'manual', id: x.id })));
+  return all;
+}
+function drawStaff() {
+  const T = S.staff, from = DS(TD(today()) - T.range * 864e5), R = staffRecords().filter(r => r.date >= from), byS = {};
+  R.forEach(r => (byS[r.staff_id] ||= []).push(r));
+  const pj = id => S.projects.find(p => p.id === id)?.name || '—';
+  const ev = T.list.filter(x => x.active).map(x => { const L = (byS[x.id] || []).filter(r => (r.status || 'present') === 'present' && r.m != null), lim = tmin(x.shift_start) + x.grace_min, start = tmin(x.shift_start);
+    const late = L.filter(r => r.m > lim), on = L.length - late.length;
+    return { x, L, days: L.length, on, late: late.length, pct: L.length ? on / L.length : null, avg: L.length ? L.reduce((s, r) => s + r.m, 0) / L.length : null, avgLate: late.length ? late.reduce((s, r) => s + (r.m - start), 0) / late.length : null, other: (byS[x.id] || []).filter(r => r.status && r.status !== 'present').length }; });
+  const scored = ev.filter(e => e.days >= 3), team = scored.length ? scored.reduce((s, e) => s + e.on, 0) / scored.reduce((s, e) => s + e.days, 0) : null;
+  const best = [...scored].sort((a, b) => b.pct - a.pct || a.avg - b.avg)[0], worst = [...scored].sort((a, b) => a.pct - b.pct || b.avg - a.avg)[0];
+  const days30 = Array.from({ length: 30 }, (_, k) => DS(TD(today()) - (29 - k) * 864e5));
+  const strip = e => { const m = Object.fromEntries((byS[e.x.id] || []).map(r => [r.date, r])), lim = tmin(e.x.shift_start) + e.x.grace_min;
+    return `<div class="dstrip">${days30.map(d => { const r = m[d]; const c = !r ? 'no' : r.status && r.status !== 'present' ? 'lv' : r.m <= lim ? 'ok' : r.m <= lim + 30 ? 'lt' : 'vl'; return `<i class="${c}" title="${d}${r ? ' · ' + (r.status && r.status !== 'present' ? ({ absent: 'غياب', leave: 'إجازة', mission: 'مأمورية' })[r.status] : tfmt(r.m)) : ''}"></i>`; }).join('')}</div>`; };
+  const sc = p => p == null ? '<span class="mut">–</span>' : `<b style="color:${p >= .85 ? 'var(--ok)' : p >= .6 ? 'var(--warn)' : 'var(--bad)'}">${Math.round(p * 100)}%</b>`;
+  const evalHtml = `<div class="kp" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))"><div class="k"><b>${ev.length}</b><span>فرد نشط</span></div><div class="k"><b>${team == null ? '–' : Math.round(team * 100) + '%'}</b><span>الالتزام بالمواعيد للفريق</span></div><div class="k"><b>${best ? esc(best.x.full_name) : '–'}</b><span>الأكثر انضباطاً${best ? ' · ' + Math.round(best.pct * 100) + '%' : ''}</span></div><div class="k"><b>${worst && worst !== best ? esc(worst.x.full_name) : '–'}</b><span>محتاج متابعة${worst && worst !== best ? ' · ' + Math.round(worst.pct * 100) + '%' : ''}</span></div></div>
+  <div class="scroll" style="margin-top:14px"><table class="stack sev"><thead><tr><th>الاسم</th><th>المشروع</th><th class="n">أيام مسجلة</th><th class="n">في الميعاد</th><th class="n">متوسط الوصول</th><th class="n">مرات التأخير</th><th class="n">متوسط التأخير</th><th>آخر 30 يوم</th></tr></thead><tbody>${ev.sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1)).map(e => `<tr class="pick" data-sid="${e.x.id}"><td data-l="الاسم"><b>${esc(e.x.full_name)}</b><div class="mut" style="font-size:12px">${esc(e.x.title || '')} · بداية ${String(e.x.shift_start).slice(0, 5)}</div></td><td data-l="المشروع">${esc(pj(e.x.project_id))}</td><td class="n" data-l="أيام">${e.days}${e.other ? ` <span class="mut">+${e.other}</span>` : ''}</td><td class="n" data-l="في الميعاد">${sc(e.pct)}</td><td class="n" data-l="متوسط الوصول">${tfmt(e.avg)}</td><td class="n" data-l="تأخير">${e.late}</td><td class="n" data-l="متوسط التأخير">${e.avgLate == null ? '–' : Math.round(e.avgLate) + ' د'}</td><td data-l="آخر 30 يوم">${strip(e)}</td></tr>${T.open === e.x.id ? `<tr class="sdet"><td colspan="8">${staffDetail(e, byS[e.x.id] || [])}</td></tr>` : ''}`).join('')}</tbody></table></div>
+  <div class="leg"><span><i style="background:var(--ok)"></i>في الميعاد</span><span><i style="background:var(--warn)"></i>تأخير لحد 30 دقيقة</span><span><i style="background:var(--bad)"></i>تأخير أكتر</span><span><i style="background:#5b8def"></i>إجازة/غياب/مأمورية</span><span><i style="background:var(--conc)"></i>مفيش تسجيل</span></div>
+  <p class="mut">مواعيد الوصول بتتسحب لوحدها من التقارير اليومية: اللي اسمه مذكور في سطر "الوصول"، ولو مفيش أسماء بتتحسب لكاتب التقرير. ايام الجمعة اللي مفيهاش تسجيل مش بتتحسب غياب. تقدر تصحح أو تضيف أي يوم يدوي من تفاصيل الشخص.</p>`;
+  const opts = (sel, list, empty = '—') => `<option value="">${empty}</option>` + list.map(([v, l]) => `<option value="${esc(v)}"${String(v) === String(sel ?? '') ? ' selected' : ''}>${esc(l)}</option>`).join('');
+  const tree = (pid, lvl = 0) => T.list.filter(x => (x.manager_id || null) === pid && x.active).map(x => `<div class="onode" style="--l:${lvl}"><div class="ocard"><b>${esc(x.full_name)}</b><span>${esc(x.title || '')}${x.project_id ? ' · ' + esc(pj(x.project_id)) : ''}</span></div>${tree(x.id, lvl + 1)}</div>`).join('');
+  const structHtml = `<div class="otree">${tree(null) || '<p class="mut">مفيش أفراد.</p>'}</div>
+  <h3>بيانات الأفراد</h3><p class="mut">"الأسماء في التقارير" = الطريقة اللي الاسم بيتكتب بيها في سطر الوصول (مثلاً: محمود، طارق). "اسم الواتساب" = اسمه في الجروب عشان التقارير اللي هو كاتبها.</p>
+  <div class="scroll"><table class="stack sedt"><thead><tr><th>الاسم</th><th>الوظيفة</th><th>القسم</th><th>المشروع</th><th>المدير المباشر</th><th>الأسماء في التقارير</th><th>اسم الواتساب</th><th>بداية الدوام</th><th>سماح (د)</th><th>نشط</th></tr></thead><tbody>${T.list.map(x => `<tr data-sid="${x.id}"><td data-l="الاسم"><input data-k="full_name" value="${esc(x.full_name)}"></td><td data-l="الوظيفة"><input data-k="title" value="${esc(x.title || '')}"></td><td data-l="القسم"><input data-k="department" value="${esc(x.department || '')}" list="deptL"></td><td data-l="المشروع"><select data-k="project_id">${opts(x.project_id, S.projects.map(p => [p.id, p.name]), 'الشركة')}</select></td><td data-l="المدير"><select data-k="manager_id">${opts(x.manager_id, T.list.filter(y => y.id !== x.id).map(y => [y.id, y.full_name]))}</select></td><td data-l="أسماء التقارير"><input data-k="aliases" value="${esc((x.aliases || []).join('، '))}"></td><td data-l="واتساب"><input data-k="wa_name" value="${esc(x.wa_name || '')}" dir="ltr"></td><td data-l="بداية الدوام"><input data-k="shift_start" type="time" value="${String(x.shift_start).slice(0, 5)}"></td><td data-l="سماح"><input data-k="grace_min" type="number" min="0" value="${x.grace_min}" style="width:70px"></td><td data-l="نشط"><input data-k="active" type="checkbox"${x.active ? ' checked' : ''} style="width:auto;min-height:0"></td></tr>`).join('')}</tbody></table></div>
+  <datalist id="deptL">${[...new Set(T.list.map(x => x.department).filter(Boolean)).add('الإدارة').add('التنفيذ').add('المكتب الفني').add('الماليات')].map(d => `<option value="${esc(d)}">`).join('')}</datalist>
+  <div class="acts"><button class="p" id="stSave">حفظ التعديلات</button><button id="stAdd">+ فرد جديد</button></div>`;
+  $('#main').innerHTML = `<h2>فريق العمل</h2><p class="mut">🔒 الصفحة دي بتظهر لمدير النظام بس، ومحدش تاني يقدر يشوفها أو يقرا بياناتها.</p>
+  <div class="filters"><div class="seg" style="flex:0 0 auto"><button type="button" data-tab="eval" class="${T.tab === 'eval' ? 'on' : ''}">تقييم المواعيد</button><button type="button" data-tab="struct" class="${T.tab === 'struct' ? 'on' : ''}">الهيكل والبيانات</button></div>${T.tab === 'eval' ? `<select id="stR" style="max-width:200px">${[[30, 'آخر 30 يوم'], [60, 'آخر 60 يوم'], [90, 'آخر 90 يوم'], [180, 'آخر 6 شهور']].map(([v, l]) => `<option value="${v}"${v === T.range ? ' selected' : ''}>${l}</option>`).join('')}</select>` : ''}</div>
+  ${T.tab === 'eval' ? evalHtml : structHtml}`;
+  document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { T.tab = b.dataset.tab; drawStaff(); });
+  $('#stR') && ($('#stR').onchange = e => { T.range = +e.target.value; drawStaff(); });
+  if (T.tab === 'eval') {
+    $('#main').querySelector('.sev').onclick = e => { const tr = e.target.closest('tr.pick'); if (tr && !e.target.closest('.sdet')) { T.open = T.open === tr.dataset.sid ? null : tr.dataset.sid; drawStaff(); } };
+    const f = $('#manF'); if (f) f.onsubmit = async ev => { ev.preventDefault(); const d = new FormData(f), row = { staff_id: T.open, work_date: d.get('date'), status: d.get('status'), arrival: d.get('status') === 'present' ? d.get('arrival') || null : null, note: d.get('note') || null };
+      const { error } = await S.sb.from('staff_attendance').upsert(row, { onConflict: 'staff_id,work_date' }); if (error) return toast(error.message); toast('اتسجل'); renderStaff(); };
+    $('#main').querySelectorAll('[data-delman]').forEach(b => b.onclick = async () => { const { error } = await S.sb.from('staff_attendance').delete().eq('id', b.dataset.delman); if (error) return toast(error.message); toast('اتمسح التسجيل اليدوي'); renderStaff(); });
+  } else {
+    $('#stAdd').onclick = async () => { const { error } = await S.sb.from('staff').insert({ full_name: 'فرد جديد', sort: Math.max(0, ...T.list.map(x => x.sort)) + 1 }); if (error) return toast(error.message); renderStaff(); };
+    $('#stSave').onclick = async () => { const rows = [...document.querySelectorAll('.sedt tr[data-sid]')].map(tr => { const g = k => tr.querySelector(`[data-k=${k}]`);
+        return { id: tr.dataset.sid, full_name: g('full_name').value.trim() || 'بدون اسم', title: g('title').value.trim() || null, department: g('department').value.trim() || null, project_id: g('project_id').value || null, manager_id: g('manager_id').value || null, aliases: g('aliases').value.split(/[،,]/).map(x => x.trim()).filter(Boolean), wa_name: g('wa_name').value.trim() || null, shift_start: g('shift_start').value || '08:00', grace_min: +g('grace_min').value || 0, active: g('active').checked }; });
+      const { error } = await S.sb.from('staff').upsert(rows); if (error) return toast('مقدرتش أحفظ: ' + error.message); toast('اتحفظ الهيكل'); renderStaff(); };
+  }
+}
+function staffDetail(e, recs) {
+  const L = [...recs].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 40), lim = tmin(e.x.shift_start) + e.x.grace_min, pj = id => S.projects.find(p => p.id === id)?.name || '';
+  return `<div class="sdbox"><form id="manF" class="grid"><label>اليوم<input type="date" name="date" value="${today()}" required></label><label>الحالة<select name="status"><option value="present">حضور</option><option value="absent">غياب</option><option value="leave">إجازة</option><option value="mission">مأمورية</option></select></label><label>موعد الوصول<input type="time" name="arrival"></label><label>ملاحظة<input name="note"></label><div class="acts" style="margin:0;align-self:end"><button class="p">تسجيل / تصحيح يوم</button></div></form>
+  <div class="scroll" style="margin-top:10px;max-height:320px;overflow:auto"><table><thead><tr><th>اليوم</th><th>المشروع</th><th class="n">الوصول</th><th>المصدر</th><th></th></tr></thead><tbody>${L.map(r => `<tr><td>${r.date}</td><td>${esc(pj(r.project_id))}</td><td class="n" style="color:${r.status && r.status !== 'present' ? 'inherit' : r.m > lim ? 'var(--bad)' : 'var(--ok)'}">${r.status && r.status !== 'present' ? ({ absent: 'غياب', leave: 'إجازة', mission: 'مأمورية' })[r.status] : tfmt(r.m)}</td><td class="mut">${esc(r.how)}</td><td>${r.src === 'manual' ? `<button type="button" data-delman="${r.id}" style="min-height:30px;padding:0 10px;font-size:12px">مسح</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="mut">مفيش تسجيلات في الفترة دي.</td></tr>'}</tbody></table></div></div>`;
 }
 
 /* ---------------- admin: members ---------------- */
