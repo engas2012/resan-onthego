@@ -132,3 +132,18 @@ label.btn{display:inline-flex;flex-direction:row;align-items:center;font-weight:
 @media(max-width:600px){.bq tr.gh{display:block;padding:6px 10px}.bq tr.gh td{display:inline;padding:0}}
 .addi summary{cursor:pointer;list-style:none}.addi summary::-webkit-details-marker{display:none}.addi{margin-bottom:12px}
 .grid .wide{grid-column:1/-1}
+/* brand & header */
+.logo{display:inline-flex;line-height:0}.logo .lg{display:none;height:100%;width:auto}
+header .logo .lg.lw,.login .logo .lg.lk{display:block}
+@media(prefers-color-scheme:dark){header .logo .lg.lw,.login .logo .lg.lk{display:none}header .logo .lg.lk,.login .logo .lg.lw{display:block}}
+header .brandlink{display:flex;align-items:center;gap:12px;color:inherit;text-decoration:none}
+header .brandlink .logo{height:44px}
+header .otg{font-size:13px;letter-spacing:.14em;text-transform:uppercase;opacity:.75;border-inline-start:1px solid currentColor;padding-inline-start:12px;line-height:1.2;direction:ltr}
+header .hbar{padding-bottom:10px;border-bottom:1px solid color-mix(in srgb,currentColor 16%,transparent)}
+header .ptitle{padding:10px 0 2px}header .ptitle p{margin:2px 0 8px}
+header .who2 a{color:inherit;text-decoration:none}
+header .homeb{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:2px 12px;border-radius:99px;border:1px solid currentColor;opacity:.9;font-size:14px}
+header .homeb:hover,header .homeb.on{background:var(--acc);border-color:var(--acc);color:#fff;opacity:1}
+.login .logo{height:auto;justify-content:center}.login .logo .lg{width:min(260px,100%);height:auto;margin:4px auto 0}
+.otgl{text-align:center;font-size:13px;letter-spacing:.14em;color:var(--mut);margin-top:-4px;direction:ltr}.otgl span{letter-spacing:0;direction:rtl;unicode-bidi:isolate}
+@media(max-width:600px){header .brandlink .logo{height:34px}header .otg{display:none}header .who2 .uname{display:none}header .ptitle h1{font-size:18px}}

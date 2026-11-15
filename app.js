@@ -40,14 +40,15 @@ async function boot() {
   const { data } = await S.sb.auth.getSession();
   if (data?.session?.user) await afterLogin(data.session.user); else renderLogin();
 }
-const fatal = t => { $('#app').innerHTML = `<div class="login"><h1><span class="brand">RESAN</span> On the go</h1><div class="note">${esc(t)}</div></div>`; };
+const LOGO = (cls = '') => `<span class="logo ${cls}"><img class="lg lw" src="logo-light.png" alt="ريسان للمقاولات"><img class="lg lk" src="logo-dark.png" alt="ريسان للمقاولات"></span>`;
+const fatal = t => { $('#app').innerHTML = `<div class="login">${LOGO()}<div class="otgl">On the go</div><div class="note">${esc(t)}</div></div>`; };
 
 function renderLogin(msg = '') {
-  $('#app').innerHTML = `<form class="login" id="lf"><h1><span class="brand">RESAN</span> On the go</h1><p class="mut" style="margin:0">متابعة مشروعات الغردقة</p>
+  $('#app').innerHTML = `<form class="login" id="lf">${LOGO()}<div class="otgl">On the go</div><p class="mut" style="margin:-8px 0 0;text-align:center">متابعة مشروعات الغردقة</p>
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 1.1.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 1.2.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -83,9 +84,9 @@ async function afterLogin(user) {
 const VIEWS = [['status', 'الموقف التنفيذي', null], ['boq', 'المقايسة والتكلفة', 'boq'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة المكتب الفني', 'review'], ['log', 'سجل التقارير', 'log']];
 function shell(pid, view) {
   const p = pid && S.projects.find(x => x.id === pid);
-  return `<header><div class="hbar"><div>${p ? '<a class="back" href="#home">→ كل المشاريع</a>' : ''}<h1>${p ? esc(p.name + ' – ' + p.place) : '<span class="brand">RESAN</span> On the go'}</h1>
-  <p>${p ? `المالك: ${esc(p.owner_name)} · المقاول العام: ${esc(p.contractor_name)} · الاستشاري: ${esc(p.consultant_name)}` : 'متابعة مشروعات الغردقة'}</p></div>
-  <div class="who2">${p ? `<span class="roleTag">${ROLE[role(pid)] || ''}</span>` : ''}<span>${esc(S.profile.full_name || S.profile.email)}</span>${S.admin ? '<a href="#admin" style="color:inherit">المستخدمين</a>' : ''}<button id="out">خروج</button></div></div>
+  return `<header><div class="hbar"><a class="brandlink" href="#home" title="الصفحة الرئيسية">${LOGO()}<span class="otg">On the go</span></a>
+  <div class="who2"><a class="homeb${!p && view !== 'admin' ? ' on' : ''}" href="#home"><svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M5.5 9.5V20h5v-6h3v6h5V9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>الرئيسية</a>${p ? `<span class="roleTag">${ROLE[role(pid)] || ''}</span>` : ''}<span class="uname">${esc(S.profile.full_name || S.profile.email)}</span>${S.admin ? '<a href="#admin" class="adm">المستخدمين</a>' : ''}<button id="out">خروج</button></div></div>
+  ${p ? `<div class="ptitle"><h1>${esc(p.name + ' – ' + p.place)}</h1><p>المالك: ${esc(p.owner_name)} · المقاول العام: ${esc(p.contractor_name)} · الاستشاري: ${esc(p.consultant_name)}</p></div>` : '<div class="ptitle"><h1>متابعة مشروعات الغردقة</h1></div>'}
   <nav>${p ? VIEWS.filter(v => !v[2] || can(v[2], pid)).map(([v, l]) => `<a href="#p/${pid}/${v}" class="${v === view ? 'on' : ''}">${l}${v === 'review' ? ' <span class="badge" id="pendN" hidden></span>' : ''}</a>`).join('') : ''}</nav></header><main id="main"><p class="mut">جاري التحميل…</p></main>`;
 }
 async function route() {
@@ -101,7 +102,7 @@ async function route() {
     if (view === 'boq' && can('boq', pid)) return renderBoq();
     return renderStatus();
   }
-  $('#app').innerHTML = shell(null); bindOut();
+  $('#app').innerHTML = shell(null, h); bindOut();
   if (h === 'admin' && S.admin) return renderAdmin();
   renderHome();
 }
