@@ -294,12 +294,11 @@ function renderReview() {
   const P = S.P, L = P.reports.filter(r => r.status === 'submitted').sort((a, b) => a.report_date.localeCompare(b.report_date));
   $('#main').innerHTML = `<h2>مراجعة المكتب الفني</h2><p class="mut">تقدر تعدّل الكميات قبل الاعتماد، والموقف بيتحدّث أول ما تعتمد.</p>${L.length ? L.map(r => { const lines = [...(r.body.qty || []), ...(r.body.pours || []).filter(x => x.item).map(x => ({ item: x.item, qty: x.vol, pour: 1 }))];
     return `<div class="card" data-id="${r.id}"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><b>${r.report_date}</b><span class="mut">${esc(S.names[r.created_by] || '')}</span></div>${details(r, false)}
-    <div class="aibar"><button type="button" class="aib" data-ai="${r.id}">🤖 مراجعة AI</button><span class="mut">بيسكّن كل نشاط على المبنى والبند الصح، ويطلّع الكميات المكتوبة، وينبّه على المشاكل. القرار في الآخر ليك.</span></div><div class="aibox" data-aibox="${r.id}"></div>
+    <div class="aibar"><button type="button" class="aib" data-ai="${r.id}">🔎 مراجعة تلقائية</button><span class="mut">بيقترح المبنى والبند لكل نشاط، ويطلّع الكميات المكتوبة، وينبّه على المشاكل. القرار في الآخر ليك.</span></div><div class="aibox" data-aibox="${r.id}"></div>
     <b>الكميات اللي هتتضاف للموقف</b><div class="scroll"><table><thead><tr><th>البند</th><th class="n">الكمية</th><th></th></tr></thead><tbody data-lines>${lines.map((q, k) => `<tr><td>${esc(itemName(q.item))}${q.pour ? ' <span class="mut">(صبة)</span>' : ''}</td><td class="n"><input type="number" step="any" data-k="${k}" data-item="${esc(q.item)}" value="${q.qty}" style="width:110px;min-height:36px"></td><td></td></tr>`).join('')}</tbody></table></div>${lines.length ? '' : '<p class="mut" data-nolines>مفيش كميات في التقرير.</p>'}
     <label style="margin-top:10px">تعليق للمهندس (مطلوب لو هترجّعه)<input data-c></label><div class="acts"><button class="ok" data-a="approve">اعتماد وتحديث الموقف</button><button data-a="return">إرجاع للمهندس</button></div></div>`; }).join('') : '<p class="mut">مفيش تقارير مستنية مراجعة.</p>'}`;
-  const prevAi = {}; S.sb.from('ai_reviews').select('report_id,result,created_at').in('report_id', L.map(r => r.id)).order('created_at', { ascending: false }).then(({ data }) => (data || []).forEach(x => { if (!prevAi[x.report_id]) { prevAi[x.report_id] = 1; showAi(x.report_id, x.result, x.created_at); } }));
   $('#main').onclick = async e => {
-    const ai = e.target.closest('[data-ai]'); if (ai) return runAi(ai);
+    const ai = e.target.closest('[data-ai]'); if (ai) { showAi(ai.dataset.ai, localReview(S.P.reports.find(x => x.id === ai.dataset.ai))); ai.textContent = '🔎 مراجعة تاني'; return; }
     const add = e.target.closest('[data-aiadd]'); if (add) return addAiLine(add);
     const b = e.target.closest('button[data-a]'); if (!b) return; const c = b.closest('[data-id]'), id = c.dataset.id, comment = c.querySelector('[data-c]').value.trim(); b.disabled = true;
     const { error } = b.dataset.a === 'approve'
@@ -325,7 +324,7 @@ function showAi(id, res, at) {
   const P = S.P, box = document.querySelector(`[data-aibox="${id}"]`), r = P.reports.find(x => x.id === id); if (!box || !r) return;
   const acts = r.body.acts || [], it = iid => P.items.find(x => x.id === iid), sev = { high: ['ret', 'مهم'], medium: ['pend', 'متوسط'], low: ['imp', 'ملاحظة'] };
   const existing = new Set([...(r.body.qty || []), ...(r.body.pours || []).filter(x => x.item)].map(q => q.item));
-  box.innerHTML = `<div class="aires"><div class="aih"><b>🤖 نتيجة المراجعة</b>${at ? `<span class="mut">${fmtD(at.slice(0, 10))}</span>` : ''}</div><p>${esc(res.summary || '')}</p>
+  box.innerHTML = `<div class="aires"><div class="aih"><b>🔎 نتيجة المراجعة</b>${at ? `<span class="mut">${fmtD(at.slice(0, 10))}</span>` : ''}</div><p>${esc(res.summary || '')}</p>
   ${(res.issues || []).length ? `<ul class="aiiss">${res.issues.map(x => `<li><span class="st ${(sev[x.severity] || sev.low)[0]}">${(sev[x.severity] || sev.low)[1]}</span> ${esc(x.text)}</li>`).join('')}</ul>` : '<p class="mut">مفيش مشاكل واضحة.</p>'}
   ${(res.acts || []).length ? `<div class="scroll"><table class="aitbl"><thead><tr><th>النشاط</th><th>المكان</th><th>التخصص</th><th>البنود</th></tr></thead><tbody>${res.acts.map(a => { const o = acts[a.index] || {}, chB = !!o.building && o.building !== (a.building || ''), chD = o.discipline && o.discipline !== a.discipline;
     return `<tr><td>${esc(o.work || '')}${a.note ? `<div class="mut" style="font-size:12px">${esc(a.note)}</div>` : ''}</td><td>${chB ? `<s class="mut">${esc(o.building || '—')}</s> ` : ''}<b>${esc(a.building || '—')}</b></td><td>${chD ? `<s class="mut">${esc(o.discipline)}</s> ` : ''}${esc(a.discipline)}</td><td>${(a.items || []).map(x => { const i = it(x.item_id); return i ? `<span class="aichip" title="${esc(i.name)}">${esc(i.code)} <small>${Math.round(x.confidence * 100)}%</small> ${esc(i.name.slice(0, 34))}${i.name.length > 34 ? '…' : ''}${i.building ? ' – ' + esc(i.building) : ''}</span>` : ''; }).join('') || '<span class="mut">مش لاقي بند مناسب</span>'}</td></tr>`; }).join('')}</tbody></table></div>` : ''}
@@ -334,8 +333,40 @@ function showAi(id, res, at) {
 }
 function addAiLine(b) {
   const card = b.closest('[data-id]'), tb = card.querySelector('[data-lines]'), k = tb.querySelectorAll('input[data-k]').length + 100;
-  tb.insertAdjacentHTML('beforeend', `<tr class="aiadded"><td>${esc(itemName(b.dataset.item))} <span class="st appr">AI</span></td><td class="n"><input type="number" step="any" data-k="${k}" data-item="${esc(b.dataset.item)}" value="${b.dataset.qty}" style="width:110px;min-height:36px"></td><td><button type="button" class="x" onclick="this.closest('tr').remove()" style="min-height:30px;padding:0 10px">✕</button></td></tr>`);
+  tb.insertAdjacentHTML('beforeend', `<tr class="aiadded"><td>${esc(itemName(b.dataset.item))} <span class="st appr">مقترح</span></td><td class="n"><input type="number" step="any" data-k="${k}" data-item="${esc(b.dataset.item)}" value="${b.dataset.qty}" style="width:110px;min-height:36px"></td><td><button type="button" class="x" onclick="this.closest('tr').remove()" style="min-height:30px;padding:0 10px">✕</button></td></tr>`);
   card.querySelector('[data-nolines]')?.remove(); b.replaceWith(Object.assign(document.createElement('span'), { className: 'mut', textContent: 'اتضافت' })); toast('اتضافت للكميات. راجعها قبل الاعتماد');
+}
+
+
+/* free rule-based reviewer (no API cost) */
+const normAr = t => AR(String(t || '')).toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[ًٌٍَُِّْـ]/g, '').replace(/land\s*0?(\d)/g, 'لاند $1');
+const STOP = new Set(['جاري', 'جارى', 'تم', 'اعمال', 'عمل', 'في', 'من', 'علي', 'الي', 'و', 'مع', 'لزوم', 'بالموقع', 'الموقع', 'اليوم', 'غدا', 'بند', 'شامل', 'شاملا', 'طبقا', 'جميع', 'كافه', 'وجاري', 'استكمال']);
+const SYN = { 'اسقف': 'سقف', 'اعمده': 'عمود', 'عمدان': 'عمود', 'حوائط': 'حائط', 'حيطان': 'حائط', 'اساسات': 'اساس', 'قواعد': 'اساس', 'سلالم': 'سلم', 'كمرات': 'كمره', 'خرسانات': 'خرسانه', 'نجاره': 'خرسانه', 'حداده': 'خرسانه', 'صب': 'خرسانه', 'مبانى': 'مباني', 'بياض': 'محاره' };
+const toks = t => normAr(t).replace(/[^ء-ي0-9\s]/g, ' ').split(/\s+/).map(w => w.replace(/^(وال|بال|فال|كال|لل|ال)(?=..)/, '')).map(w => SYN[w] || w).filter(w => w.length > 1 && !STOP.has(w));
+const FLOOR = { 'ارضي': 'ارضي', 'الارضي': 'ارضي', 'اول': 'اول', 'الاول': 'اول', 'ثاني': 'ثاني', 'تاني': 'ثاني', 'الثاني': 'ثاني', 'ثالث': 'ثالث', 'تالت': 'ثالث', 'رابع': 'رابع', 'خامس': 'خامس', 'بدروم': 'بدروم', 'سطح': 'سطح' };
+function localReview(r) {
+  const P = S.P, b = r.body || {}, acts = b.acts || [], bs = P.proj.buildings || [], multi = bs.length > 1, issues = [], out = [], qty = [];
+  const idx = P.items.map(i => ({ i, t: new Set(toks(i.name + ' ' + i.group_name + ' ' + (i.description || '').slice(0, 120))), fl: Object.values(FLOOR).filter(f => normAr(i.name + ' ' + i.group_name).includes(f)) }));
+  const findB = txt => { const n = normAr(txt); let best = ''; bs.forEach(x => { const nx = normAr(x); if (n.includes(nx) && nx.length > best.length) best = x; }); if (!best) { const m = /لاند\s*(\d)/.exec(n), v = /فيلا\s*(\d)/.exec(n); if (m) { const c = bs.filter(x => normAr(x).startsWith('لاند ' + m[1])); best = (v && c.find(x => new RegExp('فيلا\\s*' + v[1]).test(normAr(x)))) || c.find(x => normAr(x).replace(/\s/g, '') === 'لاند' + m[1]) || (c.length === 1 ? c[0] : ''); } } return best; };
+  const KEY = new Set(['سقف', 'عمود', 'حائط', 'اساس', 'سلم', 'كمره', 'دكه', 'سور', 'مباني', 'محاره', 'عزل', 'ردم', 'حفر', 'احلال', 'خوازيق', 'نزح']);
+  const match = (txt, bld) => { const T = [...new Set(toks(txt))], fl = T.map(w => FLOOR[w]).filter(Boolean);
+    return idx.map(o => { let sc = 0; T.forEach(w => { if (o.t.has(w)) sc += KEY.has(w) ? 2 : 1; else if ([...o.t].some(x => x.length > 3 && (x.startsWith(w) || w.startsWith(x)))) sc += .5; });
+      if (fl.length && o.fl.some(f => fl.includes(f))) sc += 1.5; else if (fl.length && o.fl.length) sc -= 1; if (bld && o.i.building) sc += normAr(o.i.building).startsWith(normAr(bld)) ? 1 : -2; return { o, sc }; })
+      .filter(x => x.sc >= 2).sort((a, b) => b.sc - a.sc).slice(0, 2).map((x, k, a) => ({ item_id: x.o.i.id, confidence: Math.min(.95, x.sc / (a[0].sc + 2)) })); };
+  acts.forEach((a, k) => { const bld = multi ? findB(a.work + ' ' + (a.building || '')) || (bs.includes(a.building) ? a.building : '') || a.building || '' : '';
+    const its = match(a.work, bld); out.push({ index: k, building: bld, discipline: a.discipline || waDisc(a.work), items: its, note: multi && !bld ? 'مش واضح المبنى' : '' });
+    const q = /(\d+(?:[.,]\d+)?)\s*(م3|م³|م ?مكعب|م2|م²|م\.?ط|طن)/.exec(AR(a.work)); if (q && its[0]) qty.push({ item_id: its[0].item_id, qty: +q[1].replace(',', '.'), basis: a.work });
+    if (multi && !bld && (a.discipline || waDisc(a.work)) !== 'عام') issues.push({ severity: 'medium', text: `النشاط "${a.work.slice(0, 50)}" مش محدد له مبنى` });
+    if (!its.length && (a.discipline || waDisc(a.work)) !== 'عام') issues.push({ severity: 'low', text: `مش لاقي بند في المقايسة لنشاط "${a.work.slice(0, 50)}"` }); });
+  (b.pours || []).filter(p => p.vol && !p.item).forEach(p => { const its = match('خرسانه ' + (p.element || ''), multi ? findB(p.building || p.element || '') : ''); if (its[0]) qty.push({ item_id: its[0].item_id, qty: +p.vol, basis: 'صبة ' + (p.element || '') + ' ' + p.vol + ' م3' }); else issues.push({ severity: 'medium', text: `صبة ${p.element || ''} (${p.vol} م3) مش مربوطة ببند` }); });
+  const lines = [...(b.qty || []), ...(b.pours || []).filter(p => p.item).map(p => ({ item: p.item, qty: p.vol }))], prev = P.reports.filter(x => x.id !== r.id && x.report_date < r.report_date).sort((a, c) => c.report_date.localeCompare(a.report_date)).slice(0, 5);
+  lines.forEach(l => { const i = P.items.find(x => x.id === l.item); if (!i) return; const rem = (+i.qty || 0) - i.ex;
+    if (+i.qty > 0 && +l.qty > rem + 1e-6) issues.push({ severity: 'high', text: `${i.code}: الكمية ${nf(l.qty)} أكبر من المتبقي ${nf(rem)} ${i.unit || ''}` });
+    const dup = prev.find(x => [...(x.body?.qty || []), ...(x.body?.pours || []).filter(p => p.item).map(p => ({ item: p.item, qty: p.vol }))].some(q => q.item === l.item && +q.qty === +l.qty));
+    if (dup) issues.push({ severity: 'medium', text: `${i.code}: نفس الكمية ${nf(l.qty)} متسجلة في تقرير ${dup.report_date}، اتأكد إنها مش متكررة` }); });
+  if (acts.length && !(b.labor || []).length) issues.push({ severity: 'low', text: 'مفيش عمالة مكتوبة في التقرير' });
+  const seen = new Set(lines.map(l => l.item)), Q = qty.filter(q => !seen.has(q.item_id) && (seen.add(q.item_id), true));
+  return { summary: `${acts.length} نشاط · ${lines.length} كمية في التقرير · ${Q.length} كمية مقترحة · ${issues.filter(x => x.severity === 'high').length} مشكلة مهمة`, issues, acts: out, qty_lines: Q };
 }
 
 /* ---------------- log ---------------- */
