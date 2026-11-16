@@ -56,7 +56,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 3.5.2</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 3.5.3</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -244,7 +244,7 @@ function drawOps() {
   $('#mAdd').onclick = () => mallEdit(null); $('#mEd') && ($('#mEd').onclick = e => { e.preventDefault(); mallEdit(mOf(O.mall)); });
   $('#uAdd') && ($('#uAdd').onclick = () => { if (!O.mall && M.length > 1) return toast('اختار المول الأول'); unitEdit({ mall_id: O.mall || M[0].id, status: 'vacant' }); });
   $('#lAdd') && ($('#lAdd').onclick = () => leaseEdit({}));
-  $('#uImp') && ($('#uImp').onchange = e => { if (!O.mall && M.length > 1) return toast('اختار المول الأول'); importUnits(e.target.files[0], O.mall || M[0].id); });
+  $('#uImp') && ($('#uImp').onchange = e => { const f = e.target.files[0]; e.target.value = ''; importUnits(f, O.mall); });
   $('#main').onclick = e => { const un = e.target.closest('[data-unit]'), ls = e.target.closest('[data-lease]'), py = e.target.closest('[data-pay]');
     const ow = e.target.closest('[data-owner]'), tn = e.target.closest('[data-tenant]');
     if (e.target.closest('#owAdd')) return ownerEdit({}); if (e.target.closest('#tnAdd')) return tenantEdit({});
@@ -500,13 +500,42 @@ async function importOwners(file) {
   toast(`اتضاف ${nO} مالك و${nL} ربط بوحدات${miss.length ? ` · وحدات مش موجودة: ${[...new Set(miss)].slice(0, 8).join('، ')}` : ''}`); renderOps();
 }
 async function importUnits(file, mall) {
-  if (!file) return; if (!window.XLSX) return toast('مكتبة الإكسل لسه ماحمّلتش');
-  const wb = XLSX.read(await file.arrayBuffer()), A = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
-  const hi = A.findIndex(r => r.some(x => /وحد|رقم|كود|unit/i.test(String(x)))); if (hi < 0) return toast('مش لاقي عمود الوحدة');
-  const H = A[hi].map(x => String(x).trim()), c = re => H.findIndex(x => re.test(x)), cu = c(/وحد|رقم|كود|unit/i), cf = c(/دور|floor/i), ca = c(/داخل|مساحة$|^مساح|area/i), co = c(/خارج|تراس|outdoor|terrace/i), cd = c(/دوبلكس|duplex/i), cf2 = c(/الدور الثاني|الدور التاني|دور 2|floor ?2/i), ca2 = c(/مساحة الدور الثاني|مساحة الدور التاني|مساحة 2|area ?2/i), cn = c(/نشاط|activity/i), cs = c(/حال|status/i);
-  const stOf = v => /مؤجر|leased/i.test(v) ? 'leased' : /تجهيز/.test(v) ? 'fitout' : /مالك/.test(v) ? 'owner' : 'vacant';
-  const rows = A.slice(hi + 1).filter(r => String(r[cu]).trim()).map((r, k) => ({ mall_id: mall, code: String(r[cu]).trim(), floor: cf >= 0 ? String(r[cf]).trim() || null : null, area: ca >= 0 && ca !== co && r[ca] !== '' ? +String(r[ca]).replace(/[^\d.]/g, '') || null : null, area_out: co >= 0 && r[co] !== '' ? +String(r[co]).replace(/[^\d.]/g, '') || null : null, duplex: cd >= 0 ? /نعم|اه|yes|true|1|✓|دوبلكس/i.test(String(r[cd])) : false, floor2: cf2 >= 0 && cf2 !== ca2 ? String(r[cf2]).trim() || null : null, area2: ca2 >= 0 && r[ca2] !== '' ? +String(r[ca2]).replace(/[^\d.]/g, '') || null : null, activity: cn >= 0 ? String(r[cn]).trim() || null : null, status: cs >= 0 ? stOf(String(r[cs])) : 'vacant', sort: k }));
-  const { error } = await S.sb.from('mall_units').upsert(rows, { onConflict: 'mall_id,code' }); if (error) return toast(error.message); toast(`اتضاف/اتحدث ${rows.length} وحدة`); renderOps();
+  if (!file) return; if (!window.XLSX) return toast('مكتبة الإكسل لسه ماحمّلتش – حدّث الصفحة وجرب تاني');
+  let wb; try { wb = XLSX.read(await file.arrayBuffer()); } catch (er) { return toast('مش قادر أقرا الملف: ' + er.message); }
+  const O = S.ops, T = v => String(v ?? '').trim(), N = v => { if (typeof v === 'number') return v > 0 ? v : null; const m = String(v ?? '').replace(/,/g, '').replace(/[٠-٩]/g, c => '٠١٢٣٤٥٦٧٨٩'.indexOf(c)).match(/\d+(\.\d+)?/); return m && +m[0] > 0 ? +m[0] : null; };
+  const F = [['code', 'رقم الوحدة', /رقم الوحد|كود|الوحدة|وحده|^وحدة|unit|code|shop/i, 1], ['floor', 'الدور', /^الدور$|^دور|floor|level/i], ['area', 'المساحة الداخلية', /داخل|^المساحة$|^مساحة$|^المساحه$|area|m2|م2/i], ['area_out', 'المساحة الخارجية', /خارج|تراس|outdoor|terrace/i],
+    ['utype', 'نوع الوحدة', /نوع|type|category/i], ['activity', 'النشاط', /نشاط|activity|use/i], ['status', 'الحالة', /حال|status/i], ['duplex', 'دوبلكس', /دوبلكس|duplex/i], ['floor2', 'الدور التاني', /^(ال)?دور (ال)?(ثاني|تاني)|floor ?2/i], ['area2', 'مساحة الدور التاني', /مساحة الدور|area ?2/i], ['notes', 'ملاحظات', /ملاحظ|notes|remark/i]];
+  const d = document.createElement('dialog'); d.className = 'adlg wide'; document.body.append(d); d.showModal(); const close = () => { d.close(); d.remove(); };
+  let sn = wb.SheetNames.find(n => { const A = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: '' }); return A.some(r => r.some(x => F[0][2].test(T(x)))); }) || wb.SheetNames[0], hi = -1, map = {};
+  const draw = () => {
+    const A = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '', raw: true });
+    if (hi < 0) { hi = A.slice(0, 30).findIndex(r => r.filter(x => T(x)).length >= 2 && r.some(x => F[0][2].test(T(x)))); if (hi < 0) hi = A.findIndex(r => r.filter(x => T(x)).length >= 2); map = {}; const H = (A[hi] || []).map(T); F.forEach(([k, , re]) => { const i = H.findIndex((h, j) => h && re.test(h) && !Object.values(map).includes(j)); if (i >= 0) map[k] = i; }); }
+    const H = (A[hi] || []).map(T), rows = A.slice(hi + 1).filter(r => map.code != null && T(r[map.code]));
+    const seen = new Set(), dup = new Set(); rows.forEach(r => { const c = T(r[map.code]); if (seen.has(c)) dup.add(c); seen.add(c); });
+    const colSel = k => `<select data-map="${k}"><option value="">—</option>${H.map((h, i) => `<option value="${i}"${map[k] === i ? ' selected' : ''}>${esc(h || 'عمود ' + (i + 1))}</option>`).join('')}</select>`;
+    d.innerHTML = `<div class="dh"><div><h3 style="margin:0">استيراد وحدات</h3><div class="mut" style="font-size:12px">${esc(file.name)}</div></div><button type="button" class="dx">✕</button></div>
+    <div class="grid"><label>المول<select id="imM">${O.M.length > 1 ? '<option value="">— اختار المول —</option>' : ''}${O.M.map(m => `<option value="${m.id}"${(mall || (O.M.length === 1 && O.M[0].id)) === m.id ? ' selected' : ''}>${esc(m.name)}</option>`).join('')}</select></label>
+      ${wb.SheetNames.length > 1 ? `<label>الشيت<select id="imS">${wb.SheetNames.map(n => `<option${n === sn ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select></label>` : ''}<label>صف العناوين<input id="imH" type="number" min="1" value="${hi + 1}"></label></div>
+    <h4>ربط الأعمدة</h4><div class="grid">${F.map(([k, l, , req]) => `<label>${l}${req ? ' *' : ''}${colSel(k)}</label>`).join('')}</div>
+    ${map.code == null ? '<div class="note">حدد عمود رقم الوحدة.</div>' : `<p style="margin:8px 0"><b>${seen.size}</b> وحدة في الملف${dup.size ? ` · <span style="color:var(--bad)">أرقام مكررة: ${[...dup].slice(0, 10).map(esc).join('، ')} (هيتاخد آخر سطر)</span>` : ''}</p>
+    <div class="scroll" style="max-height:34vh;overflow:auto"><table class="whyt"><thead><tr>${F.filter(([k]) => map[k] != null).map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead><tbody>${rows.slice(0, 12).map(r => `<tr>${F.filter(([k]) => map[k] != null).map(([k]) => `<td>${esc(T(r[map[k]]))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>${rows.length > 12 ? `<p class="mut" style="font-size:12px">ظاهر أول 12 من ${rows.length}</p>` : ''}`}
+    <p class="mut" style="font-size:12px">الوحدات الموجودة بنفس الرقم في نفس المول بتتحدث بياناتها، والجديدة بتتضاف. الحالة لو مش موجودة بتبقى "فاضية".</p>
+    <div class="acts"><button type="button" class="p" id="imGo"${map.code == null || !rows.length ? ' disabled' : ''}>استيراد ${seen.size} وحدة</button></div>`;
+    d.querySelectorAll('[data-map]').forEach(x => x.onchange = () => { map[x.dataset.map] = x.value === '' ? undefined : +x.value; if (x.value === '') delete map[x.dataset.map]; mall = d.querySelector('#imM').value; draw(); });
+    d.querySelector('#imS') && (d.querySelector('#imS').onchange = e => { sn = e.target.value; hi = -1; mall = d.querySelector('#imM').value; draw(); });
+    d.querySelector('#imH').onchange = e => { hi = Math.max(0, +e.target.value - 1); const H2 = (A[hi] || []).map(T); map = {}; F.forEach(([k, , re]) => { const i = H2.findIndex((h, j) => h && re.test(h) && !Object.values(map).includes(j)); if (i >= 0) map[k] = i; }); mall = d.querySelector('#imM').value; draw(); };
+    d.querySelector('#imM').onchange = e => { mall = e.target.value; };
+    d.querySelector('#imGo').onclick = async () => { const mid = d.querySelector('#imM').value; if (!mid) return toast('اختار المول'); const b = d.querySelector('#imGo'); b.disabled = true;
+      const g = (r, k) => map[k] != null ? r[map[k]] : '', stOf = v => /مؤجر|leased|rented/i.test(v) ? 'leased' : /تجهيز|fit/i.test(v) ? 'fitout' : /مالك|owner/i.test(v) ? 'owner' : 'vacant';
+      const by = new Map(); rows.forEach((r, k) => { const dx = map.duplex != null && /نعم|اه|yes|true|^1$|✓|دوبلكس/i.test(T(g(r, 'duplex')));
+        by.set(T(g(r, 'code')), { mall_id: mid, code: T(g(r, 'code')), floor: T(g(r, 'floor')) || null, area: N(g(r, 'area')), area_out: N(g(r, 'area_out')), utype: T(g(r, 'utype')) || null, activity: T(g(r, 'activity')) || null, status: map.status != null ? stOf(T(g(r, 'status'))) : 'vacant', duplex: dx, floor2: dx ? T(g(r, 'floor2')) || null : null, area2: dx ? N(g(r, 'area2')) : null, notes: T(g(r, 'notes')) || null, sort: k }); });
+      const L = [...by.values()], exist = new Map(O.U.filter(u => u.mall_id === mid).map(u => [u.code, u]));
+      L.forEach(x => { const e = exist.get(x.code); if (e && map.status == null) x.status = e.status; });
+      let done = 0; for (let k = 0; k < L.length; k += 200) { const { error } = await S.sb.from('mall_units').upsert(L.slice(k, k + 200), { onConflict: 'mall_id,code' }); if (error) { b.disabled = false; return toast('حصلت مشكلة بعد ' + done + ' وحدة: ' + error.message); } done += Math.min(200, L.length - k); }
+      toast(`✓ اتضاف/اتحدث ${done} وحدة`); close(); S.ops.mall = mid; renderOps(); };
+    d.querySelector('.dx').onclick = close;
+  };
+  draw();
 }
 
 async function renderHome() {
