@@ -385,3 +385,9 @@ tr.mutr td{opacity:.55}tr.pick{cursor:pointer}
 button.ocard2{font:inherit;color:inherit;text-align:right;cursor:pointer;min-height:0}button.ocard2:hover{border-color:var(--acc)}
 .pinfo{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:10px}.pinfo div{background:var(--bg);border-radius:9px;padding:6px 10px;display:flex;flex-direction:column}.pinfo span{font-size:11px;color:var(--mut)}.pinfo b{font-size:14px;font-weight:600;word-break:break-word}
 pre.cred{background:var(--bg);border-radius:10px;padding:10px 12px;white-space:pre-wrap;font-family:inherit}
+.modbox{border:1px solid var(--line);border-radius:12px;padding:10px 12px}.modh{display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer}.modh input{width:auto;min-height:0}
+.modb{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-top:8px}
+button.urow{font:inherit;color:inherit;cursor:pointer;min-height:0}.mchips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.mchip{font-size:12px;padding:2px 9px;border-radius:99px;background:var(--bg)}.mchip.c{background:color-mix(in srgb,var(--acc) 12%,transparent)}.mchip.o{background:color-mix(in srgb,#2e6f9e 14%,transparent)}.mchip.a{background:#1b1c1e;color:#fff}
+body.opsro #mAdd,body.opsro #mEd,body.opsro #uAdd,body.opsro label:has(#uImp),body.opsro #lAdd,body.opsro #owAdd,body.opsro label:has(#owImp),body.opsro #tnAdd,body.opsro [data-pay],body.opsro #lOther,body.opsro #lEdit,body.opsro #lEnd,body.opsro #oEd,body.opsro #oLink,body.opsro #tEd,body.opsro #tNew,body.opsro #uOwn,body.opsro #uNewL,body.opsro [data-ul],body.opsro [data-pdel],body.opsro dialog form .acts{display:none!important}
+.modbox label.modh{flex-direction:row!important;justify-content:flex-start;align-items:center}

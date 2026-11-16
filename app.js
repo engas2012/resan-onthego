@@ -56,7 +56,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 3.3.1</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 3.4.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -81,7 +81,8 @@ async function afterLogin(user) {
     S.sb.from('project_members').select('project_id,role').eq('user_id', user.id),
     S.sb.from('projects').select('*').order('sort'),
   ]);
-  S.profile = prof || { email: user.email }; S.admin = !!prof?.is_admin; S.opsU = !!(prof?.is_admin || prof?.ops);
+  const { data: um } = await S.sb.from('user_modules').select('module,position').eq('user_id', user.id); S.mods = Object.fromEntries((um || []).map(x => [x.module, x.position]));
+  S.profile = prof || { email: user.email }; S.admin = !!prof?.is_admin; S.opsU = !!(prof?.is_admin || prof?.ops || S.mods.ops); S.opsEdit = !!(prof?.is_admin || prof?.ops || ['manager', 'accountant'].includes(S.mods.ops));
   S.roles = Object.fromEntries((mem || []).map(m => [m.project_id, m.role]));
   S.projects = projs || [];
   if (!S.projects.length && !S.opsU) return fatal('حسابك لسه مش مضاف على أي مشروع. كلّم مدير النظام.');
@@ -98,7 +99,7 @@ function shell(pid, view) {
   <nav>${p ? VIEWS.filter(v => !v[2] || can(v[2], pid)).map(([v, l]) => `<a href="#p/${pid}/${v}" class="${v === view ? 'on' : ''}">${l}${v === 'review' ? ' <span class="badge" id="pendN" hidden></span>' : ''}${v === 'tasks' ? ' <span class="badge" id="taskN" hidden></span>' : ''}</a>`).join('') : ''}</nav></header><main id="main"><p class="mut">جاري التحميل…</p></main>`;
 }
 async function route() {
-  const h = location.hash.slice(1) || (hubOn() ? 'start' : S.opsU && !S.projects.length ? 'ops' : 'home'), m = h.match(/^p\/([a-z0-9_-]+)\/([a-z]+)$/);
+  const h = location.hash.slice(1) || (hubOn() ? 'start' : myMods()[0] || 'home'), m = h.match(/^p\/([a-z0-9_-]+)\/([a-z]+)$/);
   if (m && S.projects.some(p => p.id === m[1])) {
     const [, pid, view] = m;
     $('#app').innerHTML = shell(pid, view); bindOut();
@@ -153,7 +154,8 @@ const groupPct = rows => { const v = rows.filter(r => r.w > 0), avg = v.length ?
 
 /* ---------------- home ---------------- */
 /* ---------------- main hub: Construction / HR / Operations ---------------- */
-const hubOn = () => !!S.admin || (S.opsU && S.projects.length > 0);
+const myMods = () => [S.projects.length && 'home', S.opsU && 'ops', S.admin && 'hr'].filter(Boolean);
+const hubOn = () => myMods().length > 1;
 const modOf = v => v === 'start' ? 'start' : ['hr', 'staff'].includes(v) ? 'hr' : v === 'ops' ? 'ops' : ['admin', 'alerts'].includes(v) ? 'start' : 'home';
 const MODT = { start: 'RESAN On the go', home: 'Construction – مشروعات المقاولات', hr: 'HR – الموارد البشرية', ops: 'إدارة التشغيل – المولات' };
 const MODN = { home: 'Construction', hr: 'HR', ops: 'إدارة التشغيل' };
@@ -203,9 +205,11 @@ async function renderOps() {
   Object.assign(O, { M: m.data, U: u.data, T: t.data, L: l.data, C: c.data, P: p.data, W: ow.data, WS: os.data }); drawOps();
 }
 function drawOps() {
+  document.body.classList.toggle('opsro', !S.opsEdit);
   const O = S.ops, { M, T, C, P } = O, inM = x => !O.mall || x.mall_id === O.mall, U = O.U.filter(inM), uOf = id => O.U.find(x => x.id === id), tOf = id => T.find(x => x.id === id), mOf = id => M.find(x => x.id === id);
   const L = O.L.filter(x => U.some(y => y.id === x.unit_id)), act = L.filter(x => x.status === 'active'), lOfU = id => act.find(x => x.unit_id === id);
   const B = Object.fromEntries(L.map(x => [x.id, leaseBal(x, C, P)]));
+  if (!M.length && !S.opsEdit) { $('#main').innerHTML = '<div class="note">لسه مفيش مولات متسجلة.</div>'; return; }
   if (!M.length) { $('#main').innerHTML = `<div class="card" style="max-width:560px"><h3 style="margin-top:0">ابدأ بإضافة أول مول</h3><form id="mF" class="grid"><label class="wide">اسم المول<input name="name" required></label><label class="wide">المكان<input name="place"></label><div class="acts" style="margin:0"><button class="p">إضافة</button></div></form></div>`; return bindOpsMall(); }
   const area = U.reduce((s, x) => s + (+x.area || 0), 0), leasedU = U.filter(x => x.status === 'leased'), leasedA = leasedU.reduce((s, x) => s + (+x.area || 0), 0), roll = act.reduce((s, x) => s + curRent(x, C) + (+x.service_fee || 0), 0);
   const arr = act.concat(L.filter(x => x.status === 'ended')).filter(x => B[x.id].bal > 0.5), arrT = arr.reduce((s, x) => s + B[x.id].bal, 0), ending = act.filter(x => daysTo(x.end_date) <= 90).sort((a, b) => a.end_date.localeCompare(b.end_date));
@@ -1504,43 +1508,64 @@ function staffDetail(e, recs) {
 
 /* ---------------- admin: members ---------------- */
 async function adminFn(body) { const { data, error } = await S.sb.functions.invoke('admin-users', { body }); if (error) { let m = error.message; try { m = (await error.context.json()).error || m; } catch {} return { error: m }; } return data || {}; }
-function newUser() {
+const ORG = { resan: 'فريق ريسان', consultant: 'الاستشاري', owner: 'المالك', subcontractor: 'مقاول باطن', other: 'جهة أخرى' };
+const MODS = { construction: { name: 'Construction – المقاولات', note: 'الدور بيتحدد لكل مشروع' }, ops: { name: 'إدارة التشغيل – المولات', pos: { manager: 'مدير التشغيل (صلاحية كاملة)', accountant: 'محاسب / تحصيل', viewer: 'متابعة فقط (قراءة)' } } };
+const ORGROLES = { resan: ['site', 'tech', 'finance', 'management', 'store'], consultant: ['consultant'], owner: ['owner'], subcontractor: ['site'], other: Object.keys(ROLE) };
+function userModsForm(u, mem, um) {
+  const org = u.org || 'resan', hasC = S.projects.some(p => mem[u.id + '|' + p.id]) || !u.id, opsPos = um[u.id] || (u.ops ? 'manager' : '');
+  return `<label class="wide">الجهة<select name="org">${Object.entries(ORG).map(([k, l]) => `<option value="${k}"${org === k ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+  <div class="wide modbox"><label class="modh"><input type="checkbox" name="m_c"${hasC ? ' checked' : ''}> <b>1. ${MODS.construction.name}</b></label><div class="modb" data-mb="c">${S.projects.map(p => `<label>${esc(p.name)}<select name="r_${p.id}" data-rs><option value="">— ملوش دخول —</option>${Object.entries(ROLE).map(([k, l]) => `<option value="${k}"${mem[u.id + '|' + p.id] === k ? ' selected' : ''}>${l}</option>`).join('')}</select></label>`).join('')}<p class="mut" style="margin:0;font-size:12px">${MODS.construction.note}</p></div></div>
+  <div class="wide modbox"><label class="modh"><input type="checkbox" name="m_o"${opsPos ? ' checked' : ''}> <b>2. ${MODS.ops.name}</b></label><div class="modb" data-mb="o"><label>الوظيفة<select name="opos">${Object.entries(MODS.ops.pos).map(([k, l]) => `<option value="${k}"${opsPos === k ? ' selected' : ''}>${l}</option>`).join('')}</select></label></div></div>`;
+}
+function bindModsForm(f) {
+  const sync = () => { f.querySelector('[data-mb=c]').hidden = !f.m_c.checked; f.querySelector('[data-mb=o]').hidden = !f.m_o.checked;
+    const allowed = ORGROLES[f.org.value] || Object.keys(ROLE); f.querySelectorAll('[data-rs] option[value]').forEach(o => { if (o.value) o.hidden = !allowed.includes(o.value); }); };
+  f.m_c.onchange = f.m_o.onchange = sync; f.org.onchange = () => { const al = ORGROLES[f.org.value]; f.querySelectorAll('[data-rs]').forEach(s => { if (s.value && !al.includes(s.value)) s.value = ''; if (!s.value && al.length === 1 && f.m_c.checked) s.value = al[0]; }); sync(); }; sync();
+}
+const readMods = f => ({ org: f.org.value, roles: f.m_c.checked ? S.projects.map(p => ({ project_id: p.id, role: f['r_' + p.id].value })).filter(r => r.role) : [], ops: f.m_o.checked ? f.opos.value : null });
+function newUser(ctx) {
   const gen = () => Array.from(crypto.getRandomValues(new Uint8Array(10)), b => 'abcdefghjkmnpqrstuvwxyz23456789'[b % 31]).join('');
   const d = document.createElement('dialog'); d.className = 'adlg';
   d.innerHTML = `<form><div class="dh"><h3 style="margin:0">مستخدم جديد</h3><button type="button" class="dx">✕</button></div><div class="grid">
     <label class="wide">الاسم<input name="n" required></label><label class="wide">الإيميل (اسم الدخول)<input name="e" type="email" dir="ltr" required></label>
     <label class="wide">كلمة السر<div style="display:flex;gap:6px"><input name="p" dir="ltr" required minlength="8" value="${gen()}" style="flex:1"><button type="button" id="pg" class="xs">توليد</button></div></label>
-    <label class="wide">الوظيفة<select name="r"><option value="ops">مدير التشغيل – قسم المولات كامل</option>${Object.entries(ROLE).filter(([k]) => k !== 'owner').map(([k, l]) => `<option value="${k}">${l}</option>`).concat(`<option value="owner">${ROLE.owner}</option>`).join('')}</select></label>
-    <div class="wide" id="nuP" hidden><div class="mut" style="font-size:13px;margin-bottom:4px">المشروعات</div>${S.projects.map(p => `<label style="display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" name="pj" value="${p.id}" checked style="width:auto;min-height:0">${esc(p.name)}</label>`).join('')}</div>
-    <label class="wide" id="nuO" hidden style="display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" name="ox" style="width:auto;min-height:0"> وكمان مدير تشغيل (قسم المولات)</label></div>
-    <p class="mut" style="font-size:12px">ابعت للمستخدم الإيميل وكلمة السر ورابط النظام، ويقدر يغيّر كلمة السر بعد كده.</p><div class="acts"><button class="p">إنشاء المستخدم</button></div></form>`;
-  document.body.append(d); d.showModal(); const f = d.querySelector('form'), close = () => { d.close(); d.remove(); };
-  const sync = () => { const ops = f.r.value === 'ops'; d.querySelector('#nuP').hidden = ops; d.querySelector('#nuO').hidden = ops; }; f.r.onchange = sync; sync();
+    ${userModsForm({}, ctx.mem, ctx.um)}</div><p class="mut" style="font-size:12px">اختار الأقسام اللي هيدخل عليها، وبعدين وظيفته في كل قسم. لو له قسم واحد بيفتح عليه على طول، ولو أكتر بتظهر له الشاشة الرئيسية بالأقسام بتاعته بس.</p><div class="acts"><button class="p">إنشاء المستخدم</button></div></form>`;
+  document.body.append(d); d.showModal(); const f = d.querySelector('form'), close = () => { d.close(); d.remove(); }; bindModsForm(f);
   d.addEventListener('click', e => { if (e.target === d || e.target.closest('.dx')) close(); if (e.target.id === 'pg') f.p.value = gen(); });
-  f.onsubmit = async e => { e.preventDefault(); const b = f.querySelector('button.p'); b.disabled = true; const ops = f.r.value === 'ops';
-    const roles = ops ? [] : [...f.querySelectorAll('[name=pj]:checked')].map(x => ({ project_id: x.value, role: f.r.value }));
-    const r = await adminFn({ action: 'create', full_name: f.n.value.trim(), email: f.e.value.trim(), password: f.p.value, ops: ops || f.ox.checked, roles });
+  f.onsubmit = async e => { e.preventDefault(); const m = readMods(f); if (!m.roles.length && !m.ops) return toast('اختار قسم ووظيفة واحدة على الأقل'); const b = f.querySelector('button.p'); b.disabled = true;
+    const r = await adminFn({ action: 'create', full_name: f.n.value.trim(), email: f.e.value.trim(), password: f.p.value, org: m.org, roles: m.roles, modules: m.ops ? [{ module: 'ops', position: m.ops }] : [] });
     if (r.error) { b.disabled = false; return toast(r.error); }
     const msg = `رابط النظام: ${location.origin}\nالإيميل: ${f.e.value.trim()}\nكلمة السر: ${f.p.value}`;
-    d.querySelector('form').innerHTML = `<div class="dh"><h3 style="margin:0">✓ اتعمل المستخدم</h3><button type="button" class="dx">✕</button></div><p>ابعت له البيانات دي:</p><pre class="cred" dir="auto">${esc(msg)}</pre><div class="acts"><button type="button" class="p" id="cp">نسخ</button><a class="btn" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(msg)}">إرسال واتساب</a></div>`;
+    f.innerHTML = `<div class="dh"><h3 style="margin:0">✓ اتعمل المستخدم</h3><button type="button" class="dx">✕</button></div><p>ابعت له البيانات دي:</p><pre class="cred" dir="auto">${esc(msg)}</pre><div class="acts"><button type="button" class="p" id="cp">نسخ</button><a class="btn" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(msg)}">إرسال واتساب</a></div>`;
     d.querySelector('#cp').onclick = () => navigator.clipboard?.writeText(msg).then(() => toast('اتنسخ'));
     d.addEventListener('close', () => renderAdmin(), { once: true }); };
 }
+function editUser(u, ctx) {
+  const d = document.createElement('dialog'); d.className = 'adlg';
+  d.innerHTML = `<form><div class="dh"><div><h3 style="margin:0">${esc(u.full_name || u.email)}</h3><div class="mut" style="font-size:12px" dir="ltr">${esc(u.email || '')}</div></div><button type="button" class="dx">✕</button></div><div class="grid"><label class="wide">الاسم<input name="n" value="${esc(u.full_name || '')}"></label>${userModsForm(u, ctx.mem, ctx.um)}</div>
+    <div class="acts"><button class="p">حفظ</button><button type="button" id="pw">تغيير كلمة السر</button></div></form>`;
+  document.body.append(d); d.showModal(); const f = d.querySelector('form'), close = () => { d.close(); d.remove(); }; bindModsForm(f);
+  d.addEventListener('click', async e => { if (e.target === d || e.target.closest('.dx')) close();
+    if (e.target.id === 'pw') { const v = prompt('كلمة السر الجديدة (8 حروف على الأقل)'); if (v) toast((await adminFn({ action: 'password', user_id: u.id, password: v })).error || 'اتغيرت كلمة السر'); } });
+  f.onsubmit = async e => { e.preventDefault(); const m = readMods(f), b = f.querySelector('button.p'); b.disabled = true; const errs = [];
+    const r1 = await S.sb.from('profiles').update({ full_name: f.n.value.trim() || u.full_name, org: m.org, ops: false }).eq('id', u.id); if (r1.error) errs.push(r1.error.message);
+    for (const p of S.projects) { const role = m.roles.find(x => x.project_id === p.id)?.role, old = ctx.mem[u.id + '|' + p.id]; if (role === old) continue;
+      const r = role ? await S.sb.from('project_members').upsert({ user_id: u.id, project_id: p.id, role }) : await S.sb.from('project_members').delete().eq('user_id', u.id).eq('project_id', p.id); if (r.error) errs.push(r.error.message); }
+    const r2 = m.ops ? await S.sb.from('user_modules').upsert({ user_id: u.id, module: 'ops', position: m.ops }) : await S.sb.from('user_modules').delete().eq('user_id', u.id).eq('module', 'ops'); if (r2.error) errs.push(r2.error.message);
+    if (errs.length) { b.disabled = false; return toast('مقدرتش أحفظ: ' + errs[0]); } toast('اتحفظ'); close(); renderAdmin(); };
+}
 async function renderAdmin() {
-  const [{ data: users }, { data: mem }] = await Promise.all([S.sb.from('profiles').select('*').order('email'), S.sb.from('project_members').select('*')]);
-  const M = {}; (mem || []).forEach(m => M[m.user_id + '|' + m.project_id] = m.role);
-  $('#main').innerHTML = `<div class="sthead"><h2 style="margin:0">المستخدمين والصلاحيات</h2><button id="uNew" class="p">+ مستخدم جديد</button></div><p class="mut">حدد دور كل مستخدم في كل مشروع. "—" يعني ملوش دخول على المشروع. مدير التشغيل بيدخل على قسم المولات كامل.</p>
-  <div class="scroll"><table class="adm"><thead><tr><th>المستخدم</th>${S.projects.map(p => `<th>${esc(p.name)}</th>`).join('')}<th>مدير التشغيل<div class="mut" style="font-size:11px;font-weight:400">قسم المولات كامل</div></th></tr></thead><tbody>${(users || []).map(u => `<tr><td>${esc(u.full_name || '')}${u.ops && !u.is_admin ? ' <span class="tag">مدير التشغيل</span>' : ''}<div class="mut" style="font-size:12px">${esc(u.email || '')}${u.is_admin ? ' · مدير النظام' : ''} · <a href="#" data-pw="${u.id}">تغيير كلمة السر</a></div></td>${S.projects.map(p => `<td><select data-u="${u.id}" data-p="${p.id}"><option value="">—</option>${Object.entries(ROLE).map(([k, l]) => `<option value="${k}"${M[u.id + '|' + p.id] === k ? ' selected' : ''}>${l}</option>`).join('')}</select></td>`).join('')}<td style="text-align:center">${u.is_admin ? '<span class="mut">✓ (مدير)</span>' : `<input type="checkbox" data-ops="${u.id}"${u.ops ? ' checked' : ''} style="width:22px;height:22px">`}</td></tr>`).join('')}</tbody></table></div>
-  <p class="mut" style="font-size:13px">مدير التشغيل بيدخل على قسم إدارة التشغيل كامل (المولات، الوحدات، الملاك، المستأجرين، العقود، التحصيل) ويقدر يدخل ويعدّل البيانات. مش بيشوف مشروعات المقاولات إلا لو اتحدد له دور في مشروع، ومش بيشوف HR.</p>`;
-  $('#uNew').onclick = () => newUser();
-  $('#main').onclick = e => { const pw = e.target.closest('[data-pw]'); if (!pw) return; e.preventDefault(); const v = prompt('كلمة السر الجديدة (8 حروف على الأقل)'); if (!v) return;
-    adminFn({ action: 'password', user_id: pw.dataset.pw, password: v }).then(r => toast(r.error ? r.error : 'اتغيرت كلمة السر')); };
-  $('#main').onchange = async e => {
-    const ob = e.target.closest('[data-ops]'); if (ob) { const { error } = await S.sb.rpc('set_user_ops', { p_user: ob.dataset.ops, p_on: ob.checked }); return toast(error ? 'مقدرتش أحفظ: ' + error.message : ob.checked ? 'بقى مدير تشغيل' : 'اتشالت صلاحية التشغيل'); }
-    const s = e.target.closest('select[data-u]'); if (!s) return; const k = { user_id: s.dataset.u, project_id: s.dataset.p };
-    const { error } = s.value ? await S.sb.from('project_members').upsert({ ...k, role: s.value }) : await S.sb.from('project_members').delete().eq('user_id', k.user_id).eq('project_id', k.project_id);
-    toast(error ? 'مقدرتش أحفظ: ' + error.message : 'اتحفظت الصلاحية');
-  };
+  const [{ data: users }, { data: mem }, { data: ums }] = await Promise.all([S.sb.from('profiles').select('*').order('email'), S.sb.from('project_members').select('*'), S.sb.from('user_modules').select('*')]);
+  const M = {}; (mem || []).forEach(m => M[m.user_id + '|' + m.project_id] = m.role); const UM = {}; (ums || []).filter(x => x.module === 'ops').forEach(x => UM[x.user_id] = x.position);
+  const ctx = { mem: M, um: UM }, U = users || [];
+  const chips = u => { const c = S.projects.filter(p => M[u.id + '|' + p.id]).map(p => `<span class="mchip c">🏗 ${esc(p.name)}: ${ROLE[M[u.id + '|' + p.id]]}</span>`), o = UM[u.id] || (u.ops ? 'manager' : '');
+    return u.is_admin ? '<span class="mchip a">مدير النظام – كل الأقسام</span>' : (c.join('') + (o ? `<span class="mchip o">🏬 ${MODS.ops.pos[o].split(' (')[0]}</span>` : '')) || '<span class="mut">ملوش أقسام</span>'; };
+  const groups = Object.keys(ORG).map(k => [k, U.filter(u => (u.org || 'resan') === k)]).filter(([, L]) => L.length);
+  $('#main').innerHTML = `<div class="sthead"><h2 style="margin:0">المستخدمين والصلاحيات</h2><button id="uNew" class="p">+ مستخدم جديد</button></div>
+  <p class="mut">كل مستخدم: الجهة اللي تبعها (فريق ريسان، الاستشاري، المالك…)، وبعدين الأقسام اللي يدخل عليها، ووظيفته في كل قسم. اضغط على أي مستخدم لتعديله.</p>
+  ${groups.map(([k, L]) => `<h3>${ORG[k]} <span class="mut" style="font-size:14px">(${L.length})</span></h3><div class="vlist">${L.map(u => `<button type="button" class="vrow urow" data-ue="${u.id}"><div style="flex:1;min-width:0;text-align:right"><b>${esc(u.full_name || '')}</b> <span class="mut" style="font-size:12px" dir="ltr">${esc(u.email || '')}</span><div class="mchips">${chips(u)}</div></div><span class="mut">تعديل ›</span></button>`).join('')}</div>`).join('')}`;
+  $('#uNew').onclick = () => newUser(ctx);
+  $('#main').onclick = e => { const b = e.target.closest('[data-ue]'); if (!b) return; const u = U.find(x => x.id === b.dataset.ue); if (u.is_admin && u.id !== S.user.id) return toast('ده مدير النظام وله كل الصلاحيات'); if (u.is_admin) return toast('حسابك مدير النظام – كل الأقسام'); editUser(u, ctx); };
 }
 
 /* ---------------- BOQ & cost ---------------- */
