@@ -56,7 +56,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 3.1.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 3.3.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -81,10 +81,10 @@ async function afterLogin(user) {
     S.sb.from('project_members').select('project_id,role').eq('user_id', user.id),
     S.sb.from('projects').select('*').order('sort'),
   ]);
-  S.profile = prof || { email: user.email }; S.admin = !!prof?.is_admin;
+  S.profile = prof || { email: user.email }; S.admin = !!prof?.is_admin; S.opsU = !!(prof?.is_admin || prof?.ops);
   S.roles = Object.fromEntries((mem || []).map(m => [m.project_id, m.role]));
   S.projects = projs || [];
-  if (!S.projects.length) return fatal('حسابك لسه مش مضاف على أي مشروع. كلّم مدير النظام.');
+  if (!S.projects.length && !S.opsU) return fatal('حسابك لسه مش مضاف على أي مشروع. كلّم مدير النظام.');
   if (!S.routed) { addEventListener('hashchange', route); S.routed = true; } route();
 }
 
@@ -98,7 +98,7 @@ function shell(pid, view) {
   <nav>${p ? VIEWS.filter(v => !v[2] || can(v[2], pid)).map(([v, l]) => `<a href="#p/${pid}/${v}" class="${v === view ? 'on' : ''}">${l}${v === 'review' ? ' <span class="badge" id="pendN" hidden></span>' : ''}${v === 'tasks' ? ' <span class="badge" id="taskN" hidden></span>' : ''}</a>`).join('') : ''}</nav></header><main id="main"><p class="mut">جاري التحميل…</p></main>`;
 }
 async function route() {
-  const h = location.hash.slice(1) || (hubOn() ? 'start' : 'home'), m = h.match(/^p\/([a-z0-9_-]+)\/([a-z]+)$/);
+  const h = location.hash.slice(1) || (hubOn() ? 'start' : S.opsU && !S.projects.length ? 'ops' : 'home'), m = h.match(/^p\/([a-z0-9_-]+)\/([a-z]+)$/);
   if (m && S.projects.some(p => p.id === m[1])) {
     const [, pid, view] = m;
     $('#app').innerHTML = shell(pid, view); bindOut();
@@ -118,9 +118,10 @@ async function route() {
   $('#app').innerHTML = shell(null, h); bindOut();
   if (h === 'admin' && S.admin) return renderAdmin();
   if ((h === 'staff' || h === 'hr') && S.admin) return renderStaff();
-  if (h === 'ops' && S.admin) return renderOps();
+  if (h === 'ops' && S.opsU) return renderOps();
   if (h === 'start' && hubOn()) return renderHub();
   if (h === 'alerts') return renderAlerts();
+  if (!S.projects.length && S.opsU) { location.hash = '#ops'; return; }
   renderHome();
 }
 const bindOut = () => { $('#out').onclick = () => S.sb.auth.signOut(); updateBell(); };
@@ -152,13 +153,13 @@ const groupPct = rows => { const v = rows.filter(r => r.w > 0), avg = v.length ?
 
 /* ---------------- home ---------------- */
 /* ---------------- main hub: Construction / HR / Operations ---------------- */
-const hubOn = () => !!S.admin;
+const hubOn = () => !!S.admin || (S.opsU && S.projects.length > 0);
 const modOf = v => v === 'start' ? 'start' : ['hr', 'staff'].includes(v) ? 'hr' : v === 'ops' ? 'ops' : ['admin', 'alerts'].includes(v) ? 'start' : 'home';
 const MODT = { start: 'RESAN On the go', home: 'Construction – مشروعات المقاولات', hr: 'HR – الموارد البشرية', ops: 'إدارة التشغيل – المولات' };
 const MODN = { home: 'Construction', hr: 'HR', ops: 'إدارة التشغيل' };
 const modCrumb = v => { const m = modOf(v); return hubOn() && MODN[m] ? `<a class="crumb" href="#start">الرئيسية</a> <span class="crumb">›</span> <a class="crumb" href="${m === 'home' ? '#home' : '#' + m}">${MODN[m]}</a>` : ''; };
 async function renderHub() {
-  const [pp, st] = await Promise.all([Promise.all(S.projects.map(p => S.sb.rpc('phase_progress', { p_project: p.id }).then(r => ({ p, ov: overall(r.data || []) })))), S.sb.from('staff').select('id,active')]);
+  const [pp, st] = await Promise.all([Promise.all(S.projects.map(p => S.sb.rpc('phase_progress', { p_project: p.id }).then(r => ({ p, ov: overall(r.data || []) })))), S.admin ? S.sb.from('staff').select('id,active') : Promise.resolve({ data: [] })]);
   const staffN = (st.data || []).filter(x => x.active !== false).length;
   const [om, ou, ol, oc, op] = await Promise.all(['malls', 'mall_units', 'leases', 'lease_charges', 'lease_payments'].map(t => S.sb.from(t).select('*')));
   const OU = ou.data || [], ops = { malls: (om.data || []).length, units: OU.length, occ: OU.length ? Math.round(OU.filter(x => x.status === 'leased').length / OU.length * 100) : 0, arr: (ol.data || []).reduce((s, x) => s + Math.max(leaseBal(x, oc.data || [], op.data || []).bal, 0), 0) };
@@ -167,9 +168,9 @@ async function renderHub() {
   const ppl = '<svg viewBox="0 0 64 64" width="44" height="44" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><circle cx="24" cy="22" r="8"/><circle cx="44" cy="24" r="6"/><path d="M8 52c0-9 7-16 16-16s16 7 16 16M38 38c8-2 18 3 18 14"/></svg>';
   const mall = '<svg viewBox="0 0 64 64" width="44" height="44" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M6 26 12 10h40l6 16zM10 26v30h44V26M6 26h52M22 56V40h20v16M16 32h6M42 32h6"/></svg>';
   $('#main').innerHTML = `<div class="hubhi"><b>أهلاً ${esc((S.profile.full_name || '').split(' ')[0] || '')}</b><span class="mut">اختار القسم</span></div><div class="hubg">
-    ${tile('#home', 'c1', crane, 'Construction', 'مشروعات المقاولات', `${pp.map(x => `<div class="hrow"><span>${esc(x.p.name)}</span><div class="bar"><u style="width:${Math.round(x.ov * 100)}%"></u></div><em>${Math.round(x.ov * 100)}%</em></div>`).join('')}`, `${S.projects.length} مشروع`)}
-    ${tile('#hr', 'c2', ppl, 'HR', 'الموارد البشرية', `<div class="hbig">${staffN}</div><div class="mut">فرد في فريق العمل · الحضور ومواعيد الوصول</div>`, 'فريق العمل والتقييم')}
-    ${tile('#ops', 'c3', mall, 'Operations', 'إدارة التشغيل', ops.units ? `<div class="hbig">${ops.occ}%</div><div class="mut">إشغال ${ops.units} وحدة في ${ops.malls} مول${ops.arr ? ` · متأخرات ${nf(ops.arr, 0)}` : ''}</div>` : '<div class="mut">المولات والوحدات والعقود والتحصيل.</div>', ops.units ? 'الوحدات والعقود والتحصيل' : 'ابدأ بإضافة المولات')}
+    ${!S.projects.length ? '' : tile('#home', 'c1', crane, 'Construction', 'مشروعات المقاولات', `${pp.map(x => `<div class="hrow"><span>${esc(x.p.name)}</span><div class="bar"><u style="width:${Math.round(x.ov * 100)}%"></u></div><em>${Math.round(x.ov * 100)}%</em></div>`).join('')}`, `${S.projects.length} مشروع`)}
+    ${!S.admin ? '' : tile('#hr', 'c2', ppl, 'HR', 'الموارد البشرية', `<div class="hbig">${staffN}</div><div class="mut">فرد في فريق العمل · الحضور ومواعيد الوصول</div>`, 'فريق العمل والإجازات')}
+    ${!S.opsU ? '' : tile('#ops', 'c3', mall, 'Operations', 'إدارة التشغيل', ops.units ? `<div class="hbig">${ops.occ}%</div><div class="mut">إشغال ${ops.units} وحدة في ${ops.malls} مول${ops.arr ? ` · متأخرات ${nf(ops.arr, 0)}` : ''}</div>` : '<div class="mut">المولات والوحدات والعقود والتحصيل.</div>', ops.units ? 'الوحدات والعقود والتحصيل' : 'ابدأ بإضافة المولات')}
   </div>`;
 }
 /* ---------------- Operations: malls / units / leases / collection ---------------- */
@@ -197,9 +198,9 @@ function leaseBal(L, C, Pm) {
 async function renderOps() {
   const O = S.ops ||= { tab: 'dash', mall: '' };
   $('#main').innerHTML = '<p class="mut">جاري التحميل…</p>';
-  const q = t => S.sb.from(t).select('*'), [m, u, t, l, c, p] = await Promise.all([q('malls').order('sort'), q('mall_units').order('sort').order('code'), q('tenants').order('name'), q('leases').order('start_date'), q('lease_charges').order('due_date'), q('lease_payments').order('pay_date')]);
-  const err = [m, u, t, l, c, p].find(x => x.error); if (err) return $('#main').innerHTML = `<div class="note">${esc(err.error.message)}</div>`;
-  Object.assign(O, { M: m.data, U: u.data, T: t.data, L: l.data, C: c.data, P: p.data }); drawOps();
+  const q = t => S.sb.from(t).select('*'), [m, u, t, l, c, p, ow, os] = await Promise.all([q('malls').order('sort'), q('mall_units').order('sort').order('code'), q('tenants').order('name'), q('leases').order('start_date'), q('lease_charges').order('due_date'), q('lease_payments').order('pay_date'), q('unit_owners').order('name'), q('unit_ownership')]);
+  const err = [m, u, t, l, c, p, ow, os].find(x => x.error); if (err) return $('#main').innerHTML = `<div class="note">${esc(err.error.message)}</div>`;
+  Object.assign(O, { M: m.data, U: u.data, T: t.data, L: l.data, C: c.data, P: p.data, W: ow.data, WS: os.data }); drawOps();
 }
 function drawOps() {
   const O = S.ops, { M, T, C, P } = O, inM = x => !O.mall || x.mall_id === O.mall, U = O.U.filter(inM), uOf = id => O.U.find(x => x.id === id), tOf = id => T.find(x => x.id === id), mOf = id => M.find(x => x.id === id);
@@ -208,8 +209,8 @@ function drawOps() {
   if (!M.length) { $('#main').innerHTML = `<div class="card" style="max-width:560px"><h3 style="margin-top:0">ابدأ بإضافة أول مول</h3><form id="mF" class="grid"><label class="wide">اسم المول<input name="name" required></label><label class="wide">المكان<input name="place"></label><div class="acts" style="margin:0"><button class="p">إضافة</button></div></form></div>`; return bindOpsMall(); }
   const area = U.reduce((s, x) => s + (+x.area || 0), 0), leasedU = U.filter(x => x.status === 'leased'), leasedA = leasedU.reduce((s, x) => s + (+x.area || 0), 0), roll = act.reduce((s, x) => s + curRent(x, C) + (+x.service_fee || 0), 0);
   const arr = act.concat(L.filter(x => x.status === 'ended')).filter(x => B[x.id].bal > 0.5), arrT = arr.reduce((s, x) => s + B[x.id].bal, 0), ending = act.filter(x => daysTo(x.end_date) <= 90).sort((a, b) => a.end_date.localeCompare(b.end_date));
-  const tabs = [['dash', '📊 لوحة الأداء'], ['units', `🏬 الوحدات (${U.length})`], ['leases', `📝 العقود (${act.length})`], ['coll', `💰 التحصيل${arr.length ? ` (${arr.length})` : ''}`]];
-  const unitTile = x => { const ls = lOfU(x.id), b = ls && B[ls.id], st = USTAT[x.status]; return `<button type="button" class="utile" data-unit="${x.id}" style="--c:${st[1]}"><div class="uh"><b>${esc(x.code)}</b><span>${st[0]}</span></div><div class="mut" style="font-size:12px">${esc(x.floor || '')}${x.area ? ' · ' + nf(x.area) + ' م2' : ''}${x.activity ? ' · ' + esc(x.activity) : ''}</div>${ls ? `<div class="ut">${esc(tOf(ls.tenant_id)?.name || '')}</div><div class="mut" style="font-size:12px">${nf(curRent(ls, C), 0)} ج/شهر · لحد ${fmtD(ls.end_date)}</div>${b.bal > 0.5 ? `<div class="ubad">متأخرات ${nf(b.bal, 0)}</div>` : '<div class="uok">✓ منتظم</div>'}` : ''}</button>`; };
+  const tabs = [['dash', '📊 لوحة الأداء'], ['units', `🏬 الوحدات (${U.length})`], ['leases', `📝 العقود (${act.length})`], ['coll', `💰 التحصيل${arr.length ? ` (${arr.length})` : ''}`], ['owners', `👤 الملاك (${O.W.length})`], ['tenants', `🧾 المستأجرين (${T.length})`]];
+  const unitTile = x => { const ls = lOfU(x.id), b = ls && B[ls.id], st = USTAT[x.status]; return `<button type="button" class="utile" data-unit="${x.id}" style="--c:${st[1]}"><div class="uh"><b>${esc(x.code)}</b><span>${st[0]}</span></div><div class="mut" style="font-size:12px">${esc(x.floor || '')}${x.area ? ' · ' + nf(x.area) + ' م2' : ''}${x.activity ? ' · ' + esc(x.activity) : ''}</div>${ownersOf(x.id).length ? `<div class="uown">👤 ${ownersOf(x.id).map(o => esc(o.name)).join('، ')}</div>` : ''}${ls ? `<div class="ut">${esc(tOf(ls.tenant_id)?.name || '')}</div><div class="mut" style="font-size:12px">${nf(curRent(ls, C), 0)} ج/شهر · لحد ${fmtD(ls.end_date)}</div>${b.bal > 0.5 ? `<div class="ubad">متأخرات ${nf(b.bal, 0)}</div>` : '<div class="uok">✓ منتظم</div>'}` : ''}</button>`; };
   let body = '';
   if (O.tab === 'dash') body = `<div class="kpis"><div class="kpi"><b>${U.length ? Math.round(leasedU.length / U.length * 100) : 0}%</b><span>نسبة الإشغال (${leasedU.length}/${U.length} وحدة)${area ? ` · ${Math.round(leasedA / area * 100)}% من المساحة` : ''}</span></div><div class="kpi k-ok"><b>${nf(roll, 0)}</b><span>الإيراد الشهري الحالي (إيجار + خدمات)</span></div><div class="kpi${arrT > 0 ? ' k-bad' : ''}"><b>${nf(arrT, 0)}</b><span>متأخرات على ${arr.length} عقد</span></div><div class="kpi${ending.length ? ' k-warn' : ''}"><b>${ending.length}</b><span>عقود بتخلص خلال 90 يوم</span></div></div>
     <div class="two2"><div class="card"><b>أكبر المتأخرات</b>${arr.length ? `<table class="whyt"><tbody>${arr.sort((a, b) => B[b.id].bal - B[a.id].bal).slice(0, 8).map(x => `<tr class="pick" data-lease="${x.id}"><td><b>${esc(uOf(x.unit_id)?.code)}</b> ${esc(tOf(x.tenant_id)?.name || '')}</td><td class="n">${B[x.id].late} يوم</td><td class="n" style="color:var(--bad)"><b>${nf(B[x.id].bal, 0)}</b></td></tr>`).join('')}</tbody></table>` : '<p class="mut">✓ مفيش متأخرات.</p>'}</div>
@@ -220,6 +221,8 @@ function drawOps() {
       ${U.length ? fl.map(f => `<div class="tsub">${esc(f)}${!O.mall ? '' : ''} <span class="mut">(${U.filter(x => (x.floor || '—') === f).length})</span></div><div class="ugrid">${U.filter(x => (x.floor || '—') === f).map(unitTile).join('')}</div>`).join('') : '<p class="mut">لسه مفيش وحدات. ضيفها واحدة واحدة أو ارفع شيت إكسل فيه أعمدة: الوحدة، الدور، المساحة، النشاط.</p>'}`; }
   else if (O.tab === 'leases') body = `<div class="acts" style="margin-top:0"><button id="lAdd" class="p">+ عقد جديد</button></div>${L.length ? `<div class="scroll"><table class="stack"><thead><tr><th>الوحدة</th><th>المستأجر</th><th>المدة</th><th class="n">الإيجار الشهري الحالي</th><th>السداد</th><th class="n">المستحق لحد النهارده</th><th class="n">المدفوع</th><th class="n">الرصيد</th></tr></thead><tbody>${[...L].sort((a, b) => (a.status === 'active' ? 0 : 1) - (b.status === 'active' ? 0 : 1) || a.end_date.localeCompare(b.end_date)).map(x => { const b = B[x.id], dt = daysTo(x.end_date);
       return `<tr class="pick${x.status === 'ended' ? ' mutr' : ''}" data-lease="${x.id}"><td data-l="الوحدة"><b>${esc(uOf(x.unit_id)?.code)}</b>${!O.mall ? ` <span class="tag">${esc(mOf(uOf(x.unit_id)?.mall_id)?.name || '')}</span>` : ''}</td><td data-l="المستأجر">${esc(tOf(x.tenant_id)?.name || '')}</td><td data-l="المدة">${fmtD(x.start_date)} ← ${fmtD(x.end_date)}${x.status === 'ended' ? ' <span class="tag">منتهي</span>' : dt <= 90 ? ` <span class="tag" style="color:var(--warn)">${dt < 0 ? 'خلص' : 'باقي ' + dt + ' يوم'}</span>` : ''}</td><td class="n" data-l="الإيجار">${nf(curRent(x, C), 0)}</td><td data-l="السداد">${PEV[x.pay_every]}${+x.escalation_pct ? ` · زيادة ${x.escalation_pct}%` : ''}</td><td class="n" data-l="المستحق">${nf(b.due, 0)}</td><td class="n" data-l="المدفوع">${nf(b.paid, 0)}</td><td class="n" data-l="الرصيد"><b style="color:${b.bal > 0.5 ? 'var(--bad)' : 'var(--ok)'}">${nf(b.bal, 0)}</b></td></tr>`; }).join('')}</tbody></table></div>` : '<p class="mut">لسه مفيش عقود.</p>'}`;
+  else if (O.tab === 'owners') body = ownersPane(U, B);
+  else if (O.tab === 'tenants') body = tenantsPane(B);
   else body = arr.length ? `<div class="vlist">${arr.sort((a, b) => B[b.id].late - B[a.id].late).map(x => { const b = B[x.id], tn = tOf(x.tenant_id), un = uOf(x.unit_id);
       const msg = encodeURIComponent(`السلام عليكم ${tn?.name || ''}،\nنفيدكم بوجود مستحقات على وحدة ${un?.code || ''} بـ${mOf(un?.mall_id)?.name || ''} بقيمة ${nf(b.bal, 0)} جنيه، مستحقة من ${fmtD(b.oldest)}.\nبرجاء السداد في أقرب وقت. شكراً.`);
       const wa = tn?.phone ? (d => d.startsWith('0') ? '20' + d.slice(1) : d)(String(tn.phone).replace(/\D/g, '')) : '';
@@ -234,7 +237,12 @@ function drawOps() {
   $('#lAdd') && ($('#lAdd').onclick = () => leaseEdit({}));
   $('#uImp') && ($('#uImp').onchange = e => { if (!O.mall && M.length > 1) return toast('اختار المول الأول'); importUnits(e.target.files[0], O.mall || M[0].id); });
   $('#main').onclick = e => { const un = e.target.closest('[data-unit]'), ls = e.target.closest('[data-lease]'), py = e.target.closest('[data-pay]');
+    const ow = e.target.closest('[data-owner]'), tn = e.target.closest('[data-tenant]');
+    if (e.target.closest('#owAdd')) return ownerEdit({}); if (e.target.closest('#tnAdd')) return tenantEdit({});
+    if (ow) return ownerView(ow.dataset.owner); if (tn) return tenantView(tn.dataset.tenant);
     if (py) return payEdit(py.dataset.pay); if (ls) return leaseView(ls.dataset.lease); if (un) return unitEdit(O.U.find(x => x.id === un.dataset.unit)); };
+  $('#owImp') && ($('#owImp').onchange = e => importOwners(e.target.files[0]));
+  $('#owQ') && ($('#owQ').onchange = e => { O.oq = e.target.value.trim(); drawOps(); }); $('#tnQ') && ($('#tnQ').onchange = e => { O.tq = e.target.value.trim(); drawOps(); });
 }
 function bindOpsMall() { const f = $('#mF'); if (f) f.onsubmit = async e => { e.preventDefault(); const { error } = await S.sb.from('malls').insert({ name: f.name.value.trim(), place: f.place.value.trim() || null }); if (error) return toast(error.message); renderOps(); }; }
 function odlg(html, wide) { const d = document.createElement('dialog'); d.className = 'adlg' + (wide ? ' wide' : ''); d.innerHTML = html; document.body.append(d); d.showModal(); const close = () => { d.close(); d.remove(); }; d.addEventListener('click', e => { if (e.target === d || e.target.closest('.dx')) close(); }); return { d, close }; }
@@ -250,10 +258,12 @@ function unitEdit(u) {
     <label>المساحة م2<input name="area" type="number" step="any" value="${u.area ?? ''}"></label><label>النشاط<input name="activity" value="${esc(u.activity || '')}"></label>
     <label>الحالة<select name="status">${Object.entries(USTAT).map(([k, [l]]) => `<option value="${k}"${u.status === k ? ' selected' : ''}>${l}</option>`).join('')}</select></label><label class="wide">ملاحظات<input name="notes" value="${esc(u.notes || '')}"></label></div>
     <div class="acts"><button class="p">حفظ</button>${u.id ? (cur ? `<button type="button" data-open="${cur.id}">فتح العقد الحالي</button>` : '<button type="button" id="uNewL">+ عقد للوحدة</button>') : ''}${u.id && !(ls || []).length ? '<button type="button" class="danger" id="uDel">حذف</button>' : ''}</div>
+    ${u.id ? `<h4>الملاك</h4>${ownersOf(u.id).length ? `<div class="vlist">${ownersOf(u.id).map(o => `<div class="vrow pick" data-vo="${o.id}"><b style="flex:1">${esc(o.name)}</b><span class="mut">${o.link.share_pct != 100 ? nf(o.link.share_pct) + '% · ' : ''}${o.phone ? esc(o.phone) : ''}${o.link.since ? ' · من ' + fmtD(o.link.since) : ''}</span></div>`).join('')}</div>` : '<p class="mut" style="margin:0">الوحدة ملك الشركة (مفيش مالك مسجل).</p>'}<div class="acts" style="margin-top:6px"><button type="button" id="uOwn">+ ربط مالك</button></div>` : ''}
     ${(ls || []).length ? `<h4>العقود</h4><div class="vlist">${ls.map(x => `<div class="vrow pick" data-open="${x.id}"><b style="flex:1">${esc(O.T.find(t => t.id === x.tenant_id)?.name || '')}</b><span class="mut">${fmtD(x.start_date)} ← ${fmtD(x.end_date)}</span>${x.status === 'ended' ? '<span class="tag">منتهي</span>' : ''}</div>`).join('')}</div>` : ''}</form>`);
   d.querySelector('form').onsubmit = async e => { e.preventDefault(); const f = e.target, row = { mall_id: u.mall_id, code: f.code.value.trim(), floor: f.floor.value.trim() || null, area: f.area.value === '' ? null : +f.area.value, activity: f.activity.value.trim() || null, status: f.status.value, notes: f.notes.value.trim() || null };
     const { error } = u.id ? await S.sb.from('mall_units').update(row).eq('id', u.id) : await S.sb.from('mall_units').insert({ ...row, sort: O.U.length }); if (error) return toast(error.message.includes('duplicate') ? 'رقم الوحدة ده موجود في المول' : error.message); close(); renderOps(); };
   d.addEventListener('click', async e => { const o = e.target.closest('[data-open]'); if (o) { close(); return leaseView(o.dataset.open); } if (e.target.id === 'uNewL') { close(); return leaseEdit({ unit_id: u.id }); }
+    const vo = e.target.closest('[data-vo]'); if (vo) { close(); return ownerView(vo.dataset.vo); } if (e.target.id === 'uOwn') { close(); return linkOwner({ unit_id: u.id }); }
     if (e.target.id === 'uDel') { if (e.target.dataset.sure !== '1') { e.target.dataset.sure = '1'; e.target.textContent = 'متأكد؟'; return; } const { error } = await S.sb.from('mall_units').delete().eq('id', u.id); if (error) return toast(error.message); close(); renderOps(); } });
 }
 function leaseEdit(L) {
@@ -284,12 +294,13 @@ function leaseView(id) {
   const rows = [...O.C.filter(c => c.lease_id === id).map(c => ({ d: c.due_date, t: 'c', c })), ...O.P.filter(p => p.lease_id === id).map(p => ({ d: p.pay_date, t: 'p', p }))].sort((a, b) => a.d.localeCompare(b.d) || (a.t === 'c' ? -1 : 1));
   let run = 0; const st = rows.filter(r => r.t === 'p' || r.d <= addM(today(), 3)).map(r => { if (r.t === 'c') run += +r.c.amount; else run -= +r.p.amount; const fut = r.t === 'c' && r.d > today();
     return `<tr class="${fut ? 'mutr' : ''}"><td>${fmtD(r.d)}</td><td>${r.t === 'c' ? `${CHK[r.c.kind]}${r.c.period_from ? ` <span class="mut" style="font-size:12px">${fmtD(r.c.period_from)} – ${fmtD(r.c.period_to)}</span>` : ''}${r.c.note && r.c.kind === 'other' ? ' – ' + esc(r.c.note) : ''}${fut ? ' <span class="tag">لسه</span>' : ''}` : `<b style="color:var(--ok)">دفعة</b> ${esc([r.p.method, r.p.ref, r.p.notes].filter(Boolean).join(' · '))} <button type="button" class="danger xs" data-pdel="${r.p.id}">✕</button>`}</td><td class="n">${r.t === 'c' ? nf(r.c.amount, 0) : ''}</td><td class="n" style="color:var(--ok)">${r.t === 'p' ? nf(r.p.amount, 0) : ''}</td><td class="n">${fut ? '' : nf(run, 0)}</td></tr>`; }).join('');
-  const { d, close } = odlg(`<div class="dh"><div><h3 style="margin:0">${esc(u?.code || '')} – ${esc(t?.name || '')}</h3><div class="mut" style="font-size:13px">${esc(m?.name || '')} · ${fmtD(L.start_date)} ← ${fmtD(L.end_date)} · ${PEV[L.pay_every]} · الإيجار الحالي ${nf(curRent(L, O.C), 0)} ج/شهر${+L.escalation_pct ? ` · زيادة ${L.escalation_pct}% كل ${L.escalation_every} شهر` : ''}${L.status === 'ended' ? ' · <b>منتهي ' + fmtD(L.ended_on) + '</b>' : ''}</div></div><button type="button" class="dx">✕</button></div>
+  const { d, close } = odlg(`<div class="dh"><div><h3 style="margin:0">${esc(u?.code || '')} – <a href="#" data-gotn="${t?.id}">${esc(t?.name || '')}</a></h3>${ownersOf(L.unit_id).length ? `<div class="mut" style="font-size:12px">المالك: ${ownersOf(L.unit_id).map(o => esc(o.name)).join('، ')}</div>` : ''}<div class="mut" style="font-size:13px">${esc(m?.name || '')} · ${fmtD(L.start_date)} ← ${fmtD(L.end_date)} · ${PEV[L.pay_every]} · الإيجار الحالي ${nf(curRent(L, O.C), 0)} ج/شهر${+L.escalation_pct ? ` · زيادة ${L.escalation_pct}% كل ${L.escalation_every} شهر` : ''}${L.status === 'ended' ? ' · <b>منتهي ' + fmtD(L.ended_on) + '</b>' : ''}</div></div><button type="button" class="dx">✕</button></div>
     <div class="why-f"><div><span>المستحق لحد النهارده</span><b>${nf(b.due, 0)}</b></div><i>−</i><div><span>المدفوع</span><b>${nf(b.paid, 0)}</b></div><i>=</i><div class="${b.bal > 0.5 ? 'bad' : 'ok'}"><span>${b.bal > 0.5 ? 'متأخرات' : b.bal < -0.5 ? 'رصيد مقدم' : 'منتظم'}</span><b>${nf(Math.abs(b.bal), 0)}</b></div>${b.oldest ? `<div><span>متأخر من</span><b style="font-size:15px">${fmtD(b.oldest)}</b></div>` : ''}</div>
     <div class="acts"><button type="button" class="p" data-pay="${id}">+ تسجيل دفعة</button><button type="button" id="lOther">+ مستحق إضافي</button><button type="button" id="lEdit">تعديل العقد</button>${L.status === 'active' ? '<button type="button" id="lEnd">إنهاء العقد</button>' : ''}<button type="button" id="lPrint">🖨 كشف حساب</button></div>
     <h4>كشف الحساب</h4><div class="scroll" style="max-height:50vh;overflow:auto"><table class="whyt"><thead><tr><th>التاريخ</th><th>البيان</th><th class="n">مستحق</th><th class="n">مدفوع</th><th class="n">الرصيد</th></tr></thead><tbody>${st || '<tr><td colspan="5" class="mut">–</td></tr>'}</tbody></table></div><p class="mut" style="font-size:12px">ظاهر المستحقات لحد 3 شهور قدام. إجمالي قيمة العقد ${nf(b.total, 0)}.</p>`, true);
   d.addEventListener('click', async e => {
     if (e.target.closest('[data-pay]')) { close(); return payEdit(id); }
+    const gt = e.target.closest('[data-gotn]'); if (gt) { e.preventDefault(); close(); return tenantView(gt.dataset.gotn); }
     if (e.target.id === 'lEdit') { close(); return leaseEdit(L); }
     if (e.target.id === 'lPrint') return printStatement(L, u, t, m, rows, b);
     if (e.target.id === 'lOther') { const a = prompt('قيمة المستحق الإضافي (مثلاً غرامة أو كهرباء)'); if (!a) return; const n = prompt('البيان', 'كهرباء'); const r = await S.sb.from('lease_charges').insert({ lease_id: id, due_date: today(), kind: 'other', amount: +a, note: n || null }); if (r.error) return toast(r.error.message); close(); await renderOps(); return leaseView(id); }
@@ -312,6 +323,88 @@ function printStatement(L, u, t, m, rows, b) {
   <div class="top"><div><h2 style="margin:0">كشف حساب مستأجر</h2><div>${esc(m?.name || '')} – وحدة ${esc(u?.code || '')}</div><div>المستأجر: <b>${esc(t?.name || '')}</b> · العقد ${fmtD(L.start_date)} – ${fmtD(L.end_date)}</div><div>حتى ${fmtD(today())}</div></div>${LOGO()}</div>
   <table><thead><tr><th>التاريخ</th><th>البيان</th><th>مستحق</th><th>مدفوع</th><th>الرصيد</th></tr></thead><tbody>${tr}</tbody></table>
   <div class="tot">${b.bal > 0.5 ? `المستحق على المستأجر: <span style="color:#b3261e">${nf(b.bal, 0)} جنيه</span>` : 'لا توجد مستحقات متأخرة'}</div><script>window.onload=()=>setTimeout(()=>print(),400)<\/script></body></html>`); w.document.close();
+}
+/* owners & tenants registers */
+const ownersOf = uid => { const O = S.ops; return (O.WS || []).filter(x => x.unit_id === uid && x.active !== false).map(l => ({ ...(O.W.find(w => w.id === l.owner_id) || {}), link: l })).filter(x => x.id); };
+const unitsOfOwner = oid => { const O = S.ops; return (O.WS || []).filter(x => x.owner_id === oid && x.active !== false).map(l => ({ ...(O.U.find(u => u.id === l.unit_id) || {}), link: l })).filter(x => x.id); };
+const waNum = ph => { const d = String(ph || '').replace(/\D/g, ''); return d.startsWith('0') ? '20' + d.slice(1) : d; };
+function ownersPane(U, B) {
+  const O = S.ops, inMall = o => !O.mall || unitsOfOwner(o.id).some(u => u.mall_id === O.mall) || !unitsOfOwner(o.id).length;
+  const L = O.W.filter(inMall).filter(o => !O.oq || (o.name + ' ' + (o.phone || '') + ' ' + unitsOfOwner(o.id).map(u => u.code).join(' ')).includes(O.oq));
+  const act = O.L.filter(x => x.status === 'active');
+  return `<div class="filters" style="margin-top:0"><input id="owQ" type="search" placeholder="بحث بالاسم أو التليفون أو رقم الوحدة" value="${esc(O.oq || '')}"><button type="button" class="p" id="owAdd">+ مالك</button><label class="btn" style="margin:0">⬆ استيراد ملاك من إكسل<input id="owImp" type="file" accept=".xlsx,.xls,.csv" hidden></label></div>
+  ${L.length ? `<div class="vgrid">${L.map(o => { const us = unitsOfOwner(o.id), ls = us.map(u => act.find(x => x.unit_id === u.id)).filter(Boolean), rent = ls.reduce((s, x) => s + curRent(x, O.C) * (us.find(u => u.id === x.unit_id).link.share_pct / 100), 0), ar = ls.reduce((s, x) => s + Math.max(B[x.id]?.bal || 0, 0), 0);
+    return `<button type="button" class="vcard ocard2" data-owner="${o.id}"><div style="display:flex;gap:6px"><b style="flex:1">${esc(o.name)}</b><span class="tag">${o.kind === 'company' ? 'شركة' : 'فرد'}</span></div><div class="mut" style="font-size:12px" dir="auto">${esc(o.phone || 'بدون تليفون')}</div>
+      <div style="font-size:13px">${us.length ? `${us.length} وحدة: ${us.slice(0, 6).map(u => `<span class="chip3">${esc(u.code)}</span>`).join('')}${us.length > 6 ? ' …' : ''}` : '<span class="mut">مش مربوط بوحدات</span>'}</div>
+      ${us.length ? `<div class="mut" style="font-size:12px">مؤجر ${ls.length}/${us.length} · إيجار ${nf(rent, 0)} ج/شهر${ar > 0.5 ? ` · <b style="color:var(--bad)">متأخرات ${nf(ar, 0)}</b>` : ''}</div>` : ''}</button>`; }).join('')}</div>` : '<p class="mut">لسه مفيش ملاك مسجلين. ضيفهم واحد واحد أو ارفع شيت فيه: اسم المالك، التليفون، رقم الوحدة (والمول والنسبة لو موجودين).</p>'}`;
+}
+function tenantsPane(B) {
+  const O = S.ops, L = O.T.filter(t => !O.tq || (t.name + ' ' + (t.phone || '') + ' ' + (t.activity || '')).includes(O.tq)).filter(t => !O.mall || O.L.some(l => l.tenant_id === t.id && O.U.find(u => u.id === l.unit_id)?.mall_id === O.mall) || !O.L.some(l => l.tenant_id === t.id));
+  return `<div class="filters" style="margin-top:0"><input id="tnQ" type="search" placeholder="بحث بالاسم أو التليفون أو النشاط" value="${esc(O.tq || '')}"><button type="button" class="p" id="tnAdd">+ مستأجر</button></div>
+  ${L.length ? `<div class="vgrid">${L.map(t => { const ls = O.L.filter(l => l.tenant_id === t.id), ac = ls.filter(l => l.status === 'active'), bal = ls.reduce((s, l) => s + (B[l.id]?.bal ?? leaseBal(l, O.C, O.P).bal), 0);
+    return `<button type="button" class="vcard ocard2" data-tenant="${t.id}"><div style="display:flex;gap:6px"><b style="flex:1">${esc(t.name)}</b><span class="tag">${t.kind === 'person' ? 'فرد' : 'شركة'}</span></div><div class="mut" style="font-size:12px" dir="auto">${esc([t.phone, t.activity].filter(Boolean).join(' · ') || '—')}</div>
+      <div style="font-size:13px">${ac.length ? ac.map(l => `<span class="chip3">${esc(O.U.find(u => u.id === l.unit_id)?.code || '')}</span>`).join('') : `<span class="mut">${ls.length ? 'عقوده منتهية' : 'مفيش عقود'}</span>`}</div>
+      <div style="font-size:12px;color:${bal > 0.5 ? 'var(--bad)' : 'var(--ok)'}">${bal > 0.5 ? 'متأخرات ' + nf(bal, 0) : bal < -0.5 ? 'رصيد مقدم ' + nf(-bal, 0) : '✓ منتظم'}</div></button>`; }).join('')}</div>` : '<p class="mut">مفيش مستأجرين. المستأجر بيتسجل لوحده لما تعمل عقد، أو ضيفه من هنا.</p>'}`;
+}
+const PFIELDS = [['name', 'الاسم', 1], ['kind', 'النوع'], ['phone', 'تليفون'], ['phone2', 'تليفون 2'], ['email', 'الإيميل'], ['national_id', 'الرقم القومي'], ['address', 'العنوان', 1], ['notes', 'ملاحظات', 1]];
+const TFIELDS = [['name', 'الاسم / الشركة', 1], ['kind', 'النوع'], ['contact', 'المسؤول'], ['phone', 'تليفون'], ['phone2', 'تليفون 2'], ['email', 'الإيميل'], ['activity', 'النشاط'], ['commercial_reg', 'السجل التجاري'], ['tax_no', 'البطاقة الضريبية'], ['national_id', 'الرقم القومي'], ['address', 'العنوان', 1], ['notes', 'ملاحظات', 1]];
+function partyForm(F, x, title) {
+  return `<form><div class="dh"><h3 style="margin:0">${title}</h3><button type="button" class="dx">✕</button></div><div class="grid">${F.map(([k, l, w]) => k === 'kind' ? `<label>${l}<select name="kind"><option value="person"${x.kind === 'person' ? ' selected' : ''}>فرد</option><option value="company"${x.kind === 'company' ? ' selected' : ''}>شركة</option></select></label>` : `<label${w ? ' class="wide"' : ''}>${l}<input name="${k}"${k === 'name' ? ' required' : ''}${/phone|email|national|tax|commercial/.test(k) ? ' dir="ltr"' : ''} value="${esc(x[k] || '')}"></label>`).join('')}</div><div class="acts"><button class="p">حفظ</button>${x.id ? '<button type="button" class="danger" id="pDel">حذف</button>' : ''}</div></form>`;
+}
+function partySave(d, F, table, x, close, after) {
+  d.querySelector('form').onsubmit = async e => { e.preventDefault(); const f = e.target, row = {}; F.forEach(([k]) => row[k] = f[k].value.trim() || null); if (!row.kind) row.kind = table === 'tenants' ? 'company' : 'person';
+    const r = x.id ? await S.sb.from(table).update(row).eq('id', x.id).select().single() : await S.sb.from(table).insert(row).select().single(); if (r.error) return toast(r.error.message); toast('اتحفظ'); close(); await renderOps(); after && after(r.data); };
+  d.addEventListener('click', async e => { if (e.target.id !== 'pDel') return; if (e.target.dataset.sure !== '1') { e.target.dataset.sure = '1'; e.target.textContent = 'متأكد؟ هيتمسح نهائي'; return; }
+    const r = await S.sb.from(table).delete().eq('id', x.id); if (r.error) return toast(r.error.message.includes('foreign') ? 'مينفعش يتمسح – مربوط بعقود' : r.error.message); close(); renderOps(); });
+}
+function ownerEdit(o) { const { d, close } = odlg(partyForm(PFIELDS, { kind: 'person', ...o }, o.id ? 'تعديل بيانات المالك' : 'مالك جديد')); partySave(d, PFIELDS, 'unit_owners', o, close, r => ownerView(r.id)); }
+function tenantEdit(t) { const { d, close } = odlg(partyForm(TFIELDS, { kind: 'company', ...t }, t.id ? 'تعديل بيانات المستأجر' : 'مستأجر جديد')); partySave(d, TFIELDS, 'tenants', t, close, r => tenantView(r.id)); }
+const partyInfo = (x, F) => `<div class="pinfo">${F.filter(([k]) => !['name', 'kind'].includes(k) && x[k]).map(([k, l]) => `<div><span>${l}</span><b dir="auto">${/^phone/.test(k) ? `<a href="tel:${esc(x[k])}">${esc(x[k])}</a> <a target="_blank" rel="noopener" href="https://wa.me/${waNum(x[k])}" title="واتساب">💬</a>` : k === 'email' ? `<a href="mailto:${esc(x[k])}">${esc(x[k])}</a>` : esc(x[k])}</b></div>`).join('') || '<span class="mut">مفيش بيانات إضافية</span>'}</div>`;
+function ownerView(id) {
+  const O = S.ops, o = O.W.find(x => x.id === id); if (!o) return; const us = unitsOfOwner(id), mOf = mid => O.M.find(m => m.id === mid)?.name || '';
+  const rows = us.map(u => { const l = O.L.find(x => x.unit_id === u.id && x.status === 'active'), t = l && O.T.find(x => x.id === l.tenant_id), b = l && leaseBal(l, O.C, O.P);
+    return `<tr><td><a href="#" data-gu="${u.id}"><b>${esc(u.code)}</b></a> <span class="mut" style="font-size:12px">${esc(mOf(u.mall_id))} · ${esc(u.floor || '')}${u.area ? ' · ' + nf(u.area) + ' م2' : ''}</span></td><td class="n">${nf(u.link.share_pct)}%</td><td>${l ? `<a href="#" data-gl="${l.id}">${esc(t?.name || '')}</a><div class="mut" style="font-size:12px">لحد ${fmtD(l.end_date)}</div>` : `<span style="color:${USTAT[u.status][1]}">${USTAT[u.status][0]}</span>`}</td><td class="n">${l ? nf(curRent(l, O.C), 0) : '–'}</td><td class="n" style="color:${b && b.bal > 0.5 ? 'var(--bad)' : 'inherit'}">${b ? nf(b.bal, 0) : '–'}</td><td class="mut" style="font-size:12px">${[u.link.contract_no && 'عقد ' + esc(u.link.contract_no), u.link.since && fmtD(u.link.since), u.link.price && nf(u.link.price, 0) + ' ج'].filter(Boolean).join(' · ')}</td><td><button type="button" class="xs" data-ul="${u.link.id}">تعديل</button></td></tr>`; }).join('');
+  const { d, close } = odlg(`<div class="dh"><div><h3 style="margin:0">${esc(o.name)} <span class="tag">${o.kind === 'company' ? 'شركة' : 'فرد'} · مالك</span></h3></div><button type="button" class="dx">✕</button></div>${partyInfo(o, PFIELDS)}
+    <div class="acts"><button type="button" id="oEd">تعديل البيانات</button><button type="button" class="p" id="oLink">+ ربط وحدة</button></div>
+    <h4>الوحدات (${us.length})</h4>${us.length ? `<div class="scroll"><table class="whyt"><thead><tr><th>الوحدة</th><th class="n">النسبة</th><th>المستأجر الحالي</th><th class="n">الإيجار/شهر</th><th class="n">متأخرات</th><th>الشراء</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="mut">مش مربوط بوحدات لسه.</p>'}`, true);
+  d.addEventListener('click', e => { const gu = e.target.closest('[data-gu]'), gl = e.target.closest('[data-gl]'), ul = e.target.closest('[data-ul]');
+    if (e.target.id === 'oEd') { close(); return ownerEdit(o); } if (e.target.id === 'oLink') { close(); return linkOwner({ owner_id: id }); }
+    if (gu) { e.preventDefault(); close(); return unitEdit(O.U.find(x => x.id === gu.dataset.gu)); } if (gl) { e.preventDefault(); close(); return leaseView(gl.dataset.gl); }
+    if (ul) { close(); return linkOwner(O.WS.find(x => x.id === ul.dataset.ul)); } });
+}
+function tenantView(id) {
+  const O = S.ops, t = O.T.find(x => x.id === id); if (!t) return; const ls = O.L.filter(l => l.tenant_id === id).sort((a, b) => b.start_date.localeCompare(a.start_date));
+  const tot = ls.reduce((s, l) => s + leaseBal(l, O.C, O.P).bal, 0);
+  const { d, close } = odlg(`<div class="dh"><div><h3 style="margin:0">${esc(t.name)} <span class="tag">${t.kind === 'person' ? 'فرد' : 'شركة'} · مستأجر</span></h3></div><button type="button" class="dx">✕</button></div>${partyInfo(t, TFIELDS)}
+    <div class="acts"><button type="button" id="tEd">تعديل البيانات</button><button type="button" class="p" id="tNew">+ عقد جديد</button></div>
+    <h4>العقود (${ls.length}) · ${tot > 0.5 ? `<span style="color:var(--bad)">إجمالي المتأخرات ${nf(tot, 0)}</span>` : '<span style="color:var(--ok)">منتظم</span>'}</h4>${ls.length ? `<div class="vlist">${ls.map(l => { const u = O.U.find(x => x.id === l.unit_id), b = leaseBal(l, O.C, O.P), ow = ownersOf(l.unit_id);
+      return `<div class="vrow pick" data-gl="${l.id}"><div style="flex:1"><b>${esc(u?.code || '')}</b> <span class="mut" style="font-size:12px">${esc(O.M.find(m => m.id === u?.mall_id)?.name || '')}${ow.length ? ' · المالك ' + ow.map(x => esc(x.name)).join('، ') : ''}</span><div class="mut" style="font-size:12px">${fmtD(l.start_date)} ← ${fmtD(l.end_date)} · ${nf(curRent(l, O.C), 0)} ج/شهر${l.status === 'ended' ? ' · منتهي' : ''}</div></div><b style="color:${b.bal > 0.5 ? 'var(--bad)' : 'var(--ok)'}">${nf(b.bal, 0)}</b></div>`; }).join('')}</div>` : '<p class="mut">مفيش عقود.</p>'}`, true);
+  d.addEventListener('click', e => { const gl = e.target.closest('[data-gl]'); if (e.target.id === 'tEd') { close(); return tenantEdit(t); } if (e.target.id === 'tNew') { close(); return leaseEdit({ tenant_id: id }); } if (gl) { close(); return leaseView(gl.dataset.gl); } });
+}
+function linkOwner(k) {
+  const O = S.ops, mOf = mid => O.M.find(m => m.id === mid)?.name || '';
+  const { d, close } = odlg(`<form><div class="dh"><h3 style="margin:0">${k.id ? 'تعديل ملكية' : 'ربط مالك بوحدة'}</h3><button type="button" class="dx">✕</button></div><div class="grid">
+    <label>المالك<select name="o" required>${O.W.map(o => `<option value="${o.id}"${o.id === k.owner_id ? ' selected' : ''}>${esc(o.name)}</option>`).join('')}</select></label>
+    <label>الوحدة<select name="u" required>${O.U.map(u => `<option value="${u.id}"${u.id === k.unit_id ? ' selected' : ''}>${esc(u.code)}${O.M.length > 1 ? ' – ' + esc(mOf(u.mall_id)) : ''}</option>`).join('')}</select></label>
+    <label>نسبة الملكية %<input name="sh" type="number" step="any" value="${k.share_pct ?? 100}"></label><label>تاريخ الشراء / التملك<input name="since" type="date" value="${k.since || ''}"></label>
+    <label>رقم العقد<input name="cn" value="${esc(k.contract_no || '')}"></label><label>سعر الشراء<input name="pr" type="number" step="any" value="${k.price ?? ''}"></label><label class="wide">ملاحظات<input name="nt" value="${esc(k.notes || '')}"></label></div>
+    ${O.W.length ? '' : '<p class="mut">لازم تضيف المالك الأول من تبويب الملاك.</p>'}<div class="acts"><button class="p">حفظ</button>${k.id ? '<button type="button" class="danger" id="kDel">فك الربط</button>' : ''}</div></form>`);
+  d.querySelector('form').onsubmit = async e => { e.preventDefault(); const f = e.target, row = { owner_id: f.o.value, unit_id: f.u.value, share_pct: +f.sh.value || 100, since: f.since.value || null, contract_no: f.cn.value.trim() || null, price: f.pr.value === '' ? null : +f.pr.value, notes: f.nt.value.trim() || null, active: true };
+    const r = k.id ? await S.sb.from('unit_ownership').update(row).eq('id', k.id) : await S.sb.from('unit_ownership').insert(row); if (r.error) return toast(r.error.message.includes('duplicate') ? 'المالك ده مربوط بالوحدة دي قبل كده' : r.error.message); toast('اتحفظ'); close(); await renderOps(); ownerView(row.owner_id); };
+  d.addEventListener('click', async e => { if (e.target.id !== 'kDel') return; if (e.target.dataset.sure !== '1') { e.target.dataset.sure = '1'; e.target.textContent = 'متأكد؟'; return; } const r = await S.sb.from('unit_ownership').delete().eq('id', k.id); if (r.error) return toast(r.error.message); close(); await renderOps(); ownerView(k.owner_id); });
+}
+async function importOwners(file) {
+  if (!file) return; if (!window.XLSX) return toast('مكتبة الإكسل لسه ماحمّلتش'); const O = S.ops;
+  const wb = XLSX.read(await file.arrayBuffer()), A = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' }), T = v => String(v ?? '').trim();
+  const hi = A.findIndex(r => r.some(x => /مالك|اسم|owner|name/i.test(T(x)))); if (hi < 0) return toast('مش لاقي عمود اسم المالك');
+  const H = A[hi].map(T), c = re => H.findIndex(x => re.test(x)), cn = c(/مالك|اسم|owner|name/i), cp = c(/تليفون|موبايل|هاتف|phone|mobile/i), cu = c(/وحد|unit/i), cm = c(/مول|mall/i), cs = c(/نسب|share/i), ci = c(/قومي|national/i), ce = c(/ميل|email/i);
+  let nO = 0, nL = 0, miss = [];
+  for (const r of A.slice(hi + 1)) { const name = T(r[cn]); if (!name) continue;
+    let o = O.W.find(x => x.name === name); if (!o) { const res = await S.sb.from('unit_owners').insert({ name, phone: cp >= 0 ? T(r[cp]) || null : null, national_id: ci >= 0 ? T(r[ci]) || null : null, email: ce >= 0 ? T(r[ce]) || null : null }).select().single(); if (res.error) return toast(res.error.message); o = res.data; O.W.push(o); nO++; }
+    if (cu < 0) continue; for (const code of T(r[cu]).split(/[،,+&/]/).map(x => x.trim()).filter(Boolean)) {
+      const mall = cm >= 0 ? O.M.find(m => m.name === T(r[cm]) || T(r[cm]).includes(m.name)) : null, u = O.U.find(x => x.code === code && (!mall || x.mall_id === mall.id) && (mall || !O.mall || x.mall_id === O.mall));
+      if (!u) { miss.push(code); continue; } const res = await S.sb.from('unit_ownership').upsert({ unit_id: u.id, owner_id: o.id, share_pct: cs >= 0 && T(r[cs]) ? +T(r[cs]).replace('%', '') || 100 : 100, active: true }, { onConflict: 'unit_id,owner_id' }); if (!res.error) nL++; } }
+  toast(`اتضاف ${nO} مالك و${nL} ربط بوحدات${miss.length ? ` · وحدات مش موجودة: ${[...new Set(miss)].slice(0, 8).join('، ')}` : ''}`); renderOps();
 }
 async function importUnits(file, mall) {
   if (!file) return; if (!window.XLSX) return toast('مكتبة الإكسل لسه ماحمّلتش');
@@ -1414,8 +1507,10 @@ async function renderAdmin() {
   const [{ data: users }, { data: mem }] = await Promise.all([S.sb.from('profiles').select('*').order('email'), S.sb.from('project_members').select('*')]);
   const M = {}; (mem || []).forEach(m => M[m.user_id + '|' + m.project_id] = m.role);
   $('#main').innerHTML = `<h2>المستخدمين والصلاحيات</h2><p class="mut">ضيف المستخدم الأول من لوحة Supabase (Authentication ← Add user)، وبعدين حدد دوره في كل مشروع هنا. "—" يعني ملوش دخول على المشروع.</p>
-  <div class="scroll"><table class="adm"><thead><tr><th>المستخدم</th>${S.projects.map(p => `<th>${esc(p.name)}</th>`).join('')}</tr></thead><tbody>${(users || []).map(u => `<tr><td>${esc(u.full_name || '')}<div class="mut" style="font-size:12px">${esc(u.email || '')}${u.is_admin ? ' · مدير النظام' : ''}</div></td>${S.projects.map(p => `<td><select data-u="${u.id}" data-p="${p.id}"><option value="">—</option>${Object.entries(ROLE).map(([k, l]) => `<option value="${k}"${M[u.id + '|' + p.id] === k ? ' selected' : ''}>${l}</option>`).join('')}</select></td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  <div class="scroll"><table class="adm"><thead><tr><th>المستخدم</th>${S.projects.map(p => `<th>${esc(p.name)}</th>`).join('')}<th>مدير التشغيل<div class="mut" style="font-size:11px;font-weight:400">قسم المولات كامل</div></th></tr></thead><tbody>${(users || []).map(u => `<tr><td>${esc(u.full_name || '')}<div class="mut" style="font-size:12px">${esc(u.email || '')}${u.is_admin ? ' · مدير النظام' : ''}</div></td>${S.projects.map(p => `<td><select data-u="${u.id}" data-p="${p.id}"><option value="">—</option>${Object.entries(ROLE).map(([k, l]) => `<option value="${k}"${M[u.id + '|' + p.id] === k ? ' selected' : ''}>${l}</option>`).join('')}</select></td>`).join('')}<td style="text-align:center">${u.is_admin ? '<span class="mut">✓ (مدير)</span>' : `<input type="checkbox" data-ops="${u.id}"${u.ops ? ' checked' : ''} style="width:22px;height:22px">`}</td></tr>`).join('')}</tbody></table></div>
+  <p class="mut" style="font-size:13px">مدير التشغيل بيدخل على قسم إدارة التشغيل كامل (المولات، الوحدات، الملاك، المستأجرين، العقود، التحصيل) ويقدر يدخل ويعدّل البيانات. مش بيشوف مشروعات المقاولات إلا لو اتحدد له دور في مشروع، ومش بيشوف HR.</p>`;
   $('#main').onchange = async e => {
+    const ob = e.target.closest('[data-ops]'); if (ob) { const { error } = await S.sb.rpc('set_user_ops', { p_user: ob.dataset.ops, p_on: ob.checked }); return toast(error ? 'مقدرتش أحفظ: ' + error.message : ob.checked ? 'بقى مدير تشغيل' : 'اتشالت صلاحية التشغيل'); }
     const s = e.target.closest('select[data-u]'); if (!s) return; const k = { user_id: s.dataset.u, project_id: s.dataset.p };
     const { error } = s.value ? await S.sb.from('project_members').upsert({ ...k, role: s.value }) : await S.sb.from('project_members').delete().eq('user_id', k.user_id).eq('project_id', k.project_id);
     toast(error ? 'مقدرتش أحفظ: ' + error.message : 'اتحفظت الصلاحية');

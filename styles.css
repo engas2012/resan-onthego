@@ -381,3 +381,6 @@ dialog.adlg.wide{width:min(980px,96vw)}
 .two2{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:820px){.two2{grid-template-columns:1fr}}
 .ustrip{display:flex;height:30px;border-radius:9px;overflow:hidden;margin-top:8px}.ustrip div{color:#fff;font-size:12px;display:grid;place-items:center;white-space:nowrap;overflow:hidden}
 tr.mutr td{opacity:.55}tr.pick{cursor:pointer}
+.uown{font-size:11px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+button.ocard2{font:inherit;color:inherit;text-align:right;cursor:pointer;min-height:0}button.ocard2:hover{border-color:var(--acc)}
+.pinfo{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:10px}.pinfo div{background:var(--bg);border-radius:9px;padding:6px 10px;display:flex;flex-direction:column}.pinfo span{font-size:11px;color:var(--mut)}.pinfo b{font-size:14px;font-weight:600;word-break:break-word}
