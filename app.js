@@ -56,7 +56,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 2.9.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 2.9.1</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -687,6 +687,35 @@ const MVK = { receipt: ['وارد', 'appr', '⬇'], issue: ['صرف', 'pend', '�
 const MCOL = ['#3b6ea8', '#7d8189', '#b08a3e', '#d2a24c', '#8a6f5a', '#b5523b', '#7a5230', '#2e8b85', '#6a5acd', '#c2185b'];
 const MICO = [['حديد', '🔩'], ['خرسان', '🏗️'], ['اسمنت', '🧱'], ['أسمنت', '🧱'], ['رمل', '⛱️'], ['زلط', '🪨'], ['سن', '🪨'], ['طوب', '🧱'], ['خشب', '🪵'], ['عزل', '🛡️']];
 const micon = n => (MICO.find(([k]) => n.includes(k)) || [, '📦'])[1];
+async function stockWhy(mid, r, start) {
+  const P = S.P, { data: X, error } = await S.sb.rpc('stock_explain', { p_project: P.id, p_material: mid });
+  if (error || !X) return toast(error?.message || 'مفيش بيانات');
+  const u = esc(r.unit), f1 = v => nf(v, v < 10 ? 2 : 1), I = X.items || [], act = I.filter(i => +i.need > 0), cons = I.filter(i => +i.cons > 0), rest = I.filter(i => !(+i.need > 0));
+  const mv = X.moves || {}, mq = k => +(mv[k]?.q || 0), usedIssues = mq('issue') - mq('return') > 0;
+  const avail = +r.rec_reports + +r.rec_moves + +r.adjusted - (usedIssues ? +r.issued : +r.consumed_est), mat = X.material || {};
+  const ST = { running: ['جاري', 'run'], soon: ['هيبدأ', 'pend'], done: ['خلص', 'appr'], idle: ['لسه مبدأش', ''] };
+  const why = i => i.state === 'running' ? `منفذ ${f1(i.ex)} من ${f1(i.qty)} ${esc(i.unit)}` : i.state === 'soon' ? `مربوط بنشاط "${esc(i.act)}" بيبدأ ${fmtD(i.act_s)}` : '';
+  const warn = [];
+  if (!+r.rec_reports && !+r.rec_moves && !+r.adjusted) warn.push('مفيش أي وارد ولا رصيد افتتاحي مسجل من تاريخ بداية المتابعة، فالرصيد محسوب صفر. لو فيه كمية في المخزن فعلاً سجّلها كـ"تسوية / رصيد افتتاحي" وهيتصلح الحساب.');
+  if (!usedIssues && +r.consumed_est > 0) warn.push('مفيش أذون صرف، فالمنصرف محسوب من الكميات المنفذة × المعدل. لو المعدل مش مظبوط لنوع البند ده عدّله من إعدادات المعدلات.');
+  if (act.some(i => i.state === 'running' && +i.ex / +i.qty > 0.97)) warn.push('فيه بنود منفذ منها أكتر من 97% ولسه ظاهرة جارية – غالباً الكمية الإجمالية للبند أكبر من الحقيقي بشوية. راجع الكمية في المقايسة.');
+  if (mat.stocked === false) warn.push('الخامة دي متعلّمة "مش بتتخزن" فمش بتطلّع تنبيه نقص.');
+  const dlg = document.createElement('dialog'); dlg.className = 'adlg wide';
+  dlg.innerHTML = `<div class="dh"><div><h3 style="margin:0">${micon(r.name)} ${esc(r.name)} – الحسبة مبنية على إيه؟</h3><div class="mut" style="font-size:13px">المتابعة من ${fmtD(X.start)} · كل الأرقام بـ${u}</div></div><button type="button" class="dx">✕</button></div>
+  <div class="why-f"><div><span>المطلوب للبنود الجارية</span><b>${f1(r.needed)}</b></div><i>+</i><div><span>الحد الأدنى</span><b>${f1(r.min_stock)}</b></div><i>−</i><div><span>المتاح</span><b>${f1(avail)}</b></div><i>=</i><div class="${+r.shortage > 0 ? 'bad' : 'ok'}"><span>${+r.shortage > 0 ? 'النقص' : 'مفيش نقص'}</span><b>${f1(Math.max(+r.shortage, 0))}</b></div></div>
+  <p class="mut" style="margin:4px 0 0;font-size:12px">المتاح = وارد التقارير ${f1(r.rec_reports)} + وارد الأذون ${f1(r.rec_moves)} + التسويات ${f1(r.adjusted)} − ${usedIssues ? `المنصرف بالأذون ${f1(r.issued)}` : `الاستهلاك المحسوب ${f1(r.consumed_est)}`}</p>
+  ${warn.length ? `<div class="note" style="margin-top:10px">${warn.map(w => '⚠ ' + w).join('<br>')}</div>` : ''}
+  <h4>1. المطلوب (${f1(r.needed)}) – من البنود دي</h4>${act.length ? `<div class="scroll"><table class="whyt stack"><thead><tr><th>البند</th><th>ليه محسوب؟</th><th class="n">الباقي</th><th class="n">× المعدل</th><th class="n">= المطلوب</th></tr></thead><tbody>${act.map(i => `<tr><td data-l="البند"><b>${esc(i.code)}</b> ${esc(i.name)}${i.building ? ` <span class="tag">${esc(i.building)}</span>` : ''}</td><td data-l="ليه؟"><span class="st ${ST[i.state][1]}">${ST[i.state][0]}</span> <span class="mut" style="font-size:12px">${why(i)}</span></td><td class="n" data-l="الباقي">${f1(Math.max(+i.qty - +i.ex, 0))} ${esc(i.unit)}</td><td class="n" data-l="المعدل" title="${esc(i.pattern)}">${nf(i.rate, 3)}<div class="mut" style="font-size:11px">${esc(i.nnote || '')}</div></td><td class="n" data-l="المطلوب"><b>${f1(i.need)}</b></td></tr>`).join('')}</tbody></table></div>` : '<p class="mut">مفيش بنود جارية أو بادئة خلال أسبوعين محتاجة الخامة دي.</p>'}
+  <p class="mut" style="font-size:12px;margin:4px 0">البند بيتحسب "جاري" لو اتنفذ منه جزء ولسه مخلصش، أو "هيبدأ" لو مربوط بنشاط في الجدول الزمني بيبدأ خلال 14 يوم. المعدل جاي من قواعد معدلات الاستهلاك للخامة (${(X.norms || []).length} قاعدة).</p>
+  ${rest.length ? `<details><summary class="mut" style="font-size:13px">بنود تانية بتستخدم الخامة بس مش داخلة في المطلوب (${rest.length})</summary><div class="scroll"><table class="whyt"><tbody>${rest.slice(0, 60).map(i => `<tr><td><b>${esc(i.code)}</b> ${esc(i.name)}</td><td><span class="st ${ST[i.state][1]}">${ST[i.state][0]}</span></td><td class="n">${f1(i.ex)} / ${f1(i.qty)} ${esc(i.unit)}</td></tr>`).join('')}</tbody></table></div></details>` : ''}
+  <h4>2. الوارد (${f1(+r.rec_reports + +r.rec_moves + +r.adjusted)})</h4>
+  ${(X.receipts || []).length ? `<div class="scroll"><table class="whyt"><thead><tr><th>التاريخ</th><th>المكتوب في توريدات التقرير</th><th>اتعرف عليه بكلمة</th><th class="n">الكمية</th></tr></thead><tbody>${X.receipts.map(x => `<tr><td>${fmtD(x.d)}</td><td>${esc(x.txt)} <span class="mut">${esc(x.u || '')}</span></td><td><span class="tag">${esc(x.alias)}</span></td><td class="n">${f1(x.q)}</td></tr>`).join('')}</tbody></table></div><p class="mut" style="font-size:12px;margin:4px 0">⚠ راجع الوحدة: لو التقرير مكتوب فيه الكمية بوحدة غير ${u} (كجم بدل طن مثلاً) الرقم هيتحسب غلط.</p>` : '<p class="mut">مفيش توريدات في التقارير المعتمدة اتعرف عليها كـ' + esc(r.name) + ` من ${fmtD(X.start)}. الكلمات اللي بيدوّر بيها: ${(mat.aliases || []).map(a => `<span class="tag">${esc(a)}</span>`).join(' ')}</p>`}
+  ${Object.keys(mv).length ? `<p style="margin:6px 0">أذون المخزن: ${Object.entries(mv).map(([k, v]) => `${MVK[k][0].split(' /')[0]} ${f1(v.q)} (${v.n} إذن)`).join(' · ')}</p>` : '<p class="mut" style="margin:6px 0">مفيش أذون مخزن مسجلة.</p>'}
+  <h4>3. ${usedIssues ? 'المنصرف بالأذون' : 'الاستهلاك المحسوب'} (${f1(usedIssues ? r.issued : r.consumed_est)})</h4>
+  ${usedIssues ? `<p>المنصرف مأخوذ من أذون الصرف (${f1(r.issued)}). الاستهلاك المحسوب للمقارنة: ${f1(r.consumed_est)}.</p>` : cons.length ? `<div class="scroll"><table class="whyt"><thead><tr><th>البند</th><th class="n">اتنفذ من ${fmtD(X.start)}</th><th class="n">× المعدل</th><th class="n">= استهلاك</th></tr></thead><tbody>${cons.map(i => `<tr><td><b>${esc(i.code)}</b> ${esc(i.name)}</td><td class="n">${f1(i.ex_new)} ${esc(i.unit)}</td><td class="n">${nf(i.rate, 3)}</td><td class="n"><b>${f1(i.cons)}</b></td></tr>`).join('')}</tbody></table></div>` : '<p class="mut">مفيش كميات اتنفذت من تاريخ بداية المتابعة.</p>'}
+  <div class="acts" style="margin-top:12px"><a class="btn" href="#p/${P.id}/log">سجل التقارير</a></div>`;
+  document.body.append(dlg); dlg.showModal(); dlg.onclick = e => { if (e.target === dlg || e.target.closest('.dx') || e.target.closest('a')) { dlg.close(); dlg.remove(); } };
+}
 async function renderStore() {
   const P = S.P, ed = can('editBoq', P.id), mv = can('storeMove', P.id), T = S.stT ||= { tab: 'moves' };
   $('#main').innerHTML = '<p class="mut">جاري تحميل المخزن…</p>';
@@ -713,7 +742,7 @@ async function renderStore() {
       ${rec > 0 ? `<div class="mbar" title="المستهلك من الوارد"><u style="width:${Math.min(100, used / rec * 100)}%"></u></div><div class="mut" style="font-size:11px;margin-top:3px">اتستهلك ${Math.round(Math.min(used / rec, 9.99) * 100)}% من الوارد</div>` : ''}
       ${+r.shortage > 0 ? `<div class="mshort">ناقص <b>${nf(r.shortage, 1)} ${esc(r.unit)}</b>${(r.items || []).length ? `<div style="font-size:12px;margin-top:3px">للبنود: ${(r.items || []).slice(0, 4).map(i => `${esc(i.code)} (${nf(i.need, 1)})`).join(' · ')}</div>` : ''}</div>` : ''}
       ${+r.issued > 0 && +r.consumed_est > 0 && +r.issued - +r.consumed_est > 0.05 * +r.consumed_est ? `<div class="mut" style="font-size:12px;margin-top:6px;color:var(--warn)">⚠ المنصرف أكتر من الاستهلاك المحسوب بـ ${nf(+r.issued - +r.consumed_est, 1)} – هالك أو صرف زيادة؟</div>` : ''}
-      ${mv ? `<div class="mact"><button type="button" data-q="receipt" data-m="${r.material_id}">+ وارد</button><button type="button" data-q="issue" data-m="${r.material_id}">− صرف</button></div>` : ''}</div>`; };
+      <div class="mact"><button type="button" data-why="${r.material_id}">🔍 مبني على إيه؟</button>${mv ? `<button type="button" data-q="receipt" data-m="${r.material_id}">+ وارد</button><button type="button" data-q="issue" data-m="${r.material_id}">− صرف</button>` : ''}</div></div>`; };
   const order = { bad: 0, warn: 1, ok: 2, idle: 3, follow: 4 };
   const itemOpt = '<option value="">— بدون بند —</option>' + P.items.filter(i => +i.qty > 0).map(i => `<option value="${esc(i.id)}">${esc(i.code + ' ' + i.name.slice(0, 55) + (i.building ? ' – ' + i.building : ''))}</option>`).join('');
   const form = `<form id="mvF" class="card mvform"><div class="seg mk">${Object.entries(MVK).map(([k, [l, , ic]]) => `<button type="button" data-kind="${k}" class="${k === 'receipt' ? 'on' : ''}">${ic} ${l.split(' /')[0]}</button>`).join('')}</div><input type="hidden" name="kind" value="receipt">
@@ -748,7 +777,7 @@ async function renderStore() {
   $('#matSave') && ($('#matSave').onclick = async () => { const rows = [...document.querySelectorAll('.medt tr[data-mid]')].map(tr => { const g = k => tr.querySelector(`[data-k=${k}]`); return { id: tr.dataset.mid, name: g('name').value.trim(), unit: g('unit').value.trim(), aliases: g('aliases').value.split(/[،,]/).map(x => x.trim()).filter(Boolean), min_stock: +g('min_stock').value || 0, stocked: g('stocked').checked }; });
     const { error } = await S.sb.from('materials').upsert(rows); if (error) return toast(error.message); toast('اتحفظت الخامات'); re(); });
   const nf2 = $('#nF'); if (nf2) nf2.onsubmit = async e => { e.preventDefault(); const g = n => nf2[n].value; const { error } = await S.sb.from('material_norms').insert({ project_id: P.id, material_id: g('mat'), pattern: g('pat').trim(), item_unit: g('unit').trim() || null, phase_n: g('ph') ? +g('ph') : null, rate: +g('rate'), note: g('note').trim() || null }); if (error) return toast(error.message); toast('اتضاف المعدل'); re(); };
-  $('#main').onclick = async e => { const d1 = e.target.closest('[data-mvdel]'), d2 = e.target.closest('[data-ndel]'); const b = d1 || d2; if (!b) return; if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'متأكد؟'; return; }
+  $('#main').onclick = async e => { const wy = e.target.closest('[data-why]'); if (wy) return stockWhy(wy.dataset.why, R.find(x => x.material_id === wy.dataset.why), set.data?.start_date || today()); const d1 = e.target.closest('[data-mvdel]'), d2 = e.target.closest('[data-ndel]'); const b = d1 || d2; if (!b) return; if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'متأكد؟'; return; }
     const { error } = d1 ? await S.sb.from('stock_moves').delete().eq('id', d1.dataset.mvdel) : await S.sb.from('material_norms').delete().eq('id', d2.dataset.ndel); if (error) return toast(error.message); re(); };
 }
 

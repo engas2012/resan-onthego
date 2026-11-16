@@ -353,3 +353,7 @@ a.vlink{text-decoration:none;font-size:12px;background:var(--bg);border-radius:6
 .cur{color:var(--acc)}.ivfoot{display:flex;gap:18px;justify-content:flex-end;flex-wrap:wrap;margin-top:8px;font-size:14px}
 .ivpay table{width:100%;max-width:640px}.ivpay td{padding:8px 6px;border-bottom:1px solid var(--line)}.ivpay tr.tot td{font-weight:700}.ivpay tr.net td{font-size:20px;font-weight:700;color:var(--acc);border-bottom:0}
 .ivpay input{min-height:32px;padding:2px 6px}
+dialog.adlg.wide{width:min(980px,96vw)}
+.why-f{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}.why-f div{background:var(--bg);border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;min-width:110px}.why-f span{font-size:11px;color:var(--mut)}.why-f b{font-size:20px;font-variant-numeric:tabular-nums}.why-f i{font-style:normal;font-size:20px;color:var(--mut)}
+.why-f .bad{background:color-mix(in srgb,var(--bad) 12%,transparent)}.why-f .bad b{color:var(--bad)}.why-f .ok b{color:var(--ok)}
+.whyt td,.whyt th{font-size:13px;vertical-align:top}
