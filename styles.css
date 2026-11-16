@@ -391,3 +391,13 @@ button.urow{font:inherit;color:inherit;cursor:pointer;min-height:0}.mchips{displ
 .mchip{font-size:12px;padding:2px 9px;border-radius:99px;background:var(--bg)}.mchip.c{background:color-mix(in srgb,var(--acc) 12%,transparent)}.mchip.o{background:color-mix(in srgb,#2e6f9e 14%,transparent)}.mchip.a{background:#1b1c1e;color:#fff}
 body.opsro #mAdd,body.opsro #mEd,body.opsro #uAdd,body.opsro label:has(#uImp),body.opsro #lAdd,body.opsro #owAdd,body.opsro label:has(#owImp),body.opsro #tnAdd,body.opsro [data-pay],body.opsro #lOther,body.opsro #lEdit,body.opsro #lEnd,body.opsro #oEd,body.opsro #oLink,body.opsro #tEd,body.opsro #tNew,body.opsro #uOwn,body.opsro #uNewL,body.opsro [data-ul],body.opsro [data-pdel],body.opsro dialog form .acts{display:none!important}
 .modbox label.modh{flex-direction:row!important;justify-content:flex-start;align-items:center}
+/* crm */
+.cfilt{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}.cfilt button{min-height:32px;padding:0 12px;border-radius:99px;font-size:13px;border:1px solid var(--line);background:var(--card)}.cfilt button.on{background:var(--c,#1b1c1e);color:#fff;border-color:transparent}.cfilt small{opacity:.75}
+button.crow{font:inherit;color:inherit;cursor:pointer;min-height:0;border-right:4px solid var(--c)}
+.ctag{font-size:11px;font-weight:700;color:#fff;background:var(--c);border-radius:99px;padding:2px 9px;white-space:nowrap}
+.qn{width:26px;height:26px;flex:0 0 26px;border-radius:50%;background:var(--bg);display:grid;place-items:center;font-weight:700;font-size:13px}
+.wgrp{border-top:4px solid var(--c);margin-bottom:12px}.wgh{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}.wfree{font-size:12px;color:var(--ok);font-weight:700}
+.uwait{font-size:12px;color:#c98a12;font-weight:700}
+.addm{position:relative}.addmenu{display:none;position:absolute;top:100%;inset-inline-start:0;z-index:5;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.12);min-width:170px}
+.addm:hover .addmenu,.addm:focus-within .addmenu{display:flex;flex-direction:column}.addmenu button{border:0;background:none;text-align:right;min-height:36px;display:flex;gap:8px;align-items:center}.addmenu i{width:10px;height:10px;border-radius:50%}
+body.opsro .addm,body.opsro [data-cadd],body.opsro [data-lst],body.opsro [data-conv]{display:none!important}
