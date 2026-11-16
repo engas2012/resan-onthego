@@ -56,7 +56,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 3.6.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 3.6.1</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -1802,13 +1802,19 @@ async function importLedger(file) {
     if (hi < 0) continue; const H = A[hi].map(T), c = n => H.indexOf(n), cP = c('المشروع'), cM = c('مرحلة اساسية'), cS = c('مرحلة فرعية'), cE = c('مصروفات'), cR = c('ايرادات'), cD = c('بيان') >= 0 ? c('بيان') : c('البيان');
     const H0 = (A[1] || []).map(T), cDt = H0.indexOf('التاريخ'), cSup = H0.indexOf('مقاول/مورد');
     A.slice(hi + 1).forEach(r => { const pid = PM[T(r[cP])]; if (!pid) return; const e = num(r[cE]), rv = num(r[cR]); if (!e && !rv) return;
-      const m = T(r[cM]), d = r[cDt]; let dt = null; if (d instanceof Date) dt = new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); else { const x = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(T(d)); if (x) dt = `${x[3]}-${x[2].padStart(2, '0')}-${x[1].padStart(2, '0')}`; }
-      out.push({ project_id: pid, entry_date: dt, description: T(r[cD]).slice(0, 300) || null, supplier: cSup >= 0 ? T(r[cSup]) || null : null, main_phase: m && m !== '=' ? m : null, sub_phase: T(r[cS]) && T(r[cS]) !== '=' ? T(r[cS]) : null, expense: e, revenue: rv, phase_n: PH[m.replace(/\s+/g, '_')] ?? null, source: 'excel', batch: file.name + ' · ' + today() }); });
+      const m = T(r[cM]), d = r[cDt]; let dt = null, alt = null; if (d instanceof Date) { dt = new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); const [y, mo, da] = dt.split('-'); if (+da <= 12 && da !== mo) alt = `${y}-${da}-${mo}`; } else { const x = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(T(d)); if (x) dt = `${x[3]}-${x[2].padStart(2, '0')}-${x[1].padStart(2, '0')}`; }
+      out.push({ project_id: pid, entry_date: dt, description: T(r[cD]).slice(0, 300) || null, supplier: cSup >= 0 ? T(r[cSup]) || null : null, main_phase: m && m !== '=' ? m : null, sub_phase: T(r[cS]) && T(r[cS]) !== '=' ? T(r[cS]) : null, expense: e, revenue: rv, phase_n: PH[m.replace(/\s+/g, '_')] ?? null, source: 'excel', batch: file.name + ' · ' + today(), _alt: alt }); });
     if (out.length) break;
   }
   if (!out.length) return box.innerHTML = '<div class="note">مش لاقي في الملف شيت فيه أعمدة المشروع والمرحلة الأساسية والإيرادات والمصروفات.</div>';
+  // إكسل أحياناً بيخزّن التاريخ يوم/شهر مقلوب: التاريخ اللي يومه ≤ 12 بنختار له القراءة الأقرب للتواريخ الأكيدة حواليه
+  const td = today(), ms = x => Date.parse(x); let swapped = 0;
+  out.forEach((x, i) => { if (!x._alt) return; const nb = []; for (let j = Math.max(0, i - 15); j <= Math.min(out.length - 1, i + 15); j++) if (j !== i && out[j].entry_date && !out[j]._alt) nb.push(ms(out[j].entry_date));
+    let pick = x.entry_date; if (pick > td && x._alt <= td) pick = x._alt; else if (nb.length && !(x._alt > td)) { nb.sort((a, b) => a - b); const md = nb[nb.length >> 1]; if (Math.abs(ms(x._alt) - md) < Math.abs(ms(x.entry_date) - md)) pick = x._alt; }
+    if (pick !== x.entry_date) { x.entry_date = pick; swapped++; } });
+  out.forEach(x => delete x._alt);
   const sum = pid => out.filter(x => x.project_id === pid), tot = (L, k) => nf(L.reduce((s, x) => s + x[k], 0), 0);
-  box.innerHTML = `<div class="card">${S.projects.map(p => { const L = sum(p.id); return L.length ? `<div><b>${esc(p.name)}</b>: ${L.length} قيد · مصروف ${tot(L, 'expense')} · إيراد ${tot(L, 'revenue')}</div>` : ''; }).join('')}<div class="acts"><button class="ok" id="lgGo">استبدال بيانات الحسابات</button><button id="lgNo">إلغاء</button></div></div>`;
+  box.innerHTML = `<div class="card">${S.projects.map(p => { const L = sum(p.id); return L.length ? `<div><b>${esc(p.name)}</b>: ${L.length} قيد · مصروف ${tot(L, 'expense')} · إيراد ${tot(L, 'revenue')}</div>` : ''; }).join('')}${swapped ? `<div class="mut">اتصحّح ${swapped} تاريخ كان متسجّل يوم/شهر مقلوب في الإكسل.</div>` : ''}<div class="acts"><button class="ok" id="lgGo">استبدال بيانات الحسابات</button><button id="lgNo">إلغاء</button></div></div>`;
   $('#lgNo').onclick = () => box.innerHTML = '';
   $('#lgGo').onclick = async () => { $('#lgGo').disabled = true; const pids = [...new Set(out.map(x => x.project_id))]; let err = null;
     for (const pid of pids) { if (!can('ledger', pid)) continue; const { error } = await S.sb.from('ledger_entries').delete().eq('project_id', pid).eq('source', 'excel'); err = err || error;
