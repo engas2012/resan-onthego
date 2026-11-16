@@ -56,7 +56,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 3.5.3</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 3.5.4</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -502,7 +502,7 @@ async function importOwners(file) {
 async function importUnits(file, mall) {
   if (!file) return; if (!window.XLSX) return toast('مكتبة الإكسل لسه ماحمّلتش – حدّث الصفحة وجرب تاني');
   let wb; try { wb = XLSX.read(await file.arrayBuffer()); } catch (er) { return toast('مش قادر أقرا الملف: ' + er.message); }
-  const O = S.ops, T = v => String(v ?? '').trim(), N = v => { if (typeof v === 'number') return v > 0 ? v : null; const m = String(v ?? '').replace(/,/g, '').replace(/[٠-٩]/g, c => '٠١٢٣٤٥٦٧٨٩'.indexOf(c)).match(/\d+(\.\d+)?/); return m && +m[0] > 0 ? +m[0] : null; };
+  const O = S.ops, T = v => String(v ?? '').trim(), CODE = v => T(v).replace(/[٠-٩]/g, c => '٠١٢٣٤٥٦٧٨٩'.indexOf(c)).replace(/\s+/g, ' ').toUpperCase(), N = v => { if (typeof v === 'number') return v > 0 ? v : null; const m = String(v ?? '').replace(/,/g, '').replace(/[٠-٩]/g, c => '٠١٢٣٤٥٦٧٨٩'.indexOf(c)).match(/\d+(\.\d+)?/); return m && +m[0] > 0 ? +m[0] : null; };
   const F = [['code', 'رقم الوحدة', /رقم الوحد|كود|الوحدة|وحده|^وحدة|unit|code|shop/i, 1], ['floor', 'الدور', /^الدور$|^دور|floor|level/i], ['area', 'المساحة الداخلية', /داخل|^المساحة$|^مساحة$|^المساحه$|area|m2|م2/i], ['area_out', 'المساحة الخارجية', /خارج|تراس|outdoor|terrace/i],
     ['utype', 'نوع الوحدة', /نوع|type|category/i], ['activity', 'النشاط', /نشاط|activity|use/i], ['status', 'الحالة', /حال|status/i], ['duplex', 'دوبلكس', /دوبلكس|duplex/i], ['floor2', 'الدور التاني', /^(ال)?دور (ال)?(ثاني|تاني)|floor ?2/i], ['area2', 'مساحة الدور التاني', /مساحة الدور|area ?2/i], ['notes', 'ملاحظات', /ملاحظ|notes|remark/i]];
   const d = document.createElement('dialog'); d.className = 'adlg wide'; document.body.append(d); d.showModal(); const close = () => { d.close(); d.remove(); };
@@ -511,7 +511,7 @@ async function importUnits(file, mall) {
     const A = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '', raw: true });
     if (hi < 0) { hi = A.slice(0, 30).findIndex(r => r.filter(x => T(x)).length >= 2 && r.some(x => F[0][2].test(T(x)))); if (hi < 0) hi = A.findIndex(r => r.filter(x => T(x)).length >= 2); map = {}; const H = (A[hi] || []).map(T); F.forEach(([k, , re]) => { const i = H.findIndex((h, j) => h && re.test(h) && !Object.values(map).includes(j)); if (i >= 0) map[k] = i; }); }
     const H = (A[hi] || []).map(T), rows = A.slice(hi + 1).filter(r => map.code != null && T(r[map.code]));
-    const seen = new Set(), dup = new Set(); rows.forEach(r => { const c = T(r[map.code]); if (seen.has(c)) dup.add(c); seen.add(c); });
+    const seen = new Set(), dup = new Set(); rows.forEach(r => { const c = CODE(r[map.code]); if (seen.has(c)) dup.add(c); seen.add(c); });
     const colSel = k => `<select data-map="${k}"><option value="">—</option>${H.map((h, i) => `<option value="${i}"${map[k] === i ? ' selected' : ''}>${esc(h || 'عمود ' + (i + 1))}</option>`).join('')}</select>`;
     d.innerHTML = `<div class="dh"><div><h3 style="margin:0">استيراد وحدات</h3><div class="mut" style="font-size:12px">${esc(file.name)}</div></div><button type="button" class="dx">✕</button></div>
     <div class="grid"><label>المول<select id="imM">${O.M.length > 1 ? '<option value="">— اختار المول —</option>' : ''}${O.M.map(m => `<option value="${m.id}"${(mall || (O.M.length === 1 && O.M[0].id)) === m.id ? ' selected' : ''}>${esc(m.name)}</option>`).join('')}</select></label>
@@ -528,11 +528,14 @@ async function importUnits(file, mall) {
     d.querySelector('#imGo').onclick = async () => { const mid = d.querySelector('#imM').value; if (!mid) return toast('اختار المول'); const b = d.querySelector('#imGo'); b.disabled = true;
       const g = (r, k) => map[k] != null ? r[map[k]] : '', stOf = v => /مؤجر|leased|rented/i.test(v) ? 'leased' : /تجهيز|fit/i.test(v) ? 'fitout' : /مالك|owner/i.test(v) ? 'owner' : 'vacant';
       const by = new Map(); rows.forEach((r, k) => { const dx = map.duplex != null && /نعم|اه|yes|true|^1$|✓|دوبلكس/i.test(T(g(r, 'duplex')));
-        by.set(T(g(r, 'code')), { mall_id: mid, code: T(g(r, 'code')), floor: T(g(r, 'floor')) || null, area: N(g(r, 'area')), area_out: N(g(r, 'area_out')), utype: T(g(r, 'utype')) || null, activity: T(g(r, 'activity')) || null, status: map.status != null ? stOf(T(g(r, 'status'))) : 'vacant', duplex: dx, floor2: dx ? T(g(r, 'floor2')) || null : null, area2: dx ? N(g(r, 'area2')) : null, notes: T(g(r, 'notes')) || null, sort: k }); });
-      const L = [...by.values()], exist = new Map(O.U.filter(u => u.mall_id === mid).map(u => [u.code, u]));
-      L.forEach(x => { const e = exist.get(x.code); if (e && map.status == null) x.status = e.status; });
-      let done = 0; for (let k = 0; k < L.length; k += 200) { const { error } = await S.sb.from('mall_units').upsert(L.slice(k, k + 200), { onConflict: 'mall_id,code' }); if (error) { b.disabled = false; return toast('حصلت مشكلة بعد ' + done + ' وحدة: ' + error.message); } done += Math.min(200, L.length - k); }
-      toast(`✓ اتضاف/اتحدث ${done} وحدة`); close(); S.ops.mall = mid; renderOps(); };
+        by.set(CODE(g(r, 'code')), { mall_id: mid, code: CODE(g(r, 'code')), floor: T(g(r, 'floor')) || null, area: N(g(r, 'area')), area_out: N(g(r, 'area_out')), utype: T(g(r, 'utype')) || null, activity: T(g(r, 'activity')) || null, status: map.status != null ? stOf(T(g(r, 'status'))) : 'vacant', duplex: dx, floor2: dx ? T(g(r, 'floor2')) || null : null, area2: dx ? N(g(r, 'area2')) : null, notes: T(g(r, 'notes')) || null, sort: k }); });
+      const { data: cur } = await S.sb.from('mall_units').select('id,code,status').eq('mall_id', mid), exist = new Map((cur || []).map(u => [CODE(u.code), u]));
+      const L = [...by.values()], ins = L.filter(x => !exist.has(x.code)), upd = L.filter(x => exist.has(x.code));
+      let nI = 0, nU = 0, errs = [];
+      for (let k = 0; k < ins.length; k += 200) { const { error } = await S.sb.from('mall_units').insert(ins.slice(k, k + 200)); if (error) { errs.push(error.message); break; } nI += Math.min(200, ins.length - k); }
+      for (const x of upd) { const e = exist.get(x.code), row = { ...x }; delete row.mall_id; delete row.sort; row.code = e.code; if (map.status == null) delete row.status; const { error } = await S.sb.from('mall_units').update(row).eq('id', e.id); if (error) { errs.push(x.code + ': ' + error.message); if (errs.length > 3) break; } else nU++; }
+      if (errs.length) { b.disabled = false; d.querySelector('.acts').insertAdjacentHTML('beforebegin', `<div class="note" style="color:var(--bad)">اتضاف ${nI} واتحدث ${nU}، وحصلت مشكلة: ${esc(errs.join(' | '))}</div>`); return; }
+      toast(`✓ اتضاف ${nI} وحدة جديدة واتحدث ${nU}`); close(); S.ops.mall = mid; renderOps(); };
     d.querySelector('.dx').onclick = close;
   };
   draw();
