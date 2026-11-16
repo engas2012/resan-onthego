@@ -56,7 +56,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 3.3.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 3.3.1</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -1503,12 +1503,38 @@ function staffDetail(e, recs) {
 }
 
 /* ---------------- admin: members ---------------- */
+async function adminFn(body) { const { data, error } = await S.sb.functions.invoke('admin-users', { body }); if (error) { let m = error.message; try { m = (await error.context.json()).error || m; } catch {} return { error: m }; } return data || {}; }
+function newUser() {
+  const gen = () => Array.from(crypto.getRandomValues(new Uint8Array(10)), b => 'abcdefghjkmnpqrstuvwxyz23456789'[b % 31]).join('');
+  const d = document.createElement('dialog'); d.className = 'adlg';
+  d.innerHTML = `<form><div class="dh"><h3 style="margin:0">مستخدم جديد</h3><button type="button" class="dx">✕</button></div><div class="grid">
+    <label class="wide">الاسم<input name="n" required></label><label class="wide">الإيميل (اسم الدخول)<input name="e" type="email" dir="ltr" required></label>
+    <label class="wide">كلمة السر<div style="display:flex;gap:6px"><input name="p" dir="ltr" required minlength="8" value="${gen()}" style="flex:1"><button type="button" id="pg" class="xs">توليد</button></div></label>
+    <label class="wide">الوظيفة<select name="r"><option value="ops">مدير التشغيل – قسم المولات كامل</option>${Object.entries(ROLE).filter(([k]) => k !== 'owner').map(([k, l]) => `<option value="${k}">${l}</option>`).concat(`<option value="owner">${ROLE.owner}</option>`).join('')}</select></label>
+    <div class="wide" id="nuP" hidden><div class="mut" style="font-size:13px;margin-bottom:4px">المشروعات</div>${S.projects.map(p => `<label style="display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" name="pj" value="${p.id}" checked style="width:auto;min-height:0">${esc(p.name)}</label>`).join('')}</div>
+    <label class="wide" id="nuO" hidden style="display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" name="ox" style="width:auto;min-height:0"> وكمان مدير تشغيل (قسم المولات)</label></div>
+    <p class="mut" style="font-size:12px">ابعت للمستخدم الإيميل وكلمة السر ورابط النظام، ويقدر يغيّر كلمة السر بعد كده.</p><div class="acts"><button class="p">إنشاء المستخدم</button></div></form>`;
+  document.body.append(d); d.showModal(); const f = d.querySelector('form'), close = () => { d.close(); d.remove(); };
+  const sync = () => { const ops = f.r.value === 'ops'; d.querySelector('#nuP').hidden = ops; d.querySelector('#nuO').hidden = ops; }; f.r.onchange = sync; sync();
+  d.addEventListener('click', e => { if (e.target === d || e.target.closest('.dx')) close(); if (e.target.id === 'pg') f.p.value = gen(); });
+  f.onsubmit = async e => { e.preventDefault(); const b = f.querySelector('button.p'); b.disabled = true; const ops = f.r.value === 'ops';
+    const roles = ops ? [] : [...f.querySelectorAll('[name=pj]:checked')].map(x => ({ project_id: x.value, role: f.r.value }));
+    const r = await adminFn({ action: 'create', full_name: f.n.value.trim(), email: f.e.value.trim(), password: f.p.value, ops: ops || f.ox.checked, roles });
+    if (r.error) { b.disabled = false; return toast(r.error); }
+    const msg = `رابط النظام: ${location.origin}\nالإيميل: ${f.e.value.trim()}\nكلمة السر: ${f.p.value}`;
+    d.querySelector('form').innerHTML = `<div class="dh"><h3 style="margin:0">✓ اتعمل المستخدم</h3><button type="button" class="dx">✕</button></div><p>ابعت له البيانات دي:</p><pre class="cred" dir="auto">${esc(msg)}</pre><div class="acts"><button type="button" class="p" id="cp">نسخ</button><a class="btn" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(msg)}">إرسال واتساب</a></div>`;
+    d.querySelector('#cp').onclick = () => navigator.clipboard?.writeText(msg).then(() => toast('اتنسخ'));
+    d.addEventListener('close', () => renderAdmin(), { once: true }); };
+}
 async function renderAdmin() {
   const [{ data: users }, { data: mem }] = await Promise.all([S.sb.from('profiles').select('*').order('email'), S.sb.from('project_members').select('*')]);
   const M = {}; (mem || []).forEach(m => M[m.user_id + '|' + m.project_id] = m.role);
-  $('#main').innerHTML = `<h2>المستخدمين والصلاحيات</h2><p class="mut">ضيف المستخدم الأول من لوحة Supabase (Authentication ← Add user)، وبعدين حدد دوره في كل مشروع هنا. "—" يعني ملوش دخول على المشروع.</p>
-  <div class="scroll"><table class="adm"><thead><tr><th>المستخدم</th>${S.projects.map(p => `<th>${esc(p.name)}</th>`).join('')}<th>مدير التشغيل<div class="mut" style="font-size:11px;font-weight:400">قسم المولات كامل</div></th></tr></thead><tbody>${(users || []).map(u => `<tr><td>${esc(u.full_name || '')}<div class="mut" style="font-size:12px">${esc(u.email || '')}${u.is_admin ? ' · مدير النظام' : ''}</div></td>${S.projects.map(p => `<td><select data-u="${u.id}" data-p="${p.id}"><option value="">—</option>${Object.entries(ROLE).map(([k, l]) => `<option value="${k}"${M[u.id + '|' + p.id] === k ? ' selected' : ''}>${l}</option>`).join('')}</select></td>`).join('')}<td style="text-align:center">${u.is_admin ? '<span class="mut">✓ (مدير)</span>' : `<input type="checkbox" data-ops="${u.id}"${u.ops ? ' checked' : ''} style="width:22px;height:22px">`}</td></tr>`).join('')}</tbody></table></div>
+  $('#main').innerHTML = `<div class="sthead"><h2 style="margin:0">المستخدمين والصلاحيات</h2><button id="uNew" class="p">+ مستخدم جديد</button></div><p class="mut">حدد دور كل مستخدم في كل مشروع. "—" يعني ملوش دخول على المشروع. مدير التشغيل بيدخل على قسم المولات كامل.</p>
+  <div class="scroll"><table class="adm"><thead><tr><th>المستخدم</th>${S.projects.map(p => `<th>${esc(p.name)}</th>`).join('')}<th>مدير التشغيل<div class="mut" style="font-size:11px;font-weight:400">قسم المولات كامل</div></th></tr></thead><tbody>${(users || []).map(u => `<tr><td>${esc(u.full_name || '')}${u.ops && !u.is_admin ? ' <span class="tag">مدير التشغيل</span>' : ''}<div class="mut" style="font-size:12px">${esc(u.email || '')}${u.is_admin ? ' · مدير النظام' : ''} · <a href="#" data-pw="${u.id}">تغيير كلمة السر</a></div></td>${S.projects.map(p => `<td><select data-u="${u.id}" data-p="${p.id}"><option value="">—</option>${Object.entries(ROLE).map(([k, l]) => `<option value="${k}"${M[u.id + '|' + p.id] === k ? ' selected' : ''}>${l}</option>`).join('')}</select></td>`).join('')}<td style="text-align:center">${u.is_admin ? '<span class="mut">✓ (مدير)</span>' : `<input type="checkbox" data-ops="${u.id}"${u.ops ? ' checked' : ''} style="width:22px;height:22px">`}</td></tr>`).join('')}</tbody></table></div>
   <p class="mut" style="font-size:13px">مدير التشغيل بيدخل على قسم إدارة التشغيل كامل (المولات، الوحدات، الملاك، المستأجرين، العقود، التحصيل) ويقدر يدخل ويعدّل البيانات. مش بيشوف مشروعات المقاولات إلا لو اتحدد له دور في مشروع، ومش بيشوف HR.</p>`;
+  $('#uNew').onclick = () => newUser();
+  $('#main').onclick = e => { const pw = e.target.closest('[data-pw]'); if (!pw) return; e.preventDefault(); const v = prompt('كلمة السر الجديدة (8 حروف على الأقل)'); if (!v) return;
+    adminFn({ action: 'password', user_id: pw.dataset.pw, password: v }).then(r => toast(r.error ? r.error : 'اتغيرت كلمة السر')); };
   $('#main').onchange = async e => {
     const ob = e.target.closest('[data-ops]'); if (ob) { const { error } = await S.sb.rpc('set_user_ops', { p_user: ob.dataset.ops, p_on: ob.checked }); return toast(error ? 'مقدرتش أحفظ: ' + error.message : ob.checked ? 'بقى مدير تشغيل' : 'اتشالت صلاحية التشغيل'); }
     const s = e.target.closest('select[data-u]'); if (!s) return; const k = { user_id: s.dataset.u, project_id: s.dataset.p };
