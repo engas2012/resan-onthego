@@ -401,3 +401,4 @@ button.crow{font:inherit;color:inherit;cursor:pointer;min-height:0;border-right:
 .addm{position:relative}.addmenu{display:none;position:absolute;top:100%;inset-inline-start:0;z-index:5;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.12);min-width:170px}
 .addm:hover .addmenu,.addm:focus-within .addmenu{display:flex;flex-direction:column}.addmenu button{border:0;background:none;text-align:right;min-height:36px;display:flex;gap:8px;align-items:center}.addmenu i{width:10px;height:10px;border-radius:50%}
 body.opsro .addm,body.opsro [data-cadd],body.opsro [data-lst],body.opsro [data-conv]{display:none!important}
+label.chk{flex-direction:row!important;align-items:center;gap:8px;font-weight:400}label.chk input{width:auto;min-height:0}.dxl{font-weight:400;color:var(--mut)}
