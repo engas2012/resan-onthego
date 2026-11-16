@@ -56,7 +56,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 3.5.4</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 3.6.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -99,6 +99,7 @@ function shell(pid, view) {
   <nav>${p ? VIEWS.filter(v => !v[2] || can(v[2], pid)).map(([v, l]) => `<a href="#p/${pid}/${v}" class="${v === view ? 'on' : ''}">${l}${v === 'review' ? ' <span class="badge" id="pendN" hidden></span>' : ''}${v === 'tasks' ? ' <span class="badge" id="taskN" hidden></span>' : ''}</a>`).join('') : ''}</nav></header><main id="main"><p class="mut">جاري التحميل…</p></main>`;
 }
 async function route() {
+  document.querySelector('.selbar')?.remove();
   const h = location.hash.slice(1) || (hubOn() ? 'start' : myMods()[0] || 'home'), m = h.match(/^p\/([a-z0-9_-]+)\/([a-z]+)$/);
   if (m && S.projects.some(p => p.id === m[1])) {
     const [, pid, view] = m;
@@ -217,15 +218,15 @@ function drawOps() {
   const area = U.reduce((s, x) => s + areaIn(x), 0), leasedU = U.filter(x => x.status === 'leased'), leasedA = leasedU.reduce((s, x) => s + areaIn(x), 0), roll = act.reduce((s, x) => s + curRent(x, C) + (+x.service_fee || 0), 0);
   const arr = act.concat(L.filter(x => x.status === 'ended')).filter(x => B[x.id].bal > 0.5), arrT = arr.reduce((s, x) => s + B[x.id].bal, 0), ending = act.filter(x => daysTo(x.end_date) <= 90).sort((a, b) => a.end_date.localeCompare(b.end_date));
   const tabs = [['dash', '📊 لوحة الأداء'], ['units', `🏬 الوحدات (${U.length})`], ['leases', `📝 العقود (${act.length})`], ['coll', `💰 التحصيل${arr.length ? ` (${arr.length})` : ''}`], ['clients', `👥 العملاء (${O.W.length + T.length + O.LD.filter(x => !['won', 'lost'].includes(x.status)).length})`], ['wait', `⏳ قائمة الانتظار (${O.LD.filter(x => ['waiting', 'contacted', 'offered'].includes(x.status)).length})`]];
-  const unitTile = x => { const ls = lOfU(x.id), b = ls && B[ls.id], st = USTAT[x.status]; return `<button type="button" class="utile" data-unit="${x.id}" style="--c:${st[1]}"><div class="uh"><b>${esc(x.code)}</b><span>${st[0]}</span></div><div class="mut" style="font-size:12px">${x.duplex ? '' : esc(x.floor || '')}${areaTxt(x) ? (x.duplex ? '' : ' · ') + areaTxt(x) : ''}${x.activity ? ' · ' + esc(x.activity) : ''}</div>${ownersOf(x.id).length ? `<div class="uown">👤 ${ownersOf(x.id).map(o => esc(o.name)).join('، ')}</div>` : ''}${ls ? `<div class="ut">${esc(tOf(ls.tenant_id)?.name || '')}</div><div class="mut" style="font-size:12px">${nf(curRent(ls, C), 0)} ج/شهر · لحد ${fmtD(ls.end_date)}</div>${b.bal > 0.5 ? `<div class="ubad">متأخرات ${nf(b.bal, 0)}</div>` : '<div class="uok">✓ منتظم</div>'}` : ''}${!ls && ['vacant', 'fitout'].includes(x.status) && waitFor(x).length ? `<div class="uwait">⏳ ${waitFor(x).length} في الانتظار</div>` : ''}</button>`; };
+  const unitTile = x => { const ls = lOfU(x.id), b = ls && B[ls.id], st = USTAT[x.status]; return `<button type="button" class="utile${O.selMode ? ' selm' : ''}${O.sel?.has('u:' + x.id) ? ' sel' : ''}" data-unit="${x.id}" style="--c:${st[1]}">${O.selMode ? `<i class="ck">${O.sel.has('u:' + x.id) ? '✓' : ''}</i>` : ''}<div class="uh"><b>${esc(x.code)}</b><span>${st[0]}</span></div><div class="mut" style="font-size:12px">${x.duplex ? '' : esc(x.floor || '')}${areaTxt(x) ? (x.duplex ? '' : ' · ') + areaTxt(x) : ''}${x.activity ? ' · ' + esc(x.activity) : ''}</div>${ownersOf(x.id).length ? `<div class="uown">👤 ${ownersOf(x.id).map(o => esc(o.name)).join('، ')}</div>` : ''}${ls ? `<div class="ut">${esc(tOf(ls.tenant_id)?.name || '')}</div><div class="mut" style="font-size:12px">${nf(curRent(ls, C), 0)} ج/شهر · لحد ${fmtD(ls.end_date)}</div>${b.bal > 0.5 ? `<div class="ubad">متأخرات ${nf(b.bal, 0)}</div>` : '<div class="uok">✓ منتظم</div>'}` : ''}${!ls && ['vacant', 'fitout'].includes(x.status) && waitFor(x).length ? `<div class="uwait">⏳ ${waitFor(x).length} في الانتظار</div>` : ''}</button>`; };
   let body = '';
   if (O.tab === 'dash') body = `<div class="kpis"><div class="kpi"><b>${U.length ? Math.round(leasedU.length / U.length * 100) : 0}%</b><span>نسبة الإشغال (${leasedU.length}/${U.length} وحدة)${area ? ` · ${Math.round(leasedA / area * 100)}% من المساحة الداخلية` : ''}</span></div><div class="kpi k-ok"><b>${nf(roll, 0)}</b><span>الإيراد الشهري الحالي (إيجار + خدمات)</span></div><div class="kpi${arrT > 0 ? ' k-bad' : ''}"><b>${nf(arrT, 0)}</b><span>متأخرات على ${arr.length} عقد</span></div><div class="kpi${ending.length ? ' k-warn' : ''}"><b>${ending.length}</b><span>عقود بتخلص خلال 90 يوم</span></div></div>
     <div class="two2"><div class="card"><b>أكبر المتأخرات</b>${arr.length ? `<table class="whyt"><tbody>${arr.sort((a, b) => B[b.id].bal - B[a.id].bal).slice(0, 8).map(x => `<tr class="pick" data-lease="${x.id}"><td><b>${esc(uOf(x.unit_id)?.code)}</b> ${esc(tOf(x.tenant_id)?.name || '')}</td><td class="n">${B[x.id].late} يوم</td><td class="n" style="color:var(--bad)"><b>${nf(B[x.id].bal, 0)}</b></td></tr>`).join('')}</tbody></table>` : '<p class="mut">✓ مفيش متأخرات.</p>'}</div>
     <div class="card"><b>عقود قربت تخلص</b>${ending.length ? `<table class="whyt"><tbody>${ending.slice(0, 8).map(x => `<tr class="pick" data-lease="${x.id}"><td><b>${esc(uOf(x.unit_id)?.code)}</b> ${esc(tOf(x.tenant_id)?.name || '')}</td><td>${fmtD(x.end_date)}</td><td class="n" style="color:${daysTo(x.end_date) < 0 ? 'var(--bad)' : 'var(--warn)'}">${daysTo(x.end_date) < 0 ? 'خلص من ' + -daysTo(x.end_date) + ' يوم' : 'باقي ' + daysTo(x.end_date) + ' يوم'}</td></tr>`).join('')}</tbody></table>` : '<p class="mut">مفيش عقود بتخلص قريب.</p>'}</div></div>
     <div class="card" style="margin-top:12px"><b>حالة الوحدات</b><div class="ustrip">${Object.entries(USTAT).map(([k, [l, c]]) => { const n = U.filter(x => x.status === k).length; return n ? `<div style="flex:${n};background:${c}" title="${l}: ${n}">${l} ${n}</div>` : ''; }).join('')}</div></div>`;
   else if (O.tab === 'units') { const fl = [...new Set(U.map(x => x.floor || '—'))];
-    body = `<div class="acts" style="margin-top:0"><button id="uAdd" class="p">+ وحدة</button><label class="btn" style="margin:0">⬆ استيراد وحدات من إكسل<input id="uImp" type="file" accept=".xlsx,.xls,.csv" hidden></label>${!O.mall && M.length > 1 ? '<span class="mut">اختار المول من فوق عشان تضيف وحدات</span>' : ''}</div>
-      ${U.length ? fl.map(f => `<div class="tsub">${esc(f)}${!O.mall ? '' : ''} <span class="mut">(${U.filter(x => (x.floor || '—') === f).length})</span></div><div class="ugrid">${U.filter(x => (x.floor || '—') === f).map(unitTile).join('')}</div>`).join('') : '<p class="mut">لسه مفيش وحدات. ضيفها واحدة واحدة أو ارفع شيت إكسل فيه أعمدة: الوحدة، الدور، المساحة الداخلية، المساحة الخارجية، النوع، النشاط.</p>'}`; }
+    body = `<div class="acts" style="margin-top:0"><button id="uAdd" class="p">+ وحدة</button><label class="btn" style="margin:0">⬆ استيراد وحدات من إكسل<input id="uImp" type="file" accept=".xlsx,.xls,.csv" hidden></label><button type="button" id="selT" class="${O.selMode ? 'p' : ''}">${O.selMode ? 'إنهاء التحديد' : '☑ تحديد متعدد'}</button>${!O.mall && M.length > 1 ? '<span class="mut">اختار المول من فوق عشان تضيف وحدات</span>' : ''}</div>
+      ${U.length ? fl.map(f => `<div class="tsub">${esc(f)} <span class="mut">(${U.filter(x => (x.floor || '—') === f).length})</span>${O.selMode ? ` <a href="#" data-selall="${esc(f)}">تحديد الدور</a>` : ''}</div><div class="ugrid">${U.filter(x => (x.floor || '—') === f).map(unitTile).join('')}</div>`).join('') : '<p class="mut">لسه مفيش وحدات. ضيفها واحدة واحدة أو ارفع شيت إكسل فيه أعمدة: الوحدة، الدور، المساحة الداخلية، المساحة الخارجية، النوع، النشاط.</p>'}`; }
   else if (O.tab === 'leases') body = `<div class="acts" style="margin-top:0"><button id="lAdd" class="p">+ عقد جديد</button></div>${L.length ? `<div class="scroll"><table class="stack"><thead><tr><th>الوحدة</th><th>المستأجر</th><th>المدة</th><th class="n">الإيجار الشهري الحالي</th><th>السداد</th><th class="n">المستحق لحد النهارده</th><th class="n">المدفوع</th><th class="n">الرصيد</th></tr></thead><tbody>${[...L].sort((a, b) => (a.status === 'active' ? 0 : 1) - (b.status === 'active' ? 0 : 1) || a.end_date.localeCompare(b.end_date)).map(x => { const b = B[x.id], dt = daysTo(x.end_date);
       return `<tr class="pick${x.status === 'ended' ? ' mutr' : ''}" data-lease="${x.id}"><td data-l="الوحدة"><b>${esc(uOf(x.unit_id)?.code)}</b>${!O.mall ? ` <span class="tag">${esc(mOf(uOf(x.unit_id)?.mall_id)?.name || '')}</span>` : ''}</td><td data-l="المستأجر">${esc(tOf(x.tenant_id)?.name || '')}</td><td data-l="المدة">${fmtD(x.start_date)} ← ${fmtD(x.end_date)}${x.status === 'ended' ? ' <span class="tag">منتهي</span>' : dt <= 90 ? ` <span class="tag" style="color:var(--warn)">${dt < 0 ? 'خلص' : 'باقي ' + dt + ' يوم'}</span>` : ''}</td><td class="n" data-l="الإيجار">${nf(curRent(x, C), 0)}</td><td data-l="السداد">${PEV[x.pay_every]}${+x.escalation_pct ? ` · زيادة ${x.escalation_pct}%` : ''}</td><td class="n" data-l="المستحق">${nf(b.due, 0)}</td><td class="n" data-l="المدفوع">${nf(b.paid, 0)}</td><td class="n" data-l="الرصيد"><b style="color:${b.bal > 0.5 ? 'var(--bad)' : 'var(--ok)'}">${nf(b.bal, 0)}</b></td></tr>`; }).join('')}</tbody></table></div>` : '<p class="mut">لسه مفيش عقود.</p>'}`;
   else if (O.tab === 'clients') body = clientsPane(U, B);
@@ -240,12 +241,19 @@ function drawOps() {
   ${O.mall ? `<p class="mut" style="margin:6px 0 0">${esc(mOf(O.mall)?.place || '')} · <a href="#" id="mEd">تعديل بيانات المول</a></p>` : ''}
   <div class="sttabs"><div class="seg">${tabs.map(([k, l]) => `<button type="button" data-otab="${k}" class="${O.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div></div><div style="margin-top:12px">${body}</div>`;
   document.querySelectorAll('[data-mall]').forEach(b => b.onclick = () => { O.mall = b.dataset.mall; drawOps(); });
-  document.querySelectorAll('[data-otab]').forEach(b => b.onclick = () => { O.tab = b.dataset.otab; drawOps(); });
+  document.querySelectorAll('[data-otab]').forEach(b => b.onclick = () => { O.tab = b.dataset.otab; O.selMode = false; O.sel = new Set(); drawOps(); });
+  O.sel ||= new Set(); selBar();
   $('#mAdd').onclick = () => mallEdit(null); $('#mEd') && ($('#mEd').onclick = e => { e.preventDefault(); mallEdit(mOf(O.mall)); });
   $('#uAdd') && ($('#uAdd').onclick = () => { if (!O.mall && M.length > 1) return toast('اختار المول الأول'); unitEdit({ mall_id: O.mall || M[0].id, status: 'vacant' }); });
   $('#lAdd') && ($('#lAdd').onclick = () => leaseEdit({}));
   $('#uImp') && ($('#uImp').onchange = e => { const f = e.target.files[0]; e.target.value = ''; importUnits(f, O.mall); });
-  $('#main').onclick = e => { const un = e.target.closest('[data-unit]'), ls = e.target.closest('[data-lease]'), py = e.target.closest('[data-pay]');
+  $('#main').onclick = e => {
+    if (e.target.closest('#selT')) { O.selMode = !O.selMode; O.sel = new Set(); return drawOps(); }
+    const sa = e.target.closest('[data-selall]'); if (sa) { e.preventDefault(); const L = U.filter(x => (x.floor || '—') === sa.dataset.selall), all = L.every(x => O.sel.has('u:' + x.id)); L.forEach(x => all ? O.sel.delete('u:' + x.id) : O.sel.add('u:' + x.id)); return drawOps(); }
+    const sv = e.target.closest('[data-selvis]'); if (sv) { e.preventDefault(); const K = sv.dataset.selvis.split(','), all = K.every(k => O.sel.has(k)); K.forEach(k => all ? O.sel.delete(k) : O.sel.add(k)); return drawOps(); }
+    const pk = e.target.closest('[data-pick]'); if (pk) { const k = pk.dataset.pick; O.sel.has(k) ? O.sel.delete(k) : O.sel.add(k); return drawOps(); }
+    if (O.selMode && e.target.closest('[data-unit]')) { const k = 'u:' + e.target.closest('[data-unit]').dataset.unit; O.sel.has(k) ? O.sel.delete(k) : O.sel.add(k); return drawOps(); }
+    const un = e.target.closest('[data-unit]'), ls = e.target.closest('[data-lease]'), py = e.target.closest('[data-pay]');
     const ow = e.target.closest('[data-owner]'), tn = e.target.closest('[data-tenant]');
     if (e.target.closest('#owAdd')) return ownerEdit({}); if (e.target.closest('#tnAdd')) return tenantEdit({});
     const ca = e.target.closest('[data-cadd]'); if (ca) { const k = ca.dataset.cadd; return k === 'owner' ? ownerEdit({}) : k === 'tenant' ? tenantEdit({}) : leadEdit({ kind: k }); }
@@ -340,6 +348,51 @@ function printStatement(L, u, t, m, rows, b) {
   <table><thead><tr><th>التاريخ</th><th>البيان</th><th>مستحق</th><th>مدفوع</th><th>الرصيد</th></tr></thead><tbody>${tr}</tbody></table>
   <div class="tot">${b.bal > 0.5 ? `المستحق على المستأجر: <span style="color:#b3261e">${nf(b.bal, 0)} جنيه</span>` : 'لا توجد مستحقات متأخرة'}</div><script>window.onload=()=>setTimeout(()=>print(),400)<\/script></body></html>`); w.document.close();
 }
+/* bulk select: units & clients */
+function selBar() {
+  const O = S.ops; document.querySelector('.selbar')?.remove(); if (!O.selMode || !O.sel.size) return;
+  const K = [...O.sel], units = K.filter(k => k.startsWith('u:')).length, leads = K.filter(k => /^(rent|buy):/.test(k)).length, others = K.length - units;
+  const bar = document.createElement('div'); bar.className = 'selbar';
+  bar.innerHTML = `<b>${K.length} محدد</b>${units ? '<button type="button" id="bEd" class="p">تعديل جماعي</button>' : ''}${leads ? '<button type="button" id="bSt">تغيير حالة الطلبات</button>' : ''}<button type="button" id="bDel" class="danger">حذف</button><button type="button" id="bClr">إلغاء التحديد</button>`;
+  document.body.append(bar);
+  bar.querySelector('#bClr').onclick = () => { O.sel = new Set(); drawOps(); };
+  bar.querySelector('#bEd') && (bar.querySelector('#bEd').onclick = bulkUnitEdit);
+  bar.querySelector('#bSt') && (bar.querySelector('#bSt').onclick = bulkLeadStatus);
+  bar.querySelector('#bDel').onclick = bulkDelete;
+}
+function bulkUnitEdit() {
+  const O = S.ops, ids = [...O.sel].filter(k => k.startsWith('u:')).map(k => k.slice(2));
+  const { d, close } = odlg(`<form><div class="dh"><h3 style="margin:0">تعديل ${ids.length} وحدة مرة واحدة</h3><button type="button" class="dx">✕</button></div><p class="mut" style="font-size:13px;margin-top:0">املا بس الخانات اللي عاوز تغيّرها – الفاضي بيفضل زي ما هو في كل وحدة.</p><div class="grid">
+    <label>الدور<input name="floor" list="flLb"><datalist id="flLb">${[...new Set(O.U.map(x => x.floor).filter(Boolean))].map(x => `<option value="${esc(x)}">`).join('')}</datalist></label>
+    <label>نوع الوحدة<input name="utype" list="utLb"><datalist id="utLb">${utypes().map(x => `<option value="${esc(x)}">`).join('')}</datalist></label><label>النشاط<input name="activity"></label>
+    <label>الحالة<select name="status"><option value="">— زي ما هي —</option>${Object.entries(USTAT).map(([k, [l]]) => `<option value="${k}">${l}</option>`).join('')}</select></label>
+    <label>المساحة الداخلية م2<input name="area" type="number" step="any"></label><label>المساحة الخارجية م2<input name="area_out" type="number" step="any"></label>
+    ${O.M.length > 1 ? `<label>نقل لمول<select name="mall"><option value="">— زي ما هي —</option>${O.M.map(m => `<option value="${m.id}">${esc(m.name)}</option>`).join('')}</select></label>` : ''}<label class="wide">ملاحظات<input name="notes"></label></div>
+    <div class="acts"><button class="p">تطبيق على ${ids.length} وحدة</button></div></form>`);
+  d.querySelector('form').onsubmit = async e => { e.preventDefault(); const f = e.target, row = {};
+    ['floor', 'utype', 'activity', 'notes'].forEach(k => { if (f[k].value.trim()) row[k] = f[k].value.trim(); }); ['area', 'area_out'].forEach(k => { if (f[k].value !== '') row[k] = +f[k].value; });
+    if (f.status.value) row.status = f.status.value; if (f.mall && f.mall.value) row.mall_id = f.mall.value;
+    if (!Object.keys(row).length) return toast('مفيش حاجة اتغيرت'); const { error } = await S.sb.from('mall_units').update(row).in('id', ids);
+    if (error) return toast(error.message.includes('duplicate') ? 'فيه رقم وحدة متكرر في المول اللي بتنقل له' : error.message); toast(`✓ اتعدلت ${ids.length} وحدة`); close(); O.sel = new Set(); renderOps(); };
+}
+function bulkLeadStatus() {
+  const O = S.ops, ids = [...O.sel].filter(k => /^(rent|buy):/.test(k)).map(k => k.split(':')[1]);
+  const { d, close } = odlg(`<form><div class="dh"><h3 style="margin:0">حالة ${ids.length} طلب</h3><button type="button" class="dx">✕</button></div><div class="grid"><label class="wide">الحالة الجديدة<select name="st">${Object.entries(LST).map(([k, [, t]]) => `<option value="${k}">${t}</option>`).join('')}</select></label></div><div class="acts"><button class="p">تطبيق</button></div></form>`);
+  d.querySelector('form').onsubmit = async e => { e.preventDefault(); const { error } = await S.sb.from('leads').update({ status: e.target.st.value, updated_at: new Date().toISOString() }).in('id', ids); if (error) return toast(error.message); toast('✓ اتحدثت الحالة'); close(); O.sel = new Set(); renderOps(); };
+}
+async function bulkDelete() {
+  const O = S.ops, K = [...O.sel], g = p => K.filter(k => k.startsWith(p + ':')).map(k => k.split(':')[1]);
+  const U = g('u'), W = g('owner'), Tn = g('tenant'), Ld = [...g('rent'), ...g('buy')];
+  const uBlock = U.filter(id => O.L.some(l => l.unit_id === id)), tBlock = Tn.filter(id => O.L.some(l => l.tenant_id === id));
+  const U2 = U.filter(id => !uBlock.includes(id)), T2 = Tn.filter(id => !tBlock.includes(id)), total = U2.length + W.length + T2.length + Ld.length;
+  const { d, close } = odlg(`<div class="dh"><h3 style="margin:0">حذف ${total} عنصر</h3><button type="button" class="dx">✕</button></div>
+    <ul style="margin:6px 0;padding-inline-start:18px">${U2.length ? `<li>${U2.length} وحدة</li>` : ''}${W.length ? `<li>${W.length} مالك (وربطهم بالوحدات)</li>` : ''}${T2.length ? `<li>${T2.length} مستأجر</li>` : ''}${Ld.length ? `<li>${Ld.length} طلب إيجار/شراء</li>` : ''}</ul>
+    ${uBlock.length || tBlock.length ? `<div class="note">مش هيتمسح – عليهم عقود (امسح العقود أو أنهيها الأول): ${[...uBlock.map(id => O.U.find(u => u.id === id)?.code), ...tBlock.map(id => O.T.find(t => t.id === id)?.name)].map(esc).join('، ')}</div>` : ''}
+    <p style="color:var(--bad)">الحذف نهائي ومش هيترجع.</p><div class="acts">${total ? `<button type="button" class="danger" id="bGo">حذف ${total} نهائياً</button>` : ''}<button type="button" class="dx">إلغاء</button></div>`);
+  d.querySelector('#bGo') && (d.querySelector('#bGo').onclick = async () => { const errs = [];
+    for (const [t, ids] of [['leads', Ld], ['unit_owners', W], ['tenants', T2], ['mall_units', U2]]) if (ids.length) { const { error } = await S.sb.from(t).delete().in('id', ids); if (error) errs.push(error.message); }
+    if (errs.length) toast('حصلت مشكلة: ' + errs[0]); else toast(`✓ اتمسح ${total} عنصر`); close(); O.sel = new Set(); O.selMode = false; renderOps(); });
+}
 /* clients (CRM): owners, tenants, rent/buy prospects + waiting list by unit type */
 const LK = { rent: 'طالب إيجار', buy: 'طالب شراء' }, LST = { waiting: ['pend', 'في الانتظار'], contacted: ['run', 'اتواصلنا'], offered: ['run', 'اتعرض عليه وحدة'], won: ['appr', 'اتعاقد'], lost: ['ret', 'مش مهتم'] };
 const CTYPE = { owner: ['مالك', '#7a4fb3'], tenant: ['مستأجر', '#1d7a4f'], rent: ['طالب إيجار', '#c98a12'], buy: ['طالب شراء', '#2e6f9e'] };
@@ -361,9 +414,9 @@ function clientsPane(U, B) {
     ...O.LD.map(l => ({ t: l.kind, id: l.id, name: l.name, phone: l.phone, sub: `${l.unit_id ? 'وحدة ' + esc(O.U.find(u => u.id === l.unit_id)?.code || '') : esc(l.utype || 'أي نوع')}${l.area_min || l.area_max ? ` · ${l.area_min || 0}–${l.area_max || '∞'} م2` : ''}${l.budget ? ' · ' + nf(l.budget, 0) + (l.kind === 'rent' ? ' ج/شهر' : ' ج') : ''} · <span class="st ${LST[l.status][0]}">${LST[l.status][1]}</span>${openLead(l) && matchUnits(l).length ? ` · <b style="color:var(--ok)">${matchUnits(l).length} وحدة مناسبة متاحة</b>` : ''}`, att: 'data-lead', closed: !openLead(l) }))
   ].filter(r => (f === 'all' ? !r.closed : f === 'closed' ? r.closed : r.t === f && !r.closed) && (!q || (r.name + ' ' + (r.phone || '') + ' ' + r.sub).includes(q)));
   const cnt = k => k === 'all' ? null : k === 'closed' ? O.LD.filter(l => !openLead(l)).length : k === 'owner' ? O.W.length : k === 'tenant' ? O.T.length : O.LD.filter(l => l.kind === k && openLead(l)).length;
-  return `<div class="filters" style="margin-top:0"><input id="clQ" type="search" placeholder="بحث بالاسم أو التليفون أو الوحدة" value="${esc(q)}"><div class="addm"><button type="button" class="p">+ عميل</button><div class="addmenu">${Object.entries(CTYPE).map(([k, [l, c]]) => `<button type="button" data-cadd="${k}"><i style="background:${c}"></i>${l}</button>`).join('')}</div></div><label class="btn" style="margin:0">⬆ استيراد ملاك<input id="owImp" type="file" accept=".xlsx,.xls,.csv" hidden></label></div>
+  return `<div class="filters" style="margin-top:0"><input id="clQ" type="search" placeholder="بحث بالاسم أو التليفون أو الوحدة" value="${esc(q)}"><div class="addm"><button type="button" class="p">+ عميل</button><div class="addmenu">${Object.entries(CTYPE).map(([k, [l, c]]) => `<button type="button" data-cadd="${k}"><i style="background:${c}"></i>${l}</button>`).join('')}</div></div><label class="btn" style="margin:0">⬆ استيراد ملاك<input id="owImp" type="file" accept=".xlsx,.xls,.csv" hidden></label><button type="button" id="selT" class="${O.selMode ? 'p' : ''}">${O.selMode ? 'إنهاء التحديد' : '☑ تحديد متعدد'}</button></div>
   <div class="cfilt">${[['all', 'الكل'], ...Object.entries(CTYPE).map(([k, [l]]) => [k, l]), ['closed', 'طلبات مقفولة']].map(([k, l]) => `<button type="button" data-cf="${k}" class="${f === k ? 'on' : ''}"${CTYPE[k] ? ` style="--c:${CTYPE[k][1]}"` : ''}>${l}${cnt(k) != null ? ` <small>${cnt(k)}</small>` : ''}</button>`).join('')}</div>
-  ${rows.length ? `<div class="vlist">${rows.map(r => `<button type="button" class="vrow crow" ${r.att}="${r.id}" style="--c:${CTYPE[r.t][1]}"><span class="ctag">${CTYPE[r.t][0]}</span><div style="flex:1;min-width:0;text-align:right"><b>${esc(r.name)}</b> <span class="mut" style="font-size:12px" dir="ltr">${esc(r.phone || '')}</span><div class="mut" style="font-size:12px">${r.sub}</div></div></button>`).join('')}</div>` : '<p class="mut">مفيش عملاء بالفلتر ده.</p>'}`;
+  ${O.selMode && rows.length ? `<p style="margin:0 0 6px"><a href="#" data-selvis="${rows.map(r => r.t + ':' + r.id).join(',')}">تحديد كل الظاهر (${rows.length})</a></p>` : ''}${rows.length ? `<div class="vlist">${rows.map(r => `<button type="button" class="vrow crow${O.sel?.has(r.t + ':' + r.id) ? ' sel' : ''}" ${O.selMode ? `data-pick="${r.t}:${r.id}"` : `${r.att}="${r.id}"`} style="--c:${CTYPE[r.t][1]}">${O.selMode ? `<i class="ck">${O.sel.has(r.t + ':' + r.id) ? '✓' : ''}</i>` : ''}<span class="ctag">${CTYPE[r.t][0]}</span><div style="flex:1;min-width:0;text-align:right"><b>${esc(r.name)}</b> <span class="mut" style="font-size:12px" dir="ltr">${esc(r.phone || '')}</span><div class="mut" style="font-size:12px">${r.sub}</div></div></button>`).join('')}</div>` : '<p class="mut">مفيش عملاء بالفلتر ده.</p>'}`;
 }
 function waitPane() {
   const O = S.ops, open = O.LD.filter(openLead), groups = {};
