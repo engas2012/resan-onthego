@@ -56,7 +56,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 2.10.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 3.0.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -92,13 +92,13 @@ async function afterLogin(user) {
 const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', 'الجدول الزمني', null], ['tasks', 'مهام المكتب الفني', 'tasks'], ['boq', 'المقايسة والتكلفة', 'boq'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة المكتب الفني', 'review'], ['log', 'سجل التقارير', 'log'], ['store', 'المخزن', 'store'], ['inv', 'المستخلصات', 'inv'], ['docs', 'المستندات', 'docs']];
 function shell(pid, view) {
   const p = pid && S.projects.find(x => x.id === pid);
-  return `<header><div class="hbar"><a class="brandlink" href="#home" title="الصفحة الرئيسية">${LOGO()}<span class="otg">On the go</span></a>
-  <div class="who2"><a class="bell${view === 'alerts' ? ' on' : ''}" href="#alerts" title="التنبيهات"><svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span class="badge" id="bellN" hidden></span></a><a class="homeb${!p && !['admin', 'staff', 'alerts'].includes(view) ? ' on' : ''}" href="#home"><svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M5.5 9.5V20h5v-6h3v6h5V9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>الرئيسية</a>${p ? `<span class="roleTag">${ROLE[role(pid)] || ''}</span>` : ''}<span class="uname">${esc(S.profile.full_name || S.profile.email)}</span>${S.admin ? '<a href="#staff" class="adm">فريق العمل</a><a href="#admin" class="adm">المستخدمين</a>' : ''}<button id="out">خروج</button></div></div>
-  ${p ? `<div class="ptitle"><h1>${esc(p.name + ' – ' + p.place)}</h1><p>المالك: ${esc(p.owner_name)} · المقاول العام: ${esc(p.contractor_name)} · الاستشاري: ${esc(p.consultant_name)}</p></div>` : '<div class="ptitle"><h1>متابعة مشروعات الغردقة</h1></div>'}
+  return `<header><div class="hbar"><a class="brandlink" href="${hubOn() ? '#start' : '#home'}" title="الصفحة الرئيسية">${LOGO()}<span class="otg">On the go</span></a>
+  <div class="who2"><a class="bell${view === 'alerts' ? ' on' : ''}" href="#alerts" title="التنبيهات"><svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span class="badge" id="bellN" hidden></span></a><a class="homeb${!p && (view === 'start' || (!hubOn() && !['admin', 'staff', 'alerts', 'hr', 'ops'].includes(view))) ? ' on' : ''}" href="${hubOn() ? '#start' : '#home'}"><svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M5.5 9.5V20h5v-6h3v6h5V9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>الرئيسية</a>${p ? `<span class="roleTag">${ROLE[role(pid)] || ''}</span>` : ''}<span class="uname">${esc(S.profile.full_name || S.profile.email)}</span>${S.admin ? '<a href="#admin" class="adm">المستخدمين</a>' : ''}<button id="out">خروج</button></div></div>
+  ${p ? `<div class="ptitle">${modCrumb('home')}<h1>${esc(p.name + ' – ' + p.place)}</h1><p>المالك: ${esc(p.owner_name)} · المقاول العام: ${esc(p.contractor_name)} · الاستشاري: ${esc(p.consultant_name)}</p></div>` : `<div class="ptitle">${modCrumb(view)}<h1>${esc(MODT[modOf(view)] || 'متابعة مشروعات الغردقة')}</h1></div>`}
   <nav>${p ? VIEWS.filter(v => !v[2] || can(v[2], pid)).map(([v, l]) => `<a href="#p/${pid}/${v}" class="${v === view ? 'on' : ''}">${l}${v === 'review' ? ' <span class="badge" id="pendN" hidden></span>' : ''}${v === 'tasks' ? ' <span class="badge" id="taskN" hidden></span>' : ''}</a>`).join('') : ''}</nav></header><main id="main"><p class="mut">جاري التحميل…</p></main>`;
 }
 async function route() {
-  const h = location.hash.slice(1) || 'home', m = h.match(/^p\/([a-z0-9_-]+)\/([a-z]+)$/);
+  const h = location.hash.slice(1) || (hubOn() ? 'start' : 'home'), m = h.match(/^p\/([a-z0-9_-]+)\/([a-z]+)$/);
   if (m && S.projects.some(p => p.id === m[1])) {
     const [, pid, view] = m;
     $('#app').innerHTML = shell(pid, view); bindOut();
@@ -117,7 +117,9 @@ async function route() {
   }
   $('#app').innerHTML = shell(null, h); bindOut();
   if (h === 'admin' && S.admin) return renderAdmin();
-  if (h === 'staff' && S.admin) return renderStaff();
+  if ((h === 'staff' || h === 'hr') && S.admin) return renderStaff();
+  if (h === 'ops' && S.admin) return renderOps();
+  if (h === 'start' && hubOn()) return renderHub();
   if (h === 'alerts') return renderAlerts();
   renderHome();
 }
@@ -149,6 +151,32 @@ const overall = list => { const W = list.reduce((s, x) => s + (+x.weight || 0), 
 const groupPct = rows => { const v = rows.filter(r => r.w > 0), avg = v.length ? v.reduce((s, r) => s + r.w, 0) / v.length : 1; let a = 0, b = 0; rows.forEach(r => { const w = r.w > 0 ? r.w : avg; a += w * Math.min(r.pct, 1); b += w; }); return b ? a / b : 0; };
 
 /* ---------------- home ---------------- */
+/* ---------------- main hub: Construction / HR / Operations ---------------- */
+const hubOn = () => !!S.admin;
+const modOf = v => v === 'start' ? 'start' : ['hr', 'staff'].includes(v) ? 'hr' : v === 'ops' ? 'ops' : ['admin', 'alerts'].includes(v) ? 'start' : 'home';
+const MODT = { start: 'RESAN On the go', home: 'Construction – مشروعات المقاولات', hr: 'HR – الموارد البشرية', ops: 'إدارة التشغيل – المولات' };
+const MODN = { home: 'Construction', hr: 'HR', ops: 'إدارة التشغيل' };
+const modCrumb = v => { const m = modOf(v); return hubOn() && MODN[m] ? `<a class="crumb" href="#start">الرئيسية</a> <span class="crumb">›</span> <a class="crumb" href="${m === 'home' ? '#home' : '#' + m}">${MODN[m]}</a>` : ''; };
+async function renderHub() {
+  const [pp, st] = await Promise.all([Promise.all(S.projects.map(p => S.sb.rpc('phase_progress', { p_project: p.id }).then(r => ({ p, ov: overall(r.data || []) })))), S.sb.from('staff').select('id,active')]);
+  const staffN = (st.data || []).filter(x => x.active !== false).length;
+  const tile = (href, cls, ico, en, ar, body, foot) => `<a class="hubt ${cls}" href="${href}"><div class="hico">${ico}</div><div class="hen">${en}</div><div class="har">${ar}</div><div class="hbody">${body}</div><div class="hfoot">${foot} ←</div></a>`;
+  const crane = '<svg viewBox="0 0 64 64" width="44" height="44" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"><path d="M14 58V14l6-6 6 6v44M8 58h28M20 14h38M26 14l26 0M46 14v14M42 28h8v6h-8zM20 22l6 6M26 22l-6 6M20 34l6 6M26 34l-6 6"/></svg>';
+  const ppl = '<svg viewBox="0 0 64 64" width="44" height="44" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><circle cx="24" cy="22" r="8"/><circle cx="44" cy="24" r="6"/><path d="M8 52c0-9 7-16 16-16s16 7 16 16M38 38c8-2 18 3 18 14"/></svg>';
+  const mall = '<svg viewBox="0 0 64 64" width="44" height="44" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M6 26 12 10h40l6 16zM10 26v30h44V26M6 26h52M22 56V40h20v16M16 32h6M42 32h6"/></svg>';
+  $('#main').innerHTML = `<div class="hubhi"><b>أهلاً ${esc((S.profile.full_name || '').split(' ')[0] || '')}</b><span class="mut">اختار القسم</span></div><div class="hubg">
+    ${tile('#home', 'c1', crane, 'Construction', 'مشروعات المقاولات', `${pp.map(x => `<div class="hrow"><span>${esc(x.p.name)}</span><div class="bar"><u style="width:${Math.round(x.ov * 100)}%"></u></div><em>${Math.round(x.ov * 100)}%</em></div>`).join('')}`, `${S.projects.length} مشروع`)}
+    ${tile('#hr', 'c2', ppl, 'HR', 'الموارد البشرية', `<div class="hbig">${staffN}</div><div class="mut">فرد في فريق العمل · الحضور ومواعيد الوصول</div>`, 'فريق العمل والتقييم')}
+    ${tile('#ops', 'c3', mall, 'Operations', 'إدارة التشغيل', '<div class="mut">إدارة تشغيل المولات المملوكة: الوحدات والمستأجرين والتحصيل والصيانة.</div>', 'قيد الإعداد')}
+  </div>`;
+}
+function renderOps() {
+  const sec = [['🏬', 'المولات والوحدات', 'كل مول ووحداته: المساحة، الدور، النشاط، حالة الوحدة (مؤجرة/فاضية/تحت التجهيز).'], ['📝', 'المستأجرين والعقود', 'بيانات المستأجر، مدة العقد، الإيجار والزيادة السنوية، التأمين، تنبيه قبل انتهاء العقد.'],
+    ['💰', 'التحصيل', 'الإيجارات ومصاريف الخدمات المستحقة والمحصلة والمتأخرات لكل وحدة ولكل مول.'], ['🛠', 'الصيانة والتشغيل', 'طلبات الصيانة وأوامر الشغل، عقود الصيانة الدورية (مصاعد، تكييف، حريق)، والمصروفات.'],
+    ['⚡', 'المرافق', 'قراءات عدادات الكهرباء والمياه وتوزيعها على الوحدات.'], ['📊', 'لوحة الأداء', 'نسبة الإشغال، الإيراد الشهري، المتأخرات، ومصروفات التشغيل.']];
+  $('#main').innerHTML = `<div class="note">القسم ده قيد الإعداد. ده المقترح المبدئي لمحتواه – هيتبني بالتدريج حسب احتياجك.</div><div class="opsg">${sec.map(([i, t, d]) => `<div class="card opsc"><div style="font-size:26px">${i}</div><b>${t}</b><p class="mut" style="margin:4px 0 0;font-size:13px">${d}</p></div>`).join('')}</div>`;
+}
+
 async function renderHome() {
   const cards = await Promise.all(S.projects.map(async p => { const [a, w, u] = await Promise.all([S.sb.rpc('phase_progress', { p_project: p.id }), S.sb.rpc('active_work', { p_project: p.id, p_limit: 8 }), S.sb.rpc('site_updates', { p_project: p.id, p_n: 2 })]); return { p, list: a.data || [], work: w.data || [], upd: u.data || [] }; }));
   $('#main').innerHTML = `<h2>المشاريع</h2><div class="pgrid">${cards.map(({ p, list, work, upd }) => `<article class="pc"><div class="row2"><div><h2>${esc(p.name)}</h2><div class="mut">${esc(p.place)}${p.land ? ' · أرض ' + esc(p.land) : ''} · <span class="roleTag">${ROLE[role(p.id)] || ''}</span></div></div><div class="pbig">${list.length ? Math.round(overall(list) * 100) + '%' : '–'}</div></div>
