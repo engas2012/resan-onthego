@@ -83,9 +83,10 @@ async function afterLogin(user) {
   ]);
   const { data: um } = await S.sb.from('user_modules').select('module,position').eq('user_id', user.id); S.mods = Object.fromEntries((um || []).map(x => [x.module, x.position]));
   S.profile = prof || { email: user.email }; S.admin = !!prof?.is_admin; S.opsU = !!(prof?.is_admin || prof?.ops || S.mods.ops); S.opsEdit = !!(prof?.is_admin || prof?.ops || ['manager', 'accountant'].includes(S.mods.ops));
+  S.studyU = !!(prof?.is_admin || S.mods.study); S.studyEdit = !!(prof?.is_admin || S.mods.study === 'editor');
   S.roles = Object.fromEntries((mem || []).map(m => [m.project_id, m.role]));
   S.projects = projs || [];
-  if (!S.projects.length && !S.opsU) return fatal('حسابك لسه مش مضاف على أي مشروع. كلّم مدير النظام.');
+  if (!S.projects.length && !S.opsU && !S.studyU) return fatal('حسابك لسه مش مضاف على أي مشروع. كلّم مدير النظام.');
   if (!S.routed) { addEventListener('hashchange', route); S.routed = true; } route();
 }
 
@@ -94,7 +95,7 @@ const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', '
 function shell(pid, view) {
   const p = pid && S.projects.find(x => x.id === pid);
   return `<header><div class="hbar"><a class="brandlink" href="${hubOn() ? '#start' : '#home'}" title="الصفحة الرئيسية">${LOGO()}<span class="otg">On the go</span></a>
-  <div class="who2"><a class="bell${view === 'alerts' ? ' on' : ''}" href="#alerts" title="التنبيهات"><svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span class="badge" id="bellN" hidden></span></a><a class="homeb${!p && (view === 'start' || (!hubOn() && !['admin', 'staff', 'alerts', 'hr', 'ops'].includes(view))) ? ' on' : ''}" href="${hubOn() ? '#start' : '#home'}"><svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M5.5 9.5V20h5v-6h3v6h5V9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>الرئيسية</a>${p ? `<span class="roleTag">${ROLE[role(pid)] || ''}</span>` : ''}<span class="uname">${esc(S.profile.full_name || S.profile.email)}</span>${S.admin ? '<a href="#admin" class="adm">المستخدمين</a>' : ''}<button id="out">خروج</button></div></div>
+  <div class="who2"><a class="bell${view === 'alerts' ? ' on' : ''}" href="#alerts" title="التنبيهات"><svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span class="badge" id="bellN" hidden></span></a><a class="homeb${!p && (view === 'start' || (!hubOn() && !['admin', 'staff', 'alerts', 'hr', 'ops', 'study'].includes(view))) ? ' on' : ''}" href="${hubOn() ? '#start' : '#home'}"><svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M5.5 9.5V20h5v-6h3v6h5V9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>الرئيسية</a>${p ? `<span class="roleTag">${ROLE[role(pid)] || ''}</span>` : ''}<span class="uname">${esc(S.profile.full_name || S.profile.email)}</span>${S.admin ? '<a href="#admin" class="adm">المستخدمين</a>' : ''}<button id="out">خروج</button></div></div>
   ${p ? `<div class="ptitle">${modCrumb('home')}<h1>${esc(p.name + ' – ' + p.place)}</h1><p>المالك: ${esc(p.owner_name)} · المقاول العام: ${esc(p.contractor_name)} · الاستشاري: ${esc(p.consultant_name)}</p></div>` : `<div class="ptitle">${modCrumb(view)}<h1>${esc(MODT[modOf(view)] || 'متابعة مشروعات الغردقة')}</h1></div>`}
   <nav>${p ? VIEWS.filter(v => !v[2] || can(v[2], pid)).map(([v, l]) => `<a href="#p/${pid}/${v}" class="${v === view ? 'on' : ''}">${l}${v === 'review' ? ' <span class="badge" id="pendN" hidden></span>' : ''}${v === 'tasks' ? ' <span class="badge" id="taskN" hidden></span>' : ''}</a>`).join('') : ''}</nav></header><main id="main"><p class="mut">جاري التحميل…</p></main>`;
 }
@@ -121,9 +122,11 @@ async function route() {
   if (h === 'admin' && S.admin) return renderAdmin();
   if ((h === 'staff' || h === 'hr') && S.admin) return renderStaff();
   if (h === 'ops' && S.opsU) return renderOps();
+  if (h === 'study' && S.studyU) return renderStudy();
   if (h === 'start' && hubOn()) return renderHub();
   if (h === 'alerts') return renderAlerts();
   if (!S.projects.length && S.opsU) { location.hash = '#ops'; return; }
+  if (!S.projects.length && S.studyU) { location.hash = '#study'; return; }
   renderHome();
 }
 const bindOut = () => { $('#out').onclick = () => S.sb.auth.signOut(); updateBell(); };
@@ -155,11 +158,11 @@ const groupPct = rows => { const v = rows.filter(r => r.w > 0), avg = v.length ?
 
 /* ---------------- home ---------------- */
 /* ---------------- main hub: Construction / HR / Operations ---------------- */
-const myMods = () => [S.projects.length && 'home', S.opsU && 'ops', S.admin && 'hr'].filter(Boolean);
+const myMods = () => [S.projects.length && 'home', S.opsU && 'ops', S.studyU && 'study', S.admin && 'hr'].filter(Boolean);
 const hubOn = () => myMods().length > 1;
-const modOf = v => v === 'start' ? 'start' : ['hr', 'staff'].includes(v) ? 'hr' : v === 'ops' ? 'ops' : ['admin', 'alerts'].includes(v) ? 'start' : 'home';
-const MODT = { start: 'RESAN On the go', home: 'Construction – مشروعات المقاولات', hr: 'HR – الموارد البشرية', ops: 'إدارة التشغيل – المولات' };
-const MODN = { home: 'Construction', hr: 'HR', ops: 'إدارة التشغيل' };
+const modOf = v => v === 'start' ? 'start' : ['hr', 'staff'].includes(v) ? 'hr' : v === 'ops' ? 'ops' : v === 'study' ? 'study' : ['admin', 'alerts'].includes(v) ? 'start' : 'home';
+const MODT = { start: 'RESAN On the go', home: 'Construction – مشروعات المقاولات', hr: 'HR – الموارد البشرية', ops: 'إدارة التشغيل – المولات', study: 'دراسة المشروعات – دراسات الجدوى' };
+const MODN = { home: 'Construction', hr: 'HR', ops: 'إدارة التشغيل', study: 'دراسة المشروعات' };
 const modCrumb = v => { const m = modOf(v); return hubOn() && MODN[m] ? `<a class="crumb" href="#start">الرئيسية</a> <span class="crumb">›</span> <a class="crumb" href="${m === 'home' ? '#home' : '#' + m}">${MODN[m]}</a>` : ''; };
 async function renderHub() {
   const [pp, st] = await Promise.all([Promise.all(S.projects.map(p => S.sb.rpc('phase_progress', { p_project: p.id }).then(r => ({ p, ov: overall(r.data || []) })))), S.admin ? S.sb.from('staff').select('id,active') : Promise.resolve({ data: [] })]);
@@ -170,11 +173,19 @@ async function renderHub() {
   const crane = '<svg viewBox="0 0 64 64" width="44" height="44" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"><path d="M14 58V14l6-6 6 6v44M8 58h28M20 14h38M26 14l26 0M46 14v14M42 28h8v6h-8zM20 22l6 6M26 22l-6 6M20 34l6 6M26 34l-6 6"/></svg>';
   const ppl = '<svg viewBox="0 0 64 64" width="44" height="44" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><circle cx="24" cy="22" r="8"/><circle cx="44" cy="24" r="6"/><path d="M8 52c0-9 7-16 16-16s16 7 16 16M38 38c8-2 18 3 18 14"/></svg>';
   const mall = '<svg viewBox="0 0 64 64" width="44" height="44" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M6 26 12 10h40l6 16zM10 26v30h44V26M6 26h52M22 56V40h20v16M16 32h6M42 32h6"/></svg>';
+  let studies = []; if (S.studyU) { const r = await S.sb.from('feasibility_studies').select('name,net_profit,updated_at').order('updated_at', { ascending: false }).limit(3); studies = r.data || []; }
+  const calc = '<svg viewBox="0 0 64 64" width="44" height="44" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"><rect x="12" y="6" width="40" height="52" rx="5"/><rect x="18" y="12" width="28" height="10" rx="2"/><path d="M20 32h4M30 32h4M40 32h4M20 41h4M30 41h4M40 41v10M20 50h4M30 50h4"/></svg>';
   $('#main').innerHTML = `<div class="hubhi"><b>أهلاً ${esc((S.profile.full_name || '').split(' ')[0] || '')}</b><span class="mut">اختار القسم</span></div><div class="hubg">
     ${!S.projects.length ? '' : tile('#home', 'c1', crane, 'Construction', 'مشروعات المقاولات', `${pp.map(x => `<div class="hrow"><span>${esc(x.p.name)}</span><div class="bar"><u style="width:${Math.round(x.ov * 100)}%"></u></div><em>${Math.round(x.ov * 100)}%</em></div>`).join('')}`, `${S.projects.length} مشروع`)}
+    ${!S.studyU ? '' : tile('#study', 'c4', calc, 'Feasibility', 'دراسة المشروعات', studies.length ? studies.map(x => `<div class="hrow hst"><span>${esc(x.name)}</span><em>${money(+x.net_profit || 0)}</em></div>`).join('') : '<div class="mut">حاسبة دراسات الجدوى: الأرض والأدوار والتكلفة وسعر البيع ← تقرير جاهز.</div>', studies.length ? 'كل الدراسات' : 'ابدأ أول دراسة')}
     ${!S.admin ? '' : tile('#hr', 'c2', ppl, 'HR', 'الموارد البشرية', `<div class="hbig">${staffN}</div><div class="mut">فرد في فريق العمل · الحضور ومواعيد الوصول</div>`, 'فريق العمل والإجازات')}
     ${!S.opsU ? '' : tile('#ops', 'c3', mall, 'Operations', 'إدارة التشغيل', ops.units ? `<div class="hbig">${ops.occ}%</div><div class="mut">إشغال ${ops.units} وحدة في ${ops.malls} مول${ops.arr ? ` · متأخرات ${nf(ops.arr, 0)}` : ''}</div>` : '<div class="mut">المولات والوحدات والعقود والتحصيل.</div>', ops.units ? 'الوحدات والعقود والتحصيل' : 'ابدأ بإضافة المولات')}
   </div>`;
+}
+/* ---------------- Feasibility studies (lazy module) ---------------- */
+async function renderStudy() {
+  try { const m = await import('./study.js'); await m.mount($('#main'), { sb: S.sb, toast, esc, canEdit: S.studyEdit }); }
+  catch (e) { $('#main').innerHTML = `<div class="note">مقدرتش أفتح قسم الدراسات: ${esc(e.message)}</div>`; }
 }
 /* ---------------- Operations: malls / units / leases / collection ---------------- */
 const USTAT = { leased: ['مؤجرة', '#1d7a4f'], vacant: ['فاضية', '#b3261e'], fitout: ['تحت التجهيز', '#c98a12'], owner: ['استخدام المالك', '#5b6b7a'] };
@@ -1683,20 +1694,21 @@ function staffDetail(e, recs) {
 /* ---------------- admin: members ---------------- */
 async function adminFn(body) { const { data, error } = await S.sb.functions.invoke('admin-users', { body }); if (error) { let m = error.message; try { m = (await error.context.json()).error || m; } catch {} return { error: m }; } return data || {}; }
 const ORG = { resan: 'فريق ريسان', consultant: 'الاستشاري', owner: 'المالك', subcontractor: 'مقاول باطن', other: 'جهة أخرى' };
-const MODS = { construction: { name: 'Construction – المقاولات', note: 'الدور بيتحدد لكل مشروع' }, ops: { name: 'إدارة التشغيل – المولات', pos: { manager: 'مدير التشغيل (صلاحية كاملة)', accountant: 'محاسب / تحصيل', viewer: 'متابعة فقط (قراءة)' } } };
+const MODS = { construction: { name: 'Construction – المقاولات', note: 'الدور بيتحدد لكل مشروع' }, ops: { name: 'إدارة التشغيل – المولات', pos: { manager: 'مدير التشغيل (صلاحية كاملة)', accountant: 'محاسب / تحصيل', viewer: 'متابعة فقط (قراءة)' } }, study: { name: 'دراسة المشروعات – دراسات الجدوى', pos: { editor: 'إعداد الدراسات (إضافة وتعديل)', viewer: 'اطلاع على الدراسات فقط' } } };
 const ORGROLES = { resan: ['site', 'tech', 'finance', 'management', 'store'], consultant: ['consultant'], owner: ['owner'], subcontractor: ['site'], other: Object.keys(ROLE) };
 function userModsForm(u, mem, um) {
-  const org = u.org || 'resan', hasC = S.projects.some(p => mem[u.id + '|' + p.id]) || !u.id, opsPos = um[u.id] || (u.ops ? 'manager' : '');
+  const org = u.org || 'resan', hasC = S.projects.some(p => mem[u.id + '|' + p.id]) || !u.id, opsPos = um[u.id] || (u.ops ? 'manager' : ''), stPos = (S.umStudy || {})[u.id] || '';
   return `<label class="wide">الجهة<select name="org">${Object.entries(ORG).map(([k, l]) => `<option value="${k}"${org === k ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
   <div class="wide modbox"><label class="modh"><input type="checkbox" name="m_c"${hasC ? ' checked' : ''}> <b>1. ${MODS.construction.name}</b></label><div class="modb" data-mb="c">${S.projects.map(p => `<label>${esc(p.name)}<select name="r_${p.id}" data-rs><option value="">— ملوش دخول —</option>${Object.entries(ROLE).map(([k, l]) => `<option value="${k}"${mem[u.id + '|' + p.id] === k ? ' selected' : ''}>${l}</option>`).join('')}</select></label>`).join('')}<p class="mut" style="margin:0;font-size:12px">${MODS.construction.note}</p></div></div>
-  <div class="wide modbox"><label class="modh"><input type="checkbox" name="m_o"${opsPos ? ' checked' : ''}> <b>2. ${MODS.ops.name}</b></label><div class="modb" data-mb="o"><label>الوظيفة<select name="opos">${Object.entries(MODS.ops.pos).map(([k, l]) => `<option value="${k}"${opsPos === k ? ' selected' : ''}>${l}</option>`).join('')}</select></label></div></div>`;
+  <div class="wide modbox"><label class="modh"><input type="checkbox" name="m_o"${opsPos ? ' checked' : ''}> <b>2. ${MODS.ops.name}</b></label><div class="modb" data-mb="o"><label>الوظيفة<select name="opos">${Object.entries(MODS.ops.pos).map(([k, l]) => `<option value="${k}"${opsPos === k ? ' selected' : ''}>${l}</option>`).join('')}</select></label></div></div>
+  <div class="wide modbox"><label class="modh"><input type="checkbox" name="m_s"${stPos ? ' checked' : ''}> <b>3. ${MODS.study.name}</b></label><div class="modb" data-mb="s"><label>الصلاحية<select name="spos">${Object.entries(MODS.study.pos).map(([k, l]) => `<option value="${k}"${stPos === k ? ' selected' : ''}>${l}</option>`).join('')}</select></label></div></div>`;
 }
 function bindModsForm(f) {
-  const sync = () => { f.querySelector('[data-mb=c]').hidden = !f.m_c.checked; f.querySelector('[data-mb=o]').hidden = !f.m_o.checked;
+  const sync = () => { f.querySelector('[data-mb=c]').hidden = !f.m_c.checked; f.querySelector('[data-mb=o]').hidden = !f.m_o.checked; f.querySelector('[data-mb=s]').hidden = !f.m_s.checked;
     const allowed = ORGROLES[f.org.value] || Object.keys(ROLE); f.querySelectorAll('[data-rs] option[value]').forEach(o => { if (o.value) o.hidden = !allowed.includes(o.value); }); };
-  f.m_c.onchange = f.m_o.onchange = sync; f.org.onchange = () => { const al = ORGROLES[f.org.value]; f.querySelectorAll('[data-rs]').forEach(s => { if (s.value && !al.includes(s.value)) s.value = ''; if (!s.value && al.length === 1 && f.m_c.checked) s.value = al[0]; }); sync(); }; sync();
+  f.m_c.onchange = f.m_o.onchange = f.m_s.onchange = sync; f.org.onchange = () => { const al = ORGROLES[f.org.value]; f.querySelectorAll('[data-rs]').forEach(s => { if (s.value && !al.includes(s.value)) s.value = ''; if (!s.value && al.length === 1 && f.m_c.checked) s.value = al[0]; }); sync(); }; sync();
 }
-const readMods = f => ({ org: f.org.value, roles: f.m_c.checked ? S.projects.map(p => ({ project_id: p.id, role: f['r_' + p.id].value })).filter(r => r.role) : [], ops: f.m_o.checked ? f.opos.value : null });
+const readMods = f => ({ org: f.org.value, roles: f.m_c.checked ? S.projects.map(p => ({ project_id: p.id, role: f['r_' + p.id].value })).filter(r => r.role) : [], ops: f.m_o.checked ? f.opos.value : null, study: f.m_s.checked ? f.spos.value : null });
 function newUser(ctx) {
   const gen = () => Array.from(crypto.getRandomValues(new Uint8Array(10)), b => 'abcdefghjkmnpqrstuvwxyz23456789'[b % 31]).join('');
   const d = document.createElement('dialog'); d.className = 'adlg';
@@ -1706,8 +1718,8 @@ function newUser(ctx) {
     ${userModsForm({}, ctx.mem, ctx.um)}</div><p class="mut" style="font-size:12px">اختار الأقسام اللي هيدخل عليها، وبعدين وظيفته في كل قسم. لو له قسم واحد بيفتح عليه على طول، ولو أكتر بتظهر له الشاشة الرئيسية بالأقسام بتاعته بس.</p><div class="acts"><button class="p">إنشاء المستخدم</button></div></form>`;
   document.body.append(d); d.showModal(); const f = d.querySelector('form'), close = () => { d.close(); d.remove(); }; bindModsForm(f);
   d.addEventListener('click', e => { if (e.target === d || e.target.closest('.dx')) close(); if (e.target.id === 'pg') f.p.value = gen(); });
-  f.onsubmit = async e => { e.preventDefault(); const m = readMods(f); if (!m.roles.length && !m.ops) return toast('اختار قسم ووظيفة واحدة على الأقل'); const b = f.querySelector('button.p'); b.disabled = true;
-    const r = await adminFn({ action: 'create', full_name: f.n.value.trim(), email: f.e.value.trim(), password: f.p.value, org: m.org, roles: m.roles, modules: m.ops ? [{ module: 'ops', position: m.ops }] : [] });
+  f.onsubmit = async e => { e.preventDefault(); const m = readMods(f); if (!m.roles.length && !m.ops && !m.study) return toast('اختار قسم ووظيفة واحدة على الأقل'); const b = f.querySelector('button.p'); b.disabled = true;
+    const r = await adminFn({ action: 'create', full_name: f.n.value.trim(), email: f.e.value.trim(), password: f.p.value, org: m.org, roles: m.roles, modules: [m.ops && { module: 'ops', position: m.ops }, m.study && { module: 'study', position: m.study }].filter(Boolean) });
     if (r.error) { b.disabled = false; return toast(r.error); }
     const msg = `رابط النظام: ${location.origin}\nالإيميل: ${f.e.value.trim()}\nكلمة السر: ${f.p.value}`;
     f.innerHTML = `<div class="dh"><h3 style="margin:0">✓ اتعمل المستخدم</h3><button type="button" class="dx">✕</button></div><p>ابعت له البيانات دي:</p><pre class="cred" dir="auto">${esc(msg)}</pre><div class="acts"><button type="button" class="p" id="cp">نسخ</button><a class="btn" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(msg)}">إرسال واتساب</a></div>`;
@@ -1726,14 +1738,15 @@ function editUser(u, ctx) {
     for (const p of S.projects) { const role = m.roles.find(x => x.project_id === p.id)?.role, old = ctx.mem[u.id + '|' + p.id]; if (role === old) continue;
       const r = role ? await S.sb.from('project_members').upsert({ user_id: u.id, project_id: p.id, role }) : await S.sb.from('project_members').delete().eq('user_id', u.id).eq('project_id', p.id); if (r.error) errs.push(r.error.message); }
     const r2 = m.ops ? await S.sb.from('user_modules').upsert({ user_id: u.id, module: 'ops', position: m.ops }) : await S.sb.from('user_modules').delete().eq('user_id', u.id).eq('module', 'ops'); if (r2.error) errs.push(r2.error.message);
+    const r3 = m.study ? await S.sb.from('user_modules').upsert({ user_id: u.id, module: 'study', position: m.study }) : await S.sb.from('user_modules').delete().eq('user_id', u.id).eq('module', 'study'); if (r3.error) errs.push(r3.error.message);
     if (errs.length) { b.disabled = false; return toast('مقدرتش أحفظ: ' + errs[0]); } toast('اتحفظ'); close(); renderAdmin(); };
 }
 async function renderAdmin() {
   const [{ data: users }, { data: mem }, { data: ums }] = await Promise.all([S.sb.from('profiles').select('*').order('email'), S.sb.from('project_members').select('*'), S.sb.from('user_modules').select('*')]);
-  const M = {}; (mem || []).forEach(m => M[m.user_id + '|' + m.project_id] = m.role); const UM = {}; (ums || []).filter(x => x.module === 'ops').forEach(x => UM[x.user_id] = x.position);
+  const M = {}; (mem || []).forEach(m => M[m.user_id + '|' + m.project_id] = m.role); const UM = {}; (ums || []).filter(x => x.module === 'ops').forEach(x => UM[x.user_id] = x.position); S.umStudy = {}; (ums || []).filter(x => x.module === 'study').forEach(x => S.umStudy[x.user_id] = x.position);
   const ctx = { mem: M, um: UM }, U = users || [];
   const chips = u => { const c = S.projects.filter(p => M[u.id + '|' + p.id]).map(p => `<span class="mchip c">🏗 ${esc(p.name)}: ${ROLE[M[u.id + '|' + p.id]]}</span>`), o = UM[u.id] || (u.ops ? 'manager' : '');
-    return u.is_admin ? '<span class="mchip a">مدير النظام – كل الأقسام</span>' : (c.join('') + (o ? `<span class="mchip o">🏬 ${MODS.ops.pos[o].split(' (')[0]}</span>` : '')) || '<span class="mut">ملوش أقسام</span>'; };
+    return u.is_admin ? '<span class="mchip a">مدير النظام – كل الأقسام</span>' : (c.join('') + (o ? `<span class="mchip o">🏬 ${MODS.ops.pos[o].split(' (')[0]}</span>` : '') + (S.umStudy[u.id] ? `<span class="mchip s">📊 دراسة المشروعات${S.umStudy[u.id] === 'viewer' ? ' (اطلاع)' : ''}</span>` : '')) || '<span class="mut">ملوش أقسام</span>'; };
   const groups = Object.keys(ORG).map(k => [k, U.filter(u => (u.org || 'resan') === k)]).filter(([, L]) => L.length);
   $('#main').innerHTML = `<div class="sthead"><h2 style="margin:0">المستخدمين والصلاحيات</h2><button id="uNew" class="p">+ مستخدم جديد</button></div>
   <p class="mut">كل مستخدم: الجهة اللي تبعها (فريق ريسان، الاستشاري، المالك…)، وبعدين الأقسام اللي يدخل عليها، ووظيفته في كل قسم. اضغط على أي مستخدم لتعديله.</p>
