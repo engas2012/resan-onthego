@@ -376,7 +376,7 @@ const CSS = `
 .fs-leg{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--pm);margin-top:4px;justify-content:center}.fs-leg i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-inline-end:5px}
 .fs-c2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px}
 .fs-dnw{display:flex;gap:14px;align-items:center}.fs-dn{width:170px;flex:none;direction:ltr}
-.fs-dl{list-style:none;margin:0;padding:0;flex:1;display:grid;gap:5px;font-size:13.5px}.fs-dl li{display:grid;grid-template-columns:12px minmax(0,1fr) 40px 52px;gap:7px;align-items:center}
+.fs-dl{list-style:none;margin:0;padding:0;flex:1;display:grid;gap:5px;font-size:13.5px}.fs-dl li{display:grid;grid-template-columns:12px minmax(0,1fr) 40px 86px;gap:7px;align-items:center}
 .fs-dl i{width:12px;height:12px;border-radius:3px}.fs-dl b,.fs-dl em{text-align:left;font-variant-numeric:tabular-nums;font-style:normal}.fs-dl em{color:var(--pm)}
 .fs-mts{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px 24px}
 .fs-mt .h{display:flex;justify-content:space-between;gap:8px;font-size:14px;margin-bottom:5px}.fs-mt .h b{font-variant-numeric:tabular-nums}.fs-mt .tr{background:var(--pb);border-radius:99px;height:12px;overflow:hidden}.fs-mt .tr div{height:100%;border-radius:99px}
@@ -402,7 +402,7 @@ body.fs-print #fsPrint{display:block}
 #fsPrint .fs-cov{padding:12px 18px 12px;margin-bottom:10px}#fsPrint .fs-cov h2{font-size:24px;margin:8px 0 8px}#fsPrint .fs-cov img{height:32px}
 #fsPrint .fs-vb{padding:10px 14px;margin-bottom:10px}#fsPrint .fs-tiles{gap:8px}#fsPrint .fs-tile{min-height:0;padding:8px 12px 8px 44px}
 #fsPrint .fs-story{gap:5px}#fsPrint .fs-story li{padding:6px 12px;font-size:12.5px;line-height:1.6}
-#fsPrint .fs-dn{width:130px}#fsPrint .fs-dnw{gap:10px}#fsPrint .fs-dl{font-size:11.5px;gap:3px}#fsPrint .fs-dl li{grid-template-columns:10px minmax(0,1fr) 34px 46px;gap:5px}
+#fsPrint .fs-dn{width:130px}#fsPrint .fs-dnw{gap:10px}#fsPrint .fs-dl{font-size:11.5px;gap:3px}#fsPrint .fs-dl li{grid-template-columns:10px minmax(0,1fr) 34px 74px;gap:5px}
 #fsPrint .fs-tile b{font-size:19px}#fsPrint .fs-vb .nv b{font-size:26px}
 #fsPrint .fs-c2{grid-template-columns:1fr 1fr}#fsPrint .fs-tiles{grid-template-columns:repeat(3,1fr)}
 }
@@ -412,7 +412,7 @@ const clone = o => JSON.parse(JSON.stringify(o));
 const nf0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const nf2 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
 const N = v => (v == null || !isFinite(v)) ? '—' : nf0.format(Math.round(v));
-const Mn = v => (v == null || !isFinite(v)) ? '—' : nf2.format(Math.round(v / 1e5) / 10) + ' مليون';
+const Mn = v => (v == null || !isFinite(v)) ? '—' : Math.abs(v) >= 1e9 ? nf2.format(Math.round(v / 1e7) / 100) + ' مليار' : nf2.format(Math.round(v / 1e5) / 10) + ' مليون';
 const Pc = v => (v == null || !isFinite(v)) ? '—' : (v * 100).toFixed(1) + '%';
 const mLabel = m => m === 0 ? 'قبل البدء' : 'شهر ' + m + ' (سنة ' + Math.ceil(m / 12) + ')';
 const USES = ['تجاري', 'إداري', 'طبي', 'سكني', 'فندقي', 'جراج', 'خدمات (غير مباع)'];
@@ -569,8 +569,11 @@ export async function mount(root, ctx) {
   const C = { in: '#1f7a8c', out: '#f26b1d', cum: '#2b3a55', good: '#2e8b57', bad: '#c0392b', mid: '#d08a12' };
   const M1 = v => (v == null || !isFinite(v)) ? '—' : (v / 1e6).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const M2 = v => (v == null || !isFinite(v)) ? '—' : (v / 1e6).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const UN = v => Math.abs(v) >= 1e9 ? [(v / 1e9).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 'مليار'] : [M1(v), 'مليون'];
+  const Sm = v => (v == null || !isFinite(v)) ? '—' : UN(v).join(' ');
+  const axU = vals => Math.max(...vals.map(Math.abs)) >= 1e9 ? [1e9, 'مليار', 1] : [1e6, 'مليون', 0];
   const yrsTxt = m => m == null ? '—' : m < 12 ? m + ' شهر' : (m / 12).toLocaleString('en-US', { maximumFractionDigits: 1 }) + ' سنة';
-  const tx = (x, y, t, o = '') => `<text x="${x}" y="${y}" ${o}>${esc(t)}</text>`;
+  const tx = (x, y, t, o = '') => `<text x="${x}" y="${y}" ${o}>\u2067${esc(t)}\u2069</text>`;
   const ticksOf = (mn, mx, n = 4) => { const rg = mx - mn || 1, st0 = rg / n, p = Math.pow(10, Math.floor(Math.log10(st0))), st = [1, 2, 2.5, 5, 10].map(k => k * p).find(k => k >= st0) || st0; const a = []; for (let v = Math.ceil(mn / st) * st; v <= mx + 1e-6; v += st) a.push(v); return a; };
 
   function donut(items, centerTop, centerBot) {
@@ -582,7 +585,7 @@ export async function mount(root, ctx) {
         s += `<path d="M${P(R, a)} A${R} ${R} 0 ${L} 1 ${P(R, b)} L${P(r, b)} A${r} ${r} 0 ${L} 0 ${P(r, a)}Z" fill="${col}" stroke="#fff" stroke-width="1.5"/>`; }
       a = b; });
     s += tx(c, c - 2, centerTop, 'text-anchor="middle" font-size="22" font-weight="800" fill="#1b1c1e"') + tx(c, c + 18, centerBot, 'text-anchor="middle" font-size="11" fill="#6b6c6f"') + '</svg>';
-    return `<div class="fs-dnw">${s}<ul class="fs-dl">${items.map(([l, v], k) => `<li><i style="background:${PAL[k % PAL.length]}"></i><span>${esc(l)}</span><b>${Math.round(v / tot * 100)}%</b><em>${M1(v)}</em></li>`).join('')}</ul></div>`;
+    return `<div class="fs-dnw">${s}<ul class="fs-dl">${items.map(([l, v], k) => `<li><i style="background:${PAL[k % PAL.length]}"></i><span>${esc(l)}</span><b>${Math.round(v / tot * 100)}%</b><em>${Sm(v)}</em></li>`).join('')}</ul></div>`;
   }
 
   function waterfall(r) {
@@ -594,7 +597,7 @@ export async function mount(root, ctx) {
     bars.forEach((b, i) => { const y1 = y(Math.max(b.a, b.b)), h = Math.max(1.5, Math.abs(y(b.a) - y(b.b)));
       s += `<rect x="${cx(i) - bw / 2}" y="${y1}" width="${bw}" height="${h}" rx="4" fill="${b.col}"/>`;
       if (i < bars.length - 1) s += `<line x1="${cx(i) - bw / 2}" x2="${cx(i + 1) + bw / 2}" y1="${y(b.b)}" y2="${y(b.b)}" stroke="#1b1c1e" stroke-opacity=".3" stroke-dasharray="4 3"/>`;
-      s += tx(cx(i), y1 - 8, (b.v < 0 && i && i < bars.length - 1 ? '−' : '') + M1(Math.abs(b.v)), `text-anchor="middle" font-size="15" font-weight="700" fill="${b.col}"`);
+      s += tx(cx(i), y1 - 8, (b.v < 0 && i && i < bars.length - 1 ? Sm(Math.abs(b.v)).replace(/^([\d.,]+)/, '\u2066−$1\u2069') : Sm(b.v)), `text-anchor="middle" font-size="15" font-weight="700" fill="${b.col}"`);
       s += tx(cx(i), H - 14, b.l, 'text-anchor="middle" font-size="14" fill="#3a3b3e"'); });
     return s + '</svg>';
   }
@@ -602,10 +605,10 @@ export async function mount(root, ctx) {
   function chartYears(r) {
     const W = 900, H = 320, ys = r.years, n = ys.length;
     const vals = ys.flatMap(a => [a.rec, -a.pay, a.cum]), T = ticksOf(Math.min(...vals, 0), Math.max(...vals, 0)), mx = Math.max(...T, ...vals), mn = Math.min(...T, ...vals), rg = (mx - mn) || 1;
-    const pl = 54, pr = 10, top = 14, bot = 34, cw = (W - pl - pr) / n, bw = Math.min(30, cw * 0.32);
+    const pl = 54, pr = 10, top = 14, bot = 34, cw = (W - pl - pr) / n, bw = Math.min(30, cw * 0.32), [ud, un, ux] = axU(vals);
     const y = v => top + (H - top - bot) * (mx - v) / rg, cx = i => W - pr - cw * (i + 0.5);
     let s = `<svg class="fs-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="التدفقات النقدية السنوية">`;
-    T.forEach(t => s += `<line x1="${pl}" x2="${W - pr}" y1="${y(t)}" y2="${y(t)}" stroke="#1b1c1e" stroke-opacity="${Math.abs(t) < 1 ? .45 : .08}"/>` + tx(pl - 6, y(t) + 4, nf0.format(Math.round(t / 1e6)), 'font-size="12" text-anchor="end" fill="#6b6c6f"'));
+    T.forEach(t => s += `<line x1="${pl}" x2="${W - pr}" y1="${y(t)}" y2="${y(t)}" stroke="#1b1c1e" stroke-opacity="${Math.abs(t) < 1 ? .45 : .08}"/>` + tx(pl - 6, y(t) + 4, (t / ud).toLocaleString('en-US', { maximumFractionDigits: ux }), 'font-size="12" text-anchor="end" fill="#6b6c6f"'));
     ys.forEach((a, i) => {
       s += `<rect x="${cx(i) + 1}" y="${y(a.rec)}" width="${bw}" height="${Math.max(0, y(0) - y(a.rec))}" fill="${C.in}" rx="3"/>`;
       s += `<rect x="${cx(i) - bw - 1}" y="${y(0)}" width="${bw}" height="${Math.max(0, y(-a.pay) - y(0))}" fill="${C.out}" rx="3"/>`;
@@ -613,20 +616,20 @@ export async function mount(root, ctx) {
     });
     s += `<polyline points="${ys.map((a, i) => cx(i) + ',' + y(a.cum)).join(' ')}" fill="none" stroke="${C.cum}" stroke-width="3" stroke-linejoin="round"/>`;
     ys.forEach((a, i) => s += `<circle cx="${cx(i)}" cy="${y(a.cum)}" r="4.5" fill="#fff" stroke="${C.cum}" stroke-width="2.5"/>`);
-    return s + '</svg>';
+    return s + tx(pl - 6, top - 2, un, 'font-size="11" text-anchor="end" fill="#6b6c6f"') + '</svg>';
   }
 
   function chartCum(r) {
     const W = 900, H = 290, cum = r.cum, n = cum.length - 1 || 1, T = ticksOf(Math.min(...cum, 0), Math.max(...cum, 0)), mx = Math.max(...T, ...cum), mn = Math.min(...T, ...cum), rg = mx - mn || 1;
-    const pl = 54, pr = 10, top = 34, bot = 30, x = m => W - pr - (W - pl - pr) * m / n, y = v => top + (H - top - bot) * (mx - v) / rg, z = y(0);
+    const [ud, un, ux] = axU(cum), pl = 54, pr = 10, top = 34, bot = 30, x = m => W - pr - (W - pl - pr) * m / n, y = v => top + (H - top - bot) * (mx - v) / rg, z = y(0);
     const pts = cum.map((v, m) => x(m).toFixed(1) + ',' + y(v).toFixed(1)).join(' '), area = `${x(0)},${z} ${pts} ${x(n)},${z}`;
     let s = `<svg class="fs-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="الرصيد النقدي التراكمي"><defs><clipPath id="fsUp"><rect x="0" y="0" width="${W}" height="${z}"/></clipPath><clipPath id="fsDn"><rect x="0" y="${z}" width="${W}" height="${H}"/></clipPath></defs>`;
-    T.forEach(t => s += `<line x1="${pl}" x2="${W - pr}" y1="${y(t)}" y2="${y(t)}" stroke="#1b1c1e" stroke-opacity="${Math.abs(t) < 1 ? .45 : .08}"/>` + tx(pl - 6, y(t) + 4, nf0.format(Math.round(t / 1e6)), 'font-size="12" text-anchor="end" fill="#6b6c6f"'));
+    T.forEach(t => s += `<line x1="${pl}" x2="${W - pr}" y1="${y(t)}" y2="${y(t)}" stroke="#1b1c1e" stroke-opacity="${Math.abs(t) < 1 ? .45 : .08}"/>` + tx(pl - 6, y(t) + 4, (t / ud).toLocaleString('en-US', { maximumFractionDigits: ux }), 'font-size="12" text-anchor="end" fill="#6b6c6f"'));
     for (let k = 1; k * 12 <= n; k++) s += `<line x1="${x(k * 12)}" x2="${x(k * 12)}" y1="${top}" y2="${H - bot}" stroke="#1b1c1e" stroke-opacity=".06"/>` + tx(x(k * 12), H - 10, 'سنة ' + k, 'font-size="12" text-anchor="middle" fill="#3a3b3e"');
     s += `<polygon points="${area}" fill="${C.good}" fill-opacity=".22" clip-path="url(#fsUp)"/><polygon points="${area}" fill="${C.bad}" fill-opacity=".18" clip-path="url(#fsDn)"/><polyline points="${pts}" fill="none" stroke="${C.cum}" stroke-width="2.5" stroke-linejoin="round"/>`;
-    if (r.peak > 0) { const px = x(r.peakMonth), py = y(cum[r.peakMonth]); s += `<circle cx="${px}" cy="${py}" r="6" fill="${C.bad}" stroke="#fff" stroke-width="2"/>` + tx(px, Math.min(H - bot - 4, py + 22), 'أقصى احتياج ' + M1(r.peak) + ' مليون', `text-anchor="${px < 200 ? 'start' : px > W - 200 ? 'end' : 'middle'}" font-size="13" font-weight="700" fill="${C.bad}"`); }
+    if (r.peak > 0) { const px = x(r.peakMonth), py = y(cum[r.peakMonth]); s += `<circle cx="${px}" cy="${py}" r="6" fill="${C.bad}" stroke="#fff" stroke-width="2"/>` + tx(px, Math.min(H - bot - 4, py + 22), 'أقصى احتياج ' + Sm(r.peak), `text-anchor="${px < 200 ? 'start' : px > W - 200 ? 'end' : 'middle'}" font-size="13" font-weight="700" fill="${C.bad}"`); }
     if (r.payback != null && r.payback > 0) { const px = x(r.payback); s += `<line x1="${px}" x2="${px}" y1="${top - 6}" y2="${H - bot}" stroke="${C.good}" stroke-width="2" stroke-dasharray="5 4"/>` + tx(px, top - 12, 'استرداد كامل: شهر ' + r.payback, `text-anchor="${px < 200 ? 'start' : px > W - 200 ? 'end' : 'middle'}" font-size="13" font-weight="700" fill="${C.good}"`); }
-    return s + '</svg>';
+    return s + tx(pl - 6, top - 14, un, 'font-size="11" text-anchor="end" fill="#6b6c6f"') + '</svg>';
   }
 
   const meter = (val, max, col, lab, txt) => `<div class="fs-mt"><div class="h"><span>${lab}</span><b style="color:${col}">${txt}</b></div><div class="tr"><div style="width:${Math.max(2, Math.min(100, (val || 0) / max * 100)).toFixed(1)}%;background:${col}"></div></div></div>`;
@@ -666,9 +669,9 @@ export async function mount(root, ctx) {
     const be = ENG.breakEven(S);
     return `<div class="fs-rep">${cover(r, 'ملخص دراسة الجدوى')}${verdictBox(r)}${tiles(r)}
     ${sec('الخلاصة', story(r))}
-    ${sec('من المبيعات إلى صافي الربح', waterfall(r), '', 'بالمليون جنيه')}
-    ${sec('حركة الفلوس عبر الزمن', chartCum(r) + leg([[C.bad + '55', 'فترة الصرف من جيب المستثمر'], [C.good + '55', 'فترة الربح'], [C.cum, 'الرصيد التراكمي', 1]]), 'fs-pb', 'بالمليون جنيه')}
-    <section class="fs-sec"><div class="fs-c2"><div><h4>أين تذهب التكلفة؟</h4>${donut(costItems(r), M1(r.totalCost), 'مليون جنيه')}</div><div><h4>من أين تأتي المبيعات؟</h4>${donut(useItems(r), M1(r.revenue), 'مليون جنيه')}</div></div></section>
+    ${sec('من المبيعات إلى صافي الربح', waterfall(r), '', 'بالجنيه')}
+    ${sec('حركة الفلوس عبر الزمن', chartCum(r) + leg([[C.bad + '55', 'فترة الصرف من جيب المستثمر'], [C.good + '55', 'فترة الربح'], [C.cum, 'الرصيد التراكمي', 1]]), 'fs-pb', 'بالجنيه')}
+    <section class="fs-sec"><div class="fs-c2"><div><h4>أين تذهب التكلفة؟</h4>${donut(costItems(r), UN(r.totalCost)[0], UN(r.totalCost)[1] + ' جنيه')}</div><div><h4>من أين تأتي المبيعات؟</h4>${donut(useItems(r), UN(r.revenue)[0], UN(r.revenue)[1] + ' جنيه')}</div></div></section>
     ${sec('مؤشرات سريعة', `<div class="fs-mts">${meter(r.margin, 0.5, r.margin > 0 ? C.good : C.bad, 'هامش صافي الربح', Pc(r.margin))}${meter(r.irrA, Math.max(0.6, (r.irrA || 0) * 1.1), (r.irrA || 0) > S.fin.disc ? C.good : C.mid, 'العائد السنوي IRR (معدل الخصم ' + Pc(S.fin.disc) + ')', Pc(r.irrA))}${be != null ? meter(be, 0.6, be > 0.15 ? C.good : C.mid, 'أقصى انخفاض يتحمله سعر البيع', Pc(be)) : ''}${meter(r.roi, Math.max(1, (r.roi || 0) * 1.1), C.cum, 'العائد على أقصى تمويل', Pc(r.roi))}</div>`)}
     ${foot()}</div>`;
   }
@@ -685,10 +688,10 @@ export async function mount(root, ctx) {
     const be = ENG.breakEven(S), wide = r.years.length > 7;
     return `<div class="fs-rep">${cover(r, 'دراسة جدوى مالية')}${verdictBox(r)}${tiles(r)}
     ${sec('الخلاصة', story(r))}
-    ${sec('من المبيعات إلى صافي الربح', waterfall(r), '', 'بالمليون جنيه')}
-    ${sec('التدفقات النقدية السنوية', chartYears(r) + leg([[C.in, 'المقبوضات'], [C.out, 'المدفوعات'], [C.cum, 'الرصيد التراكمي', 1]]), 'fs-pb', 'بالمليون جنيه')}
-    ${sec('الرصيد النقدي التراكمي شهرياً', chartCum(r) + leg([[C.bad + '55', 'فترة الصرف من جيب المستثمر'], [C.good + '55', 'فترة الربح'], [C.cum, 'الرصيد التراكمي', 1]]), '', 'بالمليون جنيه')}
-    <section class="fs-sec fs-pb"><div class="fs-c2"><div><h4>هيكل التكاليف</h4>${donut(costItems(r), M1(r.totalCost), 'مليون جنيه')}</div><div><h4>المبيعات حسب التخصيص</h4>${donut(useItems(r), M1(r.revenue), 'مليون جنيه')}</div></div></section>
+    ${sec('من المبيعات إلى صافي الربح', waterfall(r), '', 'بالجنيه')}
+    ${sec('التدفقات النقدية السنوية', chartYears(r) + leg([[C.in, 'المقبوضات'], [C.out, 'المدفوعات'], [C.cum, 'الرصيد التراكمي', 1]]), 'fs-pb', 'بالجنيه')}
+    ${sec('الرصيد النقدي التراكمي شهرياً', chartCum(r) + leg([[C.bad + '55', 'فترة الصرف من جيب المستثمر'], [C.good + '55', 'فترة الربح'], [C.cum, 'الرصيد التراكمي', 1]]), '', 'بالجنيه')}
+    <section class="fs-sec fs-pb"><div class="fs-c2"><div><h4>هيكل التكاليف</h4>${donut(costItems(r), UN(r.totalCost)[0], UN(r.totalCost)[1] + ' جنيه')}</div><div><h4>المبيعات حسب التخصيص</h4>${donut(useItems(r), UN(r.revenue)[0], UN(r.revenue)[1] + ' جنيه')}</div></div></section>
     ${sec('قائمة الدخل التقديرية', `<table class="fs-rt"><thead><tr><th>البيان</th><th class="n">مليون جنيه</th><th class="n">% من المبيعات</th></tr></thead><tbody>
       ${pr('إجمالي المبيعات', r.revenue, 's')}${pr('تكلفة الأرض (شاملة الفوائد والأوفر والمصاريف)', -r.landTotal)}${pr('تكاليف الإنشاءات', -r.constr)}${pr('مخصص ارتفاع الأسعار', -r.escalation)}
       ${pr('مجمل الربح', r.gross, 's')}${pr('التصميمات', -r.design)}${pr('الرسوم والتراخيص', -r.lic)}${pr('الاستشاري', -r.consult)}${pr('المصروفات البيعية', -r.selling)}${pr('المصروفات التسويقية', -r.marketing)}${pr('عمومية وإدارية', -r.ga)}${r.mgmtSales ? pr('مقابل إدارة', -r.mgmtSales) : ''}

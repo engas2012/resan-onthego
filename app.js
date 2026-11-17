@@ -2,7 +2,7 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const nf = (x, d = 2) => (+x || 0).toLocaleString('en-US', { maximumFractionDigits: d });
-const money = v => v >= 1e6 ? nf(v / 1e6, 2) + ' مليون' : nf(v, 0);
+const money = v => Math.abs(v) >= 1e9 ? nf(v / 1e9, 2) + ' مليار' : Math.abs(v) >= 1e6 ? nf(v / 1e6, 2) + ' مليون' : nf(v, 0);
 const today = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); };
 const toast = t => { const m = $('#msg'); m.textContent = t; m.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => m.classList.remove('on'), 2800); };
 const bar = p => `<div class="pct"><div class="bar${p >= 1 ? ' full' : ''}" style="flex:1"><u style="width:${Math.min(Math.max(p, 0), 1) * 100}%"></u></div><span>${Math.round(p * 100)}%</span></div>`;
@@ -56,7 +56,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 3.7.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 3.7.1</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
