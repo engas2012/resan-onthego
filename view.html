@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>دراسة جدوى – ريسان للمقاولات</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" type="image/png" href="favicon.png">
+<meta name="theme-color" content="#1b1c1e">
+<script src="config.js"></script>
+<style>.vtop{background:#1b1c1e;padding:14px 18px;display:flex;align-items:center;gap:12px}.vtop img{height:34px}.vtop span{color:#c9c9c9;font-size:13px;margin-inline-start:auto}#main{max-width:1100px;margin:0 auto;padding:16px}</style>
+</head>
+<body>
+<div class="vtop"><img src="logo-light.png" alt="ريسان للمقاولات"><span>عرض فقط</span></div>
+<main id="main"><p class="mut" style="text-align:center">جاري التحميل…</p></main>
+<div class="msg" id="msg"></div>
+<script type="module">
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const toast = t => { const m = $('#msg'); m.textContent = t; m.classList.add('on'); setTimeout(() => m.classList.remove('on'), 2800); };
+const fail = t => { $('#main').innerHTML = `<div class="note" style="margin-top:40px;text-align:center">${esc(t)}</div>`; };
+const tok = new URLSearchParams(location.search).get('s') || '';
+if (!/^[0-9a-f-]{36}$/i.test(tok)) fail('الرابط ناقص أو غلط.');
+else try {
+  const cfg = window.RESAN_CONFIG || {};
+  const sb = window.__SB_MOCK__ || (await import('https://esm.sh/@supabase/supabase-js@2')).createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+  const { data, error } = await sb.rpc('shared_study', { t: tok });
+  if (error) fail('حصلت مشكلة في تحميل الدراسة.');
+  else if (!data) fail('الرابط ده اتقفل أو مش موجود. اطلب رابط جديد من صاحب الدراسة.');
+  else { document.title = 'دراسة جدوى – ' + (data.name || ''); const m = await import('./study.js'); await m.mount($('#main'), { sb: null, toast, esc, canEdit: false, shared: data }); }
+} catch (e) { fail('حصلت مشكلة في تحميل الدراسة.'); }
+</script>
+</body>
+</html>

@@ -336,6 +336,7 @@ const CSS = `
 .fs-act{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
 .fs-hint{font-size:12px;color:var(--mut)}
 .fs .neg{color:var(--fneg)}
+.fs-dlg{border:1px solid var(--line);border-radius:16px;padding:20px;max-width:min(560px,92vw);width:100%;background:var(--card);color:var(--ink)}.fs-dlg::backdrop{background:rgba(0,0,0,.45)}
 .fs-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
 .fs-card{display:flex;flex-direction:column;gap:4px;text-align:right;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;cursor:pointer;font:inherit;color:inherit}
 .fs-card:hover{border-color:var(--acc)}.fs-card b{font-size:16px}.fs-card .r{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:var(--mut)}.fs-card .r em{font-style:normal;color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
@@ -421,7 +422,7 @@ export async function mount(root, ctx) {
   const { sb, toast, esc, canEdit } = ctx;
   if (!document.getElementById('fs-css')) { const st = document.createElement('style'); st.id = 'fs-css'; st.textContent = CSS; document.head.append(st); }
   const q = s => root.querySelector(s);
-  let S = null, R = null, curId = '', dirty = false, view = 'list', list = [];
+  let S = null, R = null, curId = '', dirty = false, view = 'list', list = [], shareTok = null;
 
   /* ---------- قائمة الدراسات ---------- */
   async function loadList() {
@@ -445,7 +446,7 @@ export async function mount(root, ctx) {
       const b = e.target.closest('button'); if (!b) return;
       if (b.dataset.new != null) openStudy(clone(BLANK), '');
       else if (b.dataset.sample != null) openStudy(clone(SAMPLE), '');
-      else if (b.dataset.open) { const { data, error } = await sb.from('feasibility_studies').select('*').eq('id', b.dataset.open).single(); if (error) return toast(error.message); openStudy(data.data, data.id); }
+      else if (b.dataset.open) { const { data, error } = await sb.from('feasibility_studies').select('*').eq('id', b.dataset.open).single(); if (error) return toast(error.message); shareTok = data.share_token || null; openStudy(data.data, data.id); }
     };
     root.oninput = root.onchange = root.onfocusout = null;
   }
@@ -459,7 +460,7 @@ export async function mount(root, ctx) {
       <div class="fs-tabs"><button class="fs-tab on" data-v="in">المدخلات</button><button class="fs-tab" data-v="rep">التقرير الكامل</button><button class="fs-tab" data-v="brief">التقرير المختصر</button></div>
       ${canEdit ? '<button class="fs-btn p" data-save>حفظ</button><button class="fs-btn" data-dup>نسخة</button>' : ''}
       <button class="fs-btn" data-xlsx>Excel</button><button class="fs-btn" data-print>طباعة / PDF</button>
-      ${canEdit && curId ? '<button class="fs-btn d" data-del-study>حذف</button>' : ''}
+      ${canEdit && curId ? '<button class="fs-btn" data-share>🔗 رابط عرض</button><button class="fs-btn d" data-del-study>حذف</button>' : ''}
       <span class="fs-st" id="fsSt">${curId ? '' : 'دراسة غير محفوظة'}</span></div>
       <div id="fsIn"><div class="fs-side" id="fsSide"></div><div id="fsForm"></div></div>
       <div id="fsRep" hidden></div></div>`;
@@ -754,6 +755,7 @@ export async function mount(root, ctx) {
       if (d.back != null) { if (dirty && !confirm('فيه تعديلات مش محفوظة. ترجع من غير حفظ؟')) return; return showList(); }
       if (d.v) return setView(d.v);
       if (d.print != null) return printRep();
+      if (d.share != null) return shareDlg();
       if (d.xlsx != null) return exportX();
       if (d.save != null) return save();
       if (d.dup != null) { const c = clone(S); c.info.name = (c.info.name || '') + ' — نسخة'; openStudy(c, ''); touch(); return toast('اتعملت نسخة — احفظها باسم جديد'); }
@@ -763,6 +765,22 @@ export async function mount(root, ctx) {
       else return;
       touch(); renderForm(); recalc(true);
     };
+  }
+  function shareDlg() {
+    const dlg = document.createElement('dialog'); dlg.className = 'fs-dlg'; document.body.append(dlg);
+    const url = () => location.origin + location.pathname.replace(/[^/]*$/, '') + 'view.html?s=' + shareTok;
+    const draw = () => { dlg.innerHTML = `<h3 style="margin:0 0 6px">رابط عرض الدراسة</h3><p class="mut" style="margin:0 0 12px">أي حد معاه الرابط يقدر يشوف التقرير الكامل والمختصر ويطبعهم، من غير تسجيل دخول ومن غير ما يعدّل أي حاجة.</p>
+      ${shareTok ? `<input class="fs-in" readonly value="${esc(url())}" dir="ltr" style="width:100%;text-align:left" onclick="this.select()">
+      <div class="fs-act" style="margin-top:12px"><button class="fs-btn p" data-cp>نسخ الرابط</button><a class="fs-btn" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent('دراسة جدوى: ' + (S.info.name || '') + '\n' + url())}">واتساب</a><a class="fs-btn" target="_blank" rel="noopener" href="${esc(url())}">فتح</a><button class="fs-btn d" data-off>إيقاف الرابط</button></div>
+      <p class="fs-hint">الرابط بيعرض آخر نسخة <b>محفوظة</b> — احفظ تعديلاتك الأول عشان تظهر. إيقاف الرابط بيقفله فوراً، ولو عملت رابط جديد بيتغير.</p>`
+      : `<div class="fs-act"><button class="fs-btn p" data-on>إنشاء رابط عرض</button></div>`}
+      <div class="fs-act" style="margin-top:10px"><button class="fs-btn" data-x>إغلاق</button></div>`; };
+    const setTok = async t => { const { error } = await sb.from('feasibility_studies').update({ share_token: t }).eq('id', curId); if (error) { toast(error.message); return false; } shareTok = t; draw(); return true; };
+    draw(); dlg.showModal();
+    dlg.onclick = async e => { const b = e.target.closest('button'); if (e.target === dlg || (b && b.dataset.x != null)) { dlg.close(); dlg.remove(); return; } if (!b) return;
+      if (b.dataset.on != null) { if (dirty) toast('في تعديلات مش محفوظة — الرابط هيعرض آخر نسخة محفوظة'); await setTok(crypto.randomUUID()); }
+      else if (b.dataset.off != null) { if (await setTok(null)) toast('الرابط اتقفل'); }
+      else if (b.dataset.cp != null) { try { await navigator.clipboard.writeText(url()); toast('الرابط اتنسخ'); } catch { dlg.querySelector('input').select(); } } };
   }
   function printRep() {
     if (view === 'in') setView('rep');
@@ -795,6 +813,19 @@ export async function mount(root, ctx) {
     const mh = ['الشهر', 'المبيعات', 'دفعات التعاقد', 'الأقساط', 'المقبوضات', ...keys.map(k => lab[k]), 'المدفوعات', 'الصافي', 'التراكمي', 'الرصيد'];
     add('التدفق الشهري', [mh, ...r.rec.map((_, m) => [m, R0(r.salesM[m]), R0(r.downM[m]), R0(r.instM[m]), R0(r.rec[m]), ...keys.map(k => R0(r.pay[k][m])), R0(r.payM[m]), R0(r.netM[m]), R0(r.cum[m]), R0(r.balM[m])])], mh.map(() => 14));
     X.writeFile(wb, ('دراسة جدوى - ' + (S.info.name || 'مشروع')).replace(/[\\/:*?"<>|]/g, '-').slice(0, 120) + '.xlsx');
+  }
+
+  /* ---------- عرض فقط (رابط مشاركة) ---------- */
+  if (ctx.shared) {
+    S = Object.assign(clone(BLANK), ctx.shared.data || {}); view = 'brief';
+    while (S.plans[0].years.length > 1 && S.plans.every(p => !+p.years[p.years.length - 1])) S.plans.forEach(p => p.years.pop());
+    R = ENG.compute(S);
+    root.innerHTML = `<div class="fs"><div class="fs-bar"><div class="fs-tabs"><button class="fs-tab on" data-v="brief">التقرير المختصر</button><button class="fs-tab" data-v="rep">التقرير الكامل</button></div>
+      <button class="fs-btn" data-print>طباعة / PDF</button><span class="fs-st">عرض فقط · آخر تحديث ${new Date(ctx.shared.updated_at).toLocaleDateString('ar-EG')}</span></div><div id="fsRep"></div></div>`;
+    const draw = () => { q('#fsRep').innerHTML = repOf(view); root.querySelectorAll('.fs-tab').forEach(t => t.classList.toggle('on', t.dataset.v === view)); };
+    draw();
+    root.onclick = e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.v) { view = b.dataset.v; draw(); } else if (b.dataset.print != null) printRep(); };
+    return;
   }
 
   await showList();
