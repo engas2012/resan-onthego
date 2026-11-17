@@ -60,7 +60,7 @@ tr.g td{background:light-dark(#e4e2db,#2a2c30);font-weight:700}
 .pc .pbig{font-size:64px;font-weight:700;line-height:1;color:var(--acc);font-variant-numeric:tabular-nums}
 .who{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:14px}.who dt{color:var(--mut)}.who dd{margin:0;font-weight:500}
 .mbars{display:flex;flex-direction:column;gap:6px;font-size:13px}
-.mbars div{display:grid;grid-template-columns:130px minmax(0,1fr) 40px;gap:8px;align-items:center}
+.mbars>div{display:grid;grid-template-columns:130px minmax(0,1fr) 40px;gap:8px;align-items:center}
 .mbars em{font-style:normal;text-align:left;font-variant-numeric:tabular-nums}
 a.btn,label.btn,button{font:inherit;font-size:15px;min-height:44px;padding:8px 16px;border-radius:9px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
 a.btn.p,button.p{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:700}
