@@ -335,33 +335,77 @@ const CSS = `
 .fs-x{border:0;background:none;color:var(--mut);cursor:pointer;font-size:20px;width:34px;height:34px;border-radius:8px;min-height:0;padding:0}.fs-x:hover{color:var(--fneg)}
 .fs-act{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
 .fs-hint{font-size:12px;color:var(--mut)}
-.fs-rep{max-width:1060px;margin:0 auto;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:clamp(16px,3vw,36px)}
-.fs-rh{border-bottom:3px solid var(--ink);padding-bottom:14px;margin-bottom:18px;display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:end}
-.fs-rh h2{font-size:clamp(24px,3.4vw,36px);line-height:1.1;margin:4px 0}.fs-rh .m{color:var(--mut);font-size:14px}
-.fs-find{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:18px;margin-bottom:10px}
-.fs-find .fs-hero .b{font-size:clamp(32px,4.4vw,48px)}.fs-find p{margin:8px 0 0;font-size:14px}
-.fs-rep h4{font-size:19px;margin:28px 0 8px;padding-top:10px;border-top:1px solid var(--line)}.fs-rep h4 small{font-size:13px;color:var(--mut);font-weight:500}
-.fs-rt{border-collapse:collapse;width:100%;font-size:14px}
-.fs-rt th,.fs-rt td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right}
-.fs-rt th{background:var(--bg);font-weight:600;font-size:12px;color:var(--mut);white-space:nowrap}
-.fs-rt .n{text-align:left;font-variant-numeric:tabular-nums;white-space:nowrap;direction:ltr}
-.fs-rt tr.t td{font-weight:700;border-top:2px solid var(--ink)}.fs-rt tr.s td{font-weight:700;background:var(--bg)}
-.fs-rt tr.k td,.fs-rt td.k{font-weight:700;background:var(--acc);color:#fff}
-.fs-rt .neg,.fs .neg{color:var(--fneg)}.fs-rt td.k.neg{color:#fff}
-.fs-sens td{text-align:center!important}.fs-sens small{color:var(--mut)}.fs-sens td.k small{color:#fff}
-.fs-chart{width:100%;height:auto;display:block}
-.fs-leg{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--mut);margin-top:4px}.fs-leg i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-inline-end:5px}
-.fs-hb{display:grid;grid-template-columns:160px minmax(0,1fr) 110px;gap:10px;align-items:center;font-size:14px;margin:6px 0}
-.fs-hb .tr{background:var(--bg);border-radius:4px;height:14px;overflow:hidden}.fs-hb .tr div{height:100%;background:var(--ink)}.fs-hb .v{text-align:left;font-variant-numeric:tabular-nums;white-space:nowrap}
-.fs-c2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px}
-.fs-foot{margin-top:26px;color:var(--mut);font-size:12px;border-top:1px solid var(--line);padding-top:10px}
+.fs .neg{color:var(--fneg)}
 .fs-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
 .fs-card{display:flex;flex-direction:column;gap:4px;text-align:right;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;cursor:pointer;font:inherit;color:inherit}
 .fs-card:hover{border-color:var(--acc)}.fs-card b{font-size:16px}.fs-card .r{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:var(--mut)}.fs-card .r em{font-style:normal;color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
 .fs-card.new{border-style:dashed;align-items:center;justify-content:center;min-height:120px;color:var(--acc);font-weight:700}
 @media(max-width:1100px){.fs-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media(max-width:760px){.fs-side{position:static;grid-template-columns:minmax(0,1fr)}.fs-kpis{grid-template-columns:1fr 1fr}.fs-find,.fs-c2{grid-template-columns:minmax(0,1fr)}.fs-hb{grid-template-columns:100px minmax(0,1fr) 90px}.fs-f.w2{grid-column:auto}}
-@media print{body.fs-print header,body.fs-print .fs-bar,body.fs-print .fs-noprint{display:none!important}body.fs-print main{padding:0;max-width:none}body.fs-print .fs-rep{border:0;padding:0}.fs-rep h4{break-after:avoid}.fs-rt tr{break-inside:avoid}}
+@media(max-width:760px){.fs-side{position:static;grid-template-columns:minmax(0,1fr)}.fs-kpis{grid-template-columns:1fr 1fr}.fs-f.w2{grid-column:auto}}
+.fs-rep{--pi:#1b1c1e;--pm:#6b6c6f;--pl:#e6e3dc;--pb:#f6f4ef;color-scheme:light;color:var(--pi);max-width:1000px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:16px;padding:clamp(14px,3vw,34px);font-size:15px}
+.fs-cov{background:#1b1c1e;color:#fff;border-radius:14px;padding:18px 22px 16px;border-bottom:5px solid #f26b1d;margin-bottom:14px}
+.fs-cov .t{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;opacity:.85}.fs-cov img{height:38px;width:auto}
+.fs-cov h2{font-size:clamp(24px,3.4vw,34px);line-height:1.15;margin:12px 0 10px}
+.fs-cov .ch{display:flex;flex-wrap:wrap;gap:6px}.fs-cov .ch span{background:rgba(255,255,255,.12);border-radius:99px;padding:2px 11px;font-size:13px}
+.fs-vb{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center;border-radius:14px;padding:14px 18px;margin-bottom:14px;border:1px solid}
+.fs-vb.good{background:#eaf6ef;border-color:#9fd3b4}.fs-vb.mid{background:#fdf4e3;border-color:#ecc77d}.fs-vb.bad{background:#fbeceb;border-color:#e8a7a1}
+.fs-vb span{font-size:12px;color:var(--pm);display:block}.fs-vb b{font-size:20px}.fs-vb p{margin:4px 0 0;font-size:14px}
+.fs-vb.good b{color:#1f6b43}.fs-vb.mid b{color:#94600c}.fs-vb.bad b{color:#a2271f}
+.fs-vb .nv{text-align:center;border-inline-start:1px solid rgba(0,0,0,.12);padding-inline-start:18px}.fs-vb .nv b{font-size:30px;display:block;line-height:1.1;font-variant-numeric:tabular-nums;white-space:nowrap}.fs-vb .nv small{color:var(--pm)}
+.fs-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:6px}
+.fs-tile{position:relative;background:var(--pb);border-radius:12px;padding:12px 14px 12px 50px;border-top:4px solid var(--c);min-height:86px}
+.fs-tile svg{position:absolute;left:12px;top:14px;width:28px;height:28px;fill:none;stroke:var(--c);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.fs-tile span{display:block;font-size:13px;color:var(--pm)}.fs-tile b{display:block;font-size:22px;line-height:1.25;font-variant-numeric:tabular-nums;white-space:nowrap}.fs-tile small{font-size:12px;color:var(--pm)}
+.fs-sec{margin-top:18px}
+.fs-rep h4{font-size:18px;margin:0 0 10px;padding-inline-start:10px;border-inline-start:4px solid #f26b1d;line-height:1.3}.fs-rep h4 small{font-size:13px;color:var(--pm);font-weight:500}
+.fs-story{margin:0;padding:0;list-style:none;display:grid;gap:8px}.fs-story li{background:var(--pb);border-radius:10px;padding:10px 14px;font-size:15px;line-height:1.7}.fs-story b{font-variant-numeric:tabular-nums}
+.fs-rep .neg{color:#b3261e}
+.fs-rt{border-collapse:collapse;width:100%;font-size:14px;background:#fff;border:0;border-radius:0;overflow:visible}
+.fs-rt th,.fs-rt td{padding:6px 8px;border-bottom:1px solid var(--pl);text-align:right}
+.fs-rt thead th{background:#2b3a55;color:#fff;font-weight:600;font-size:12.5px;white-space:nowrap}
+.fs-rt tbody tr:nth-child(even) td{background:#fbfaf7}
+.fs-rt .n{text-align:left;font-variant-numeric:tabular-nums;white-space:nowrap;direction:ltr}
+.fs-rt tbody tr.t td{font-weight:700;border-top:2px solid var(--pi)}.fs-rt tbody tr.s td{font-weight:700;background:var(--pb)}
+.fs-rt .nr{text-align:left;white-space:nowrap;font-variant-numeric:tabular-nums}
+.fs-rt tbody tr.s.in td{background:#e6f1f3;color:#145564}.fs-rt tbody tr.s.out td{background:#fdeee4;color:#9a3f0b}.fs-rt tr.cm td{font-weight:700;color:#2b3a55}
+.fs-rt tbody tr.k td{font-weight:700;background:#f26b1d;color:#fff}
+.fs-cb{font-size:13px}.fs-cb td:first-child{white-space:nowrap}
+.fs-sens td{text-align:center!important;border:2px solid #fff!important;border-radius:6px}.fs-sens td b{display:block;font-size:16px;font-variant-numeric:tabular-nums}.fs-sens td small{opacity:.8;font-size:12px}
+.fs-sens td.cur{outline:3px solid #1b1c1e;outline-offset:-3px}.fs-sens tbody th{background:#2b3a55;color:#fff;font-size:12.5px;text-align:center}
+.fs-chart{width:100%;height:auto;display:block;direction:ltr;font-family:inherit}
+.fs-leg{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--pm);margin-top:4px;justify-content:center}.fs-leg i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-inline-end:5px}
+.fs-c2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px}
+.fs-dnw{display:flex;gap:14px;align-items:center}.fs-dn{width:170px;flex:none;direction:ltr}
+.fs-dl{list-style:none;margin:0;padding:0;flex:1;display:grid;gap:5px;font-size:13.5px}.fs-dl li{display:grid;grid-template-columns:12px minmax(0,1fr) 40px 52px;gap:7px;align-items:center}
+.fs-dl i{width:12px;height:12px;border-radius:3px}.fs-dl b,.fs-dl em{text-align:left;font-variant-numeric:tabular-nums;font-style:normal}.fs-dl em{color:var(--pm)}
+.fs-mts{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px 24px}
+.fs-mt .h{display:flex;justify-content:space-between;gap:8px;font-size:14px;margin-bottom:5px}.fs-mt .h b{font-variant-numeric:tabular-nums}.fs-mt .tr{background:var(--pb);border-radius:99px;height:12px;overflow:hidden}.fs-mt .tr div{height:100%;border-radius:99px}
+.fs-rep .fs-hint{color:var(--pm)}
+.fs-foot{margin-top:24px;color:var(--pm);font-size:12px;border-top:1px solid var(--pl);padding-top:10px}
+@media(max-width:760px){.fs-tiles{grid-template-columns:1fr 1fr}.fs-vb{grid-template-columns:minmax(0,1fr)}.fs-vb .nv{border:0;padding:0;text-align:start}.fs-c2,.fs-mts{grid-template-columns:minmax(0,1fr)}.fs-dnw{flex-direction:column;align-items:stretch}.fs-dn{margin:0 auto}.fs-rep .fs-tw,.fs-sec{overflow-x:auto}}
+#fsPrint{display:none}
+@page{size:A4;margin:11mm}
+@page wide{size:A4 landscape;margin:10mm}
+@media print{
+body.fs-print>*:not(#fsPrint){display:none!important}body.fs-print{background:#fff!important}
+body.fs-print #fsPrint{display:block}
+#fsPrint *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+#fsPrint .fs-rep{max-width:none;border:0;border-radius:0;padding:0;font-size:12.5px}
+#fsPrint .fs-sec,#fsPrint .fs-vb,#fsPrint .fs-tiles,#fsPrint .fs-cov,#fsPrint .fs-story li,#fsPrint .fs-tile{break-inside:avoid;page-break-inside:avoid}
+#fsPrint .fs-sec{margin-top:12px}
+#fsPrint .fs-pb{break-before:page;page-break-before:always}
+#fsPrint .wide{page:wide}
+#fsPrint h4{break-after:avoid}
+#fsPrint .fs-rt{font-size:11px}#fsPrint .fs-rt th,#fsPrint .fs-rt td{padding:4px 6px}
+#fsPrint thead{display:table-header-group}#fsPrint tr{break-inside:avoid}
+#fsPrint .fs-chart{max-height:68mm}
+#fsPrint .fs-cov{padding:12px 18px 12px;margin-bottom:10px}#fsPrint .fs-cov h2{font-size:24px;margin:8px 0 8px}#fsPrint .fs-cov img{height:32px}
+#fsPrint .fs-vb{padding:10px 14px;margin-bottom:10px}#fsPrint .fs-tiles{gap:8px}#fsPrint .fs-tile{min-height:0;padding:8px 12px 8px 44px}
+#fsPrint .fs-story{gap:5px}#fsPrint .fs-story li{padding:6px 12px;font-size:12.5px;line-height:1.6}
+#fsPrint .fs-dn{width:130px}#fsPrint .fs-dnw{gap:10px}#fsPrint .fs-dl{font-size:11.5px;gap:3px}#fsPrint .fs-dl li{grid-template-columns:10px minmax(0,1fr) 34px 46px;gap:5px}
+#fsPrint .fs-tile b{font-size:19px}#fsPrint .fs-vb .nv b{font-size:26px}
+#fsPrint .fs-c2{grid-template-columns:1fr 1fr}#fsPrint .fs-tiles{grid-template-columns:repeat(3,1fr)}
+}
 `;
 
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -409,9 +453,10 @@ export async function mount(root, ctx) {
   /* ---------- فتح دراسة ---------- */
   function openStudy(data, id) {
     S = Object.assign(clone(BLANK), data); curId = id; dirty = false; view = 'in';
+    while (S.plans[0].years.length > 1 && S.plans.every(p => !+p.years[p.years.length - 1])) S.plans.forEach(p => p.years.pop());
     root.innerHTML = `<div class="fs"><div class="fs-bar">
       <button class="fs-btn sm" data-back>‹ كل الدراسات</button>
-      <div class="fs-tabs"><button class="fs-tab on" data-v="in">المدخلات</button><button class="fs-tab" data-v="rep">التقرير</button></div>
+      <div class="fs-tabs"><button class="fs-tab on" data-v="in">المدخلات</button><button class="fs-tab" data-v="rep">التقرير الكامل</button><button class="fs-tab" data-v="brief">التقرير المختصر</button></div>
       ${canEdit ? '<button class="fs-btn p" data-save>حفظ</button><button class="fs-btn" data-dup>نسخة</button>' : ''}
       <button class="fs-btn" data-xlsx>Excel</button><button class="fs-btn" data-print>طباعة / PDF</button>
       ${canEdit && curId ? '<button class="fs-btn d" data-del-study>حذف</button>' : ''}
@@ -425,8 +470,9 @@ export async function mount(root, ctx) {
   function setView(v) {
     view = v; q('#fsIn').hidden = v !== 'in'; q('#fsRep').hidden = v !== 'rep';
     root.querySelectorAll('.fs-tab').forEach(t => t.classList.toggle('on', t.dataset.v === v));
-    if (v === 'rep') q('#fsRep').innerHTML = reportHTML(R);
+    if (v !== 'in') q('#fsRep').innerHTML = repOf(v);
   }
+  const repOf = v => v === 'brief' ? reportBrief(R) : reportFull(R);
 
   /* ---------- مسارات ---------- */
   const getP = p => p.split('.').reduce((o, k) => o == null ? o : o[k], S);
@@ -445,7 +491,7 @@ export async function mount(root, ctx) {
   const parse = (v, t) => { if (t === 'text') return v; const x = parseFloat(String(v).replace(/[,،\s]/g, '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))); return isFinite(x) ? (t === 'pct' ? x / 100 : x) : 0; };
 
   function ensurePlans() {
-    const L = Math.max(3, ...S.plans.map(p => p.years.length));
+    const L = Math.max(1, ...S.plans.map(p => p.years.length));
     S.plans.forEach(p => { while (p.years.length < L) p.years.push(0); while (p.plan.length < L) p.plan.push(clone(p.plan[p.plan.length - 1] || { down: 0.1, months: 60 })); });
     const ids = S.plans.map(p => p.id); S.floors.forEach(f => { if (!ids.includes(f.plan)) f.plan = ids[0]; });
   }
@@ -453,7 +499,8 @@ export async function mount(root, ctx) {
   /* ---------- شاشة الإدخال ---------- */
   function renderForm() {
     ensurePlans();
-    const pl = S.plans.map(x => [x.id, x.name]), yrs = S.plans[0].years.length, mp = pl.length > 1;
+    const pl = S.plans.map(x => [x.id, x.name]), yrs = S.plans[0].years.length, mp = pl.length > 1, ey = S.exec.dist.length;
+    const cnt = (lab, k, v) => `<label class="fs-f"><span>${lab}</span><input class="fs-in n" data-cnt="${k}" type="number" min="1" max="15" inputmode="numeric" value="${v}"${ro}></label>`;
     const x = canEdit;
     q('#fsForm').innerHTML = `<div class="fs-sheet">
     <div class="fs-blk"><div class="fs-bh"><h3>المشروع</h3></div><div class="fs-fields">
@@ -471,18 +518,20 @@ export async function mount(root, ctx) {
       <div class="fs-act">${x ? '<button class="fs-btn sm" data-add="floors">+ دور</button>' : ''}<span class="fs-hint">مساحة الدور = النسبة البنائية × مساحة الأرض · المساحة البيعية = المساحة × عدد الأدوار × معامل التحميل · سعر بيع صفر = غير مباع</span></div>
     </div>
     <div class="fs-blk"><div class="fs-bh"><h3>البيع والتحصيل</h3></div>
+      <div class="fs-fields" style="margin-bottom:12px">${cnt('عدد سنوات البيع', 'sale', yrs)}${fld('سماح قبل أول قسط', 'grace', 'num', 'شهر')}${fld('زيادة سعر البيع سنوياً', 'priceInc', 'pct', '%')}</div>
       <div class="fs-tw"><table class="fs-et fs-pl"><thead><tr><th>خطة البيع</th><th>بدء البيع (شهر)</th><th></th>${Array.from({ length: yrs }, (_, y) => `<th>سنة ${y + 1}</th>`).join('')}<th>المجموع</th><th></th></tr></thead><tbody>
       ${S.plans.map((p, i) => `
         <tr class="p1"><td rowspan="3" class="wn">${inp('plans.' + i + '.name', 'text')}</td><td rowspan="3" style="width:80px">${inp('plans.' + i + '.start')}</td><td class="lab">نسبة البيع %</td>${Array.from({ length: yrs }, (_, y) => `<td>${inp('plans.' + i + '.years.' + y, 'pct')}</td>`).join('')}<td class="o" data-o="ps${i}"></td><td rowspan="3">${x && S.plans.length > 1 ? `<button class="fs-x" data-del="plans.${i}" aria-label="حذف الخطة">×</button>` : ''}</td></tr>
         <tr><td class="lab">المقدم %</td>${Array.from({ length: yrs }, (_, y) => `<td>${inp('plans.' + i + '.plan.' + y + '.down', 'pct')}</td>`).join('')}<td></td></tr>
         <tr><td class="lab">أقساط (شهر)</td>${Array.from({ length: yrs }, (_, y) => `<td>${inp('plans.' + i + '.plan.' + y + '.months')}</td>`).join('')}<td></td></tr>`).join('')}
       </tbody></table></div>
-      <div class="fs-act">${x ? '<button class="fs-btn sm" data-add="plans">+ خطة بيع</button><button class="fs-btn sm" data-addyear>+ سنة بيع</button>' : ''}</div>
-      <div class="fs-fields" style="margin-top:12px">${fld('سماح قبل أول قسط', 'grace', 'num', 'شهر')}${fld('زيادة سعر البيع سنوياً', 'priceInc', 'pct', '%')}</div>
+      <div class="fs-act">${x ? '<button class="fs-btn sm" data-add="plans">+ خطة بيع</button>' : ''}<span class="fs-hint">تغيير عدد سنوات البيع بيوزّع النسب بالتساوي، وبعدها تقدر تعدّل نسبة كل سنة.</span></div>
     </div>
-    <div class="fs-blk"><div class="fs-bh"><h3>التنفيذ والمصروفات والتمويل</h3></div><div class="fs-fields">
-      ${fld('بدء التنفيذ في شهر', 'exec.start', 'num')}<label class="fs-f"><span>توزيع التنفيذ على السنوات <small>(%)</small></span>${inp('exec.dist', 'dist', '30, 30, 40')}</label>${fld('مخصص ارتفاع الأسعار', 'exec.dist', 'esc', '% سنوياً')}
-      ${fld('التصميمات', 'exec.design', 'num', 'جنيه')}${fld('الاستشاري', 'exec.consult', 'num', 'جنيه')}${fld('الرسوم والتراخيص', 'exec.lic', 'num', 'جنيه')}${fld('سداد التراخيص في الأشهر', 'exec.licMonths', 'text')}
+    <div class="fs-blk"><div class="fs-bh"><h3>التنفيذ</h3><span>مدة التنفيذ ${ey} سنة</span></div><div class="fs-fields">
+      ${fld('بدء التنفيذ في شهر', 'exec.start', 'num')}${cnt('عدد سنوات التنفيذ', 'exec', ey)}${fld('مخصص ارتفاع الأسعار', 'exec.dist', 'esc', '% سنوياً')}
+      ${fld('التصميمات', 'exec.design', 'num', 'جنيه')}${fld('الاستشاري', 'exec.consult', 'num', 'جنيه')}${fld('الرسوم والتراخيص', 'exec.lic', 'num', 'جنيه')}${fld('سداد التراخيص في الأشهر', 'exec.licMonths', 'text')}</div>
+      <div class="fs-tw" style="margin-top:12px"><table class="fs-et fs-pl"><thead><tr><th></th>${S.exec.dist.map((_, y) => `<th>سنة ${y + 1}</th>`).join('')}<th>المجموع</th></tr></thead><tbody><tr><td class="lab">نسبة التنفيذ من التكلفة %</td>${S.exec.dist.map((_, y) => `<td>${inp('exec.dist.' + y + '.pct', 'pct')}</td>`).join('')}<td class="o" data-o="eds"></td></tr></tbody></table></div></div>
+    <div class="fs-blk"><div class="fs-bh"><h3>المصروفات والتمويل</h3></div><div class="fs-fields">
       ${fld('مصروفات بيعية', 'exp.sell', 'pct', '% مبيعات')}${fld('مصروفات تسويقية', 'exp.mkt', 'pct', '% مبيعات')}${fld('عمومية وإدارية', 'exp.ga', 'pct', '% مبيعات')}${fld('توزع على', 'exp.gaMonths', 'num', 'شهر')}
       <label class="fs-f"><span>وعاء الضريبة</span>${sel('exp.taxBasis', [['sales', 'من المبيعات'], ['profit', 'من صافي الربح']])}</label>${fld('نسبة الضريبة', 'exp.tax', 'pct', '%')}${fld('نسبة الإدارة', 'exp.mgmt', 'pct', '% من الربح')}${fld('مقابل إدارة', 'exp.mgmtSales', 'pct', '% مبيعات')}
       ${fld('رأس المال المتاح', 'fin.equity', 'num', 'جنيه')}${fld('معدل الخصم', 'fin.disc', 'pct', '%')}${fld('معدل إعادة الاستثمار', 'fin.reinv', 'pct', '%')}
@@ -491,14 +540,14 @@ export async function mount(root, ctx) {
   }
 
   let tmr = 0;
-  function recalc(now) { clearTimeout(tmr); const go = () => { R = ENG.compute(S); fillCalc(); renderSide(); if (view === 'rep') q('#fsRep').innerHTML = reportHTML(R); }; now ? go() : (tmr = setTimeout(go, 120)); }
+  function recalc(now) { clearTimeout(tmr); const go = () => { R = ENG.compute(S); fillCalc(); renderSide(); if (view !== 'in') q('#fsRep').innerHTML = repOf(view); }; now ? go() : (tmr = setTimeout(go, 120)); }
   function fillCalc() {
     if (!R) return;
     const set = (k, v) => { const e = root.querySelector(`[data-o="${k}"]`); if (e) e.textContent = v; };
     let ta = 0, tc = 0, ts = 0;
     S.floors.forEach((f, i) => { const A = (+f.ratio || 0) * (+S.land.area || 0), n = +f.count || 1, c = A * n * (+f.cost || 0), v = A * n * (+f.load || 1) * (+f.price || 0); ta += A * n; tc += c; ts += v; set('fa' + i, N(A) + (n > 1 ? ' × ' + n : '')); set('fc' + i, N(c)); set('fs' + i, v ? N(v) : '—'); });
     set('fat', N(ta)); set('fct', N(tc)); set('fst', N(ts));
-    S.plans.forEach((p, i) => set('ps' + i, Pc(ENG.sum(p.years))));
+    S.plans.forEach((p, i) => set('ps' + i, Pc(ENG.sum(p.years)))); set('eds', Pc(ENG.sum(S.exec.dist.map(d => d.pct))));
     const fs = q('#fsFs'); if (fs) fs.textContent = 'تنفيذ ' + Mn(tc) + ' · مبيعات ' + Mn(ts);
     const ls = q('#fsLs'); if (ls) ls.textContent = Mn(R.landTotal);
     const lc = q('#fsLc'); if (lc) lc.innerHTML = `قيمة الأرض <b>${N(R.landVal)}</b> · المقدم <b>${N(R.landDown)}</b> · الفوائد <b>${N(R.landInterest)}</b> · الإجمالي شامل الفوائد والأوفر <b>${N(R.landTotal)}</b> · سعر المتر الفعلي <b>${N(R.landTotal / (S.land.area || 1))}</b>`;
@@ -515,99 +564,174 @@ export async function mount(root, ctx) {
     ${r.warn.length ? `<div class="fs-warn"><b>تنبيهات المدخلات</b><ul>${r.warn.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}`;
   }
 
-  /* ---------- الرسم السنوي ---------- */
+  /* ---------- رسومات التقرير (SVG) ---------- */
+  const PAL = ['#f26b1d', '#1f7a8c', '#2b3a55', '#d9a21b', '#3a9d6a', '#b8433a', '#7b5ea7', '#8a8f98', '#c97b4a'];
+  const C = { in: '#1f7a8c', out: '#f26b1d', cum: '#2b3a55', good: '#2e8b57', bad: '#c0392b', mid: '#d08a12' };
+  const M1 = v => (v == null || !isFinite(v)) ? '—' : (v / 1e6).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const M2 = v => (v == null || !isFinite(v)) ? '—' : (v / 1e6).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const yrsTxt = m => m == null ? '—' : m < 12 ? m + ' شهر' : (m / 12).toLocaleString('en-US', { maximumFractionDigits: 1 }) + ' سنة';
+  const tx = (x, y, t, o = '') => `<text x="${x}" y="${y}" ${o}>${esc(t)}</text>`;
+  const ticksOf = (mn, mx, n = 4) => { const rg = mx - mn || 1, st0 = rg / n, p = Math.pow(10, Math.floor(Math.log10(st0))), st = [1, 2, 2.5, 5, 10].map(k => k * p).find(k => k >= st0) || st0; const a = []; for (let v = Math.ceil(mn / st) * st; v <= mx + 1e-6; v += st) a.push(v); return a; };
+
+  function donut(items, centerTop, centerBot) {
+    items = items.filter(i => i[1] > 0); const tot = items.reduce((s, i) => s + i[1], 0) || 1;
+    const R = 80, r = 52, c = 90; let a = -Math.PI / 2, s = `<svg class="fs-dn" viewBox="0 0 180 180" role="img">`;
+    items.forEach(([, v], k) => { const f = v / tot, b = a + f * 2 * Math.PI, col = PAL[k % PAL.length];
+      if (f > 0.9999) s += `<circle cx="${c}" cy="${c}" r="${(R + r) / 2}" fill="none" stroke="${col}" stroke-width="${R - r}"/>`;
+      else { const L = f > 0.5 ? 1 : 0, P = (rr, t) => (c + rr * Math.cos(t)).toFixed(2) + ' ' + (c + rr * Math.sin(t)).toFixed(2);
+        s += `<path d="M${P(R, a)} A${R} ${R} 0 ${L} 1 ${P(R, b)} L${P(r, b)} A${r} ${r} 0 ${L} 0 ${P(r, a)}Z" fill="${col}" stroke="#fff" stroke-width="1.5"/>`; }
+      a = b; });
+    s += tx(c, c - 2, centerTop, 'text-anchor="middle" font-size="22" font-weight="800" fill="#1b1c1e"') + tx(c, c + 18, centerBot, 'text-anchor="middle" font-size="11" fill="#6b6c6f"') + '</svg>';
+    return `<div class="fs-dnw">${s}<ul class="fs-dl">${items.map(([l, v], k) => `<li><i style="background:${PAL[k % PAL.length]}"></i><span>${esc(l)}</span><b>${Math.round(v / tot * 100)}%</b><em>${M1(v)}</em></li>`).join('')}</ul></div>`;
+  }
+
+  function waterfall(r) {
+    const st = [['المبيعات', r.revenue, 'in'], ['الأرض', -r.landTotal], ['الإنشاءات', -(r.constr + r.escalation)], ['تصميم وتراخيص', -(r.design + r.lic + r.consult)], ['بيع وإدارة', -(r.selling + r.marketing + r.ga + r.mgmtSales)], ['ضرائب وإدارة', -(r.tax + r.mgmtProfit)], ['صافي الربح', r.net, 'tot']].filter((x, i) => i === 0 || i === 6 || x[1]);
+    let run = 0; const bars = st.map(([l, v, k]) => { if (k === 'tot') return { l, a: 0, b: v, v, col: v >= 0 ? C.good : C.bad }; if (k === 'in') { run = v; return { l, a: 0, b: v, v, col: C.in }; } const a = run; run += v; return { l, a, b: run, v, col: C.out }; });
+    const W = 900, H = 300, top = 30, bot = 40, pl = 10, pr = 10, mx = Math.max(...bars.map(b => Math.max(b.a, b.b)), 0), mn = Math.min(...bars.map(b => Math.min(b.a, b.b)), 0), rg = mx - mn || 1;
+    const y = v => top + (H - top - bot) * (mx - v) / rg, cw = (W - pl - pr) / bars.length, bw = cw * 0.56, cx = i => W - pr - cw * (i + 0.5);
+    let s = `<svg class="fs-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="من المبيعات إلى صافي الربح"><line x1="${pl}" x2="${W - pr}" y1="${y(0)}" y2="${y(0)}" stroke="#1b1c1e" stroke-opacity=".35"/>`;
+    bars.forEach((b, i) => { const y1 = y(Math.max(b.a, b.b)), h = Math.max(1.5, Math.abs(y(b.a) - y(b.b)));
+      s += `<rect x="${cx(i) - bw / 2}" y="${y1}" width="${bw}" height="${h}" rx="4" fill="${b.col}"/>`;
+      if (i < bars.length - 1) s += `<line x1="${cx(i) - bw / 2}" x2="${cx(i + 1) + bw / 2}" y1="${y(b.b)}" y2="${y(b.b)}" stroke="#1b1c1e" stroke-opacity=".3" stroke-dasharray="4 3"/>`;
+      s += tx(cx(i), y1 - 8, (b.v < 0 && i && i < bars.length - 1 ? '−' : '') + M1(Math.abs(b.v)), `text-anchor="middle" font-size="15" font-weight="700" fill="${b.col}"`);
+      s += tx(cx(i), H - 14, b.l, 'text-anchor="middle" font-size="14" fill="#3a3b3e"'); });
+    return s + '</svg>';
+  }
+
   function chartYears(r) {
     const W = 900, H = 320, ys = r.years, n = ys.length;
-    const vals = ys.flatMap(a => [a.rec, -a.pay, a.cum]); const mx = Math.max(...vals, 0), mn = Math.min(...vals, 0), rg = (mx - mn) || 1;
-    const pl = 70, pr = 10, top = 14, bot = 34, cw = (W - pl - pr) / n, bw = Math.min(26, cw * 0.32);
+    const vals = ys.flatMap(a => [a.rec, -a.pay, a.cum]), T = ticksOf(Math.min(...vals, 0), Math.max(...vals, 0)), mx = Math.max(...T, ...vals), mn = Math.min(...T, ...vals), rg = (mx - mn) || 1;
+    const pl = 54, pr = 10, top = 14, bot = 34, cw = (W - pl - pr) / n, bw = Math.min(30, cw * 0.32);
     const y = v => top + (H - top - bot) * (mx - v) / rg, cx = i => W - pr - cw * (i + 0.5);
-    const ticks = [mx, (mx + mn) / 2, mn, 0].filter((v, i, a) => a.indexOf(v) === i);
-    let s = `<svg class="fs-chart" style="direction:ltr" viewBox="0 0 ${W} ${H}" role="img" aria-label="التدفقات النقدية السنوية">`;
-    ticks.forEach(t => s += `<line x1="${pl}" x2="${W - pr}" y1="${y(t)}" y2="${y(t)}" stroke="currentColor" stroke-opacity="${t === 0 ? .45 : .1}"/><text x="${pl - 6}" y="${y(t) + 4}" font-size="12" text-anchor="end" fill="currentColor" fill-opacity=".65">${nf0.format(Math.round(t / 1e6))}</text>`);
+    let s = `<svg class="fs-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="التدفقات النقدية السنوية">`;
+    T.forEach(t => s += `<line x1="${pl}" x2="${W - pr}" y1="${y(t)}" y2="${y(t)}" stroke="#1b1c1e" stroke-opacity="${Math.abs(t) < 1 ? .45 : .08}"/>` + tx(pl - 6, y(t) + 4, nf0.format(Math.round(t / 1e6)), 'font-size="12" text-anchor="end" fill="#6b6c6f"'));
     ys.forEach((a, i) => {
-      s += `<rect x="${cx(i) - bw - 1}" y="${y(a.rec)}" width="${bw}" height="${Math.max(0, y(0) - y(a.rec))}" fill="var(--fb1)" rx="2"/>`;
-      s += `<rect x="${cx(i) + 1}" y="${y(0)}" width="${bw}" height="${Math.max(0, y(-a.pay) - y(0))}" fill="var(--fb2)" rx="2"/>`;
-      s += `<text x="${cx(i)}" y="${H - 12}" font-size="12" text-anchor="middle" fill="currentColor" fill-opacity=".7">${i === 0 ? 'قبل' : i}</text>`;
+      s += `<rect x="${cx(i) + 1}" y="${y(a.rec)}" width="${bw}" height="${Math.max(0, y(0) - y(a.rec))}" fill="${C.in}" rx="3"/>`;
+      s += `<rect x="${cx(i) - bw - 1}" y="${y(0)}" width="${bw}" height="${Math.max(0, y(-a.pay) - y(0))}" fill="${C.out}" rx="3"/>`;
+      s += tx(cx(i), H - 12, i === 0 ? 'قبل البدء' : 'سنة ' + i, 'font-size="12" text-anchor="middle" fill="#3a3b3e"');
     });
-    s += `<polyline points="${ys.map((a, i) => cx(i) + ',' + y(a.cum)).join(' ')}" fill="none" stroke="var(--fcum)" stroke-width="3"/>`;
-    ys.forEach((a, i) => s += `<circle cx="${cx(i)}" cy="${y(a.cum)}" r="4" fill="var(--fcum)"/>`);
-    return s + `<text x="${pl - 6}" y="${H - 12}" font-size="11" text-anchor="end" fill="currentColor" fill-opacity=".6">مليون</text></svg>`;
+    s += `<polyline points="${ys.map((a, i) => cx(i) + ',' + y(a.cum)).join(' ')}" fill="none" stroke="${C.cum}" stroke-width="3" stroke-linejoin="round"/>`;
+    ys.forEach((a, i) => s += `<circle cx="${cx(i)}" cy="${y(a.cum)}" r="4.5" fill="#fff" stroke="${C.cum}" stroke-width="2.5"/>`);
+    return s + '</svg>';
   }
-  const hbars = items => { const mx = Math.max(...items.map(i => Math.abs(i[1])), 1); return items.map(([l, v]) => `<div class="fs-hb"><span>${esc(l)}</span><div class="tr"><div style="width:${(Math.abs(v) / mx * 100).toFixed(1)}%"></div></div><span class="v">${Mn(v)}</span></div>`).join(''); };
 
-  /* ---------- التقرير ---------- */
-  function reportHTML(r) {
-    const I = S.info, rv = r.revenue || 1;
-    const pr = (l, v, cls = '') => `<tr class="${cls}"><td>${l}</td><td class="n ${v < 0 ? 'neg' : ''}">${N(v)}</td><td class="n">${Pc(v / rv)}</td></tr>`;
-    const steps = [-0.2, -0.1, 0, 0.1, 0.2];
-    const sens = steps.map(c => steps.map(p => ENG.compute(S, { price: 1 + p, cost: 1 + c })));
+  function chartCum(r) {
+    const W = 900, H = 290, cum = r.cum, n = cum.length - 1 || 1, T = ticksOf(Math.min(...cum, 0), Math.max(...cum, 0)), mx = Math.max(...T, ...cum), mn = Math.min(...T, ...cum), rg = mx - mn || 1;
+    const pl = 54, pr = 10, top = 34, bot = 30, x = m => W - pr - (W - pl - pr) * m / n, y = v => top + (H - top - bot) * (mx - v) / rg, z = y(0);
+    const pts = cum.map((v, m) => x(m).toFixed(1) + ',' + y(v).toFixed(1)).join(' '), area = `${x(0)},${z} ${pts} ${x(n)},${z}`;
+    let s = `<svg class="fs-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="الرصيد النقدي التراكمي"><defs><clipPath id="fsUp"><rect x="0" y="0" width="${W}" height="${z}"/></clipPath><clipPath id="fsDn"><rect x="0" y="${z}" width="${W}" height="${H}"/></clipPath></defs>`;
+    T.forEach(t => s += `<line x1="${pl}" x2="${W - pr}" y1="${y(t)}" y2="${y(t)}" stroke="#1b1c1e" stroke-opacity="${Math.abs(t) < 1 ? .45 : .08}"/>` + tx(pl - 6, y(t) + 4, nf0.format(Math.round(t / 1e6)), 'font-size="12" text-anchor="end" fill="#6b6c6f"'));
+    for (let k = 1; k * 12 <= n; k++) s += `<line x1="${x(k * 12)}" x2="${x(k * 12)}" y1="${top}" y2="${H - bot}" stroke="#1b1c1e" stroke-opacity=".06"/>` + tx(x(k * 12), H - 10, 'سنة ' + k, 'font-size="12" text-anchor="middle" fill="#3a3b3e"');
+    s += `<polygon points="${area}" fill="${C.good}" fill-opacity=".22" clip-path="url(#fsUp)"/><polygon points="${area}" fill="${C.bad}" fill-opacity=".18" clip-path="url(#fsDn)"/><polyline points="${pts}" fill="none" stroke="${C.cum}" stroke-width="2.5" stroke-linejoin="round"/>`;
+    if (r.peak > 0) { const px = x(r.peakMonth), py = y(cum[r.peakMonth]); s += `<circle cx="${px}" cy="${py}" r="6" fill="${C.bad}" stroke="#fff" stroke-width="2"/>` + tx(px, Math.min(H - bot - 4, py + 22), 'أقصى احتياج ' + M1(r.peak) + ' مليون', `text-anchor="${px < 200 ? 'start' : px > W - 200 ? 'end' : 'middle'}" font-size="13" font-weight="700" fill="${C.bad}"`); }
+    if (r.payback != null && r.payback > 0) { const px = x(r.payback); s += `<line x1="${px}" x2="${px}" y1="${top - 6}" y2="${H - bot}" stroke="${C.good}" stroke-width="2" stroke-dasharray="5 4"/>` + tx(px, top - 12, 'استرداد كامل: شهر ' + r.payback, `text-anchor="${px < 200 ? 'start' : px > W - 200 ? 'end' : 'middle'}" font-size="13" font-weight="700" fill="${C.good}"`); }
+    return s + '</svg>';
+  }
+
+  const meter = (val, max, col, lab, txt) => `<div class="fs-mt"><div class="h"><span>${lab}</span><b style="color:${col}">${txt}</b></div><div class="tr"><div style="width:${Math.max(2, Math.min(100, (val || 0) / max * 100)).toFixed(1)}%;background:${col}"></div></div></div>`;
+
+  /* ---------- مكونات التقرير ---------- */
+  const tone = r => (r.net > 0 && r.npv > 0 && (r.irrA == null || r.irrA > S.fin.disc)) ? 'good' : r.net > 0 ? 'mid' : 'bad';
+  const ICO = { profit: 'M4 17l5-5 4 4 7-8M15 8h5v5', sales: 'M4 7h16v10H4zM8 12h8', cost: 'M12 3v18M17 7H9.5a3 3 0 0 0 0 6h5a3 3 0 0 1 0 6H6', irr: 'M4 20V10M10 20V4M16 20v-7M22 20H2', peak: 'M12 4v12m-5-5 5 5 5-5M4 20h16', time: 'M12 7v5l3 3M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18' };
+  const tile = (ico, col, lab, val, hint) => `<div class="fs-tile" style="--c:${col}"><svg viewBox="0 0 24 24"><path d="${ICO[ico]}"/></svg><span>${lab}</span><b>${val}</b>${hint ? `<small>${hint}</small>` : ''}</div>`;
+  function cover(r, sub) {
+    const I = S.info, sy = Math.max(...S.plans.map(p => { let k = p.years.length; while (k > 1 && !+p.years[k - 1]) k--; return k; })), ey = S.exec.dist.length;
+    const chips = [I.location, I.type, 'أرض ' + N(S.land.area) + ' م²', 'بيع ' + sy + ' سنة', 'تنفيذ ' + ey + ' سنة', 'مدة الدراسة ' + yrsTxt(r.months)].filter(Boolean);
+    return `<div class="fs-cov"><div class="t"><img src="logo-light.png" alt="ريسان للمقاولات"><span>${sub}${I.date ? ' · بداية ' + esc(I.date) : ''}</span></div><h2>${esc(I.name)}</h2><div class="ch">${chips.map(c => `<span>${esc(c)}</span>`).join('')}</div></div>`;
+  }
+  function verdictBox(r) {
+    const t = tone(r), be = ENG.breakEven(S);
+    const why = t === 'good' ? `العائد السنوي ${Pc(r.irrA)} أعلى من معدل الخصم ${Pc(S.fin.disc)}، وصافي القيمة الحالية موجب.` : t === 'mid' ? `المشروع يحقق ربحاً، لكن عائده السنوي ${Pc(r.irrA)} أقل من معدل الخصم ${Pc(S.fin.disc)}.` : 'التكاليف أعلى من المبيعات بهذه الافتراضات.';
+    return `<div class="fs-vb ${t}"><div><span>النتيجة</span><b>${verdict(r)}</b><p>${why}${be != null && r.net > 0 ? ` ويظل رابحاً حتى لو انخفضت أسعار البيع ${Pc(be)}.` : ''}</p></div><div class="nv"><span>صافي الربح</span><b>${Mn(r.net)}</b><small>${Pc(r.margin)} من المبيعات</small></div></div>`;
+  }
+  const tiles = r => `<div class="fs-tiles">${tile('sales', C.in, 'إجمالي المبيعات', Mn(r.revenue))}${tile('cost', C.out, 'إجمالي التكاليف', Mn(r.totalCost), 'شامل الأرض والضرائب')}${tile('profit', r.net >= 0 ? C.good : C.bad, 'صافي الربح', Mn(r.net), Pc(r.onCost) + ' على التكلفة')}${tile('irr', C.cum, 'العائد السنوي IRR', Pc(r.irrA), 'معدل الخصم ' + Pc(S.fin.disc))}${tile('peak', C.bad, 'أقصى تمويل مطلوب', Mn(r.peak), mLabel(r.peakMonth))}${tile('time', PAL[3], 'استرداد الفلوس', r.payback == null ? 'لا يسترد' : yrsTxt(r.payback), r.payback == null ? '' : 'شهر ' + r.payback)}</div>`;
+  function story(r) {
+    const be = ENG.breakEven(S), L = [
+      `المشروع يبيع بإجمالي <b>${Mn(r.revenue)}</b> ويتكلف <b>${Mn(r.totalCost)}</b>، فيتبقى صافي ربح <b>${Mn(r.net)}</b>.`,
+      `أكبر مبلغ يحتاجه المشروع من جيب المستثمر <b>${Mn(r.peak)}</b>، ويحدث في ${mLabel(r.peakMonth)}${S.fin.equity ? (r.gap > 0 ? `، ورأس المال المتاح (${Mn(r.equity)}) <b class="neg">لا يكفي</b> — العجز ${Mn(r.gap)}` : `، ورأس المال المتاح (${Mn(r.equity)}) يكفي`) : ''}.`,
+      r.payback == null ? 'المشروع لا يسترد ما صُرف عليه خلال مدة الدراسة.' : `يسترد المشروع كل ما صُرف عليه بعد <b>${yrsTxt(r.payback)}</b> (شهر ${r.payback})، وبعدها تبدأ الفلوس الزيادة.`,
+      be != null && r.net > 0 ? `هامش الأمان: يظل المشروع رابحاً حتى لو انخفضت أسعار البيع <b>${Pc(be)}</b>.` : ''
+    ].filter(Boolean);
+    return `<ul class="fs-story">${L.map(l => `<li>${l}</li>`).join('')}</ul>`;
+  }
+  const costItems = r => [['الأرض', r.landTotal], ['الإنشاءات', r.constr], ['ارتفاع الأسعار', r.escalation], ['تصميم وتراخيص واستشاري', r.design + r.lic + r.consult], ['بيعية وتسويقية', r.selling + r.marketing], ['عمومية وإدارية', r.ga + r.mgmtSales], ['ضرائب', r.tax], ['نسبة الإدارة', r.mgmtProfit]];
+  const useItems = r => { const u = {}; r.sales.forEach(s => u[s.use || 'أخرى'] = (u[s.use || 'أخرى'] || 0) + s.value); return Object.entries(u).sort((a, b) => b[1] - a[1]); };
+  const leg = a => `<div class="fs-leg">${a.map(([c, l, line]) => `<span><i style="background:${c}${line ? ';height:4px;vertical-align:3px' : ''}"></i>${l}</span>`).join('')}</div>`;
+  const sec = (title, body, cls = '', small = '') => `<section class="fs-sec ${cls}"><h4>${title}${small ? ` <small>${small}</small>` : ''}</h4>${body}</section>`;
+  const foot = () => `<div class="fs-foot">دراسة مبدئية مبنية على الافتراضات المدخلة؛ المبالغ بالجنيه المصري. أُعدت بواسطة ريسان للمقاولات في ${new Date().toLocaleDateString('ar-EG')}.</div>`;
+
+  /* ---------- التقرير المختصر ---------- */
+  function reportBrief(r) {
     const be = ENG.breakEven(S);
-    const uses = {}; r.sales.forEach(s => uses[s.use || 'أخرى'] = (uses[s.use || 'أخرى'] || 0) + s.value);
+    return `<div class="fs-rep">${cover(r, 'ملخص دراسة الجدوى')}${verdictBox(r)}${tiles(r)}
+    ${sec('الخلاصة', story(r))}
+    ${sec('من المبيعات إلى صافي الربح', waterfall(r), '', 'بالمليون جنيه')}
+    ${sec('حركة الفلوس عبر الزمن', chartCum(r) + leg([[C.bad + '55', 'فترة الصرف من جيب المستثمر'], [C.good + '55', 'فترة الربح'], [C.cum, 'الرصيد التراكمي', 1]]), 'fs-pb', 'بالمليون جنيه')}
+    <section class="fs-sec"><div class="fs-c2"><div><h4>أين تذهب التكلفة؟</h4>${donut(costItems(r), M1(r.totalCost), 'مليون جنيه')}</div><div><h4>من أين تأتي المبيعات؟</h4>${donut(useItems(r), M1(r.revenue), 'مليون جنيه')}</div></div></section>
+    ${sec('مؤشرات سريعة', `<div class="fs-mts">${meter(r.margin, 0.5, r.margin > 0 ? C.good : C.bad, 'هامش صافي الربح', Pc(r.margin))}${meter(r.irrA, Math.max(0.6, (r.irrA || 0) * 1.1), (r.irrA || 0) > S.fin.disc ? C.good : C.mid, 'العائد السنوي IRR (معدل الخصم ' + Pc(S.fin.disc) + ')', Pc(r.irrA))}${be != null ? meter(be, 0.6, be > 0.15 ? C.good : C.mid, 'أقصى انخفاض يتحمله سعر البيع', Pc(be)) : ''}${meter(r.roi, Math.max(1, (r.roi || 0) * 1.1), C.cum, 'العائد على أقصى تمويل', Pc(r.roi))}</div>`)}
+    ${foot()}</div>`;
+  }
+
+  /* ---------- التقرير الكامل ---------- */
+  function reportFull(r) {
+    const rv = r.revenue || 1;
+    const pr = (l, v, cls = '') => `<tr class="${cls}"><td>${l}</td><td class="n ${v < 0 ? 'neg' : ''}">${M2(v)}</td><td class="n">${Pc(v / rv)}</td></tr>`;
+    const steps = [-0.2, -0.1, 0, 0.1, 0.2], sens = steps.map(c => steps.map(p => ENG.compute(S, { price: 1 + p, cost: 1 + c }))), smx = Math.max(...sens.flat().map(c => Math.abs(c.net)), 1);
+    const heat = v => { const t = Math.min(1, Math.abs(v) / smx); return v >= 0 ? `background:hsl(150 42% ${94 - 44 * t}%);color:${t > .6 ? '#fff' : '#14361f'}` : `background:hsl(4 62% ${94 - 40 * t}%);color:${t > .6 ? '#fff' : '#5a1510'}`; };
     const parts = [['مقدم وأقساط الأرض', 'land', 'landInst'], ['فوائد الأرض', 'landInt'], ['التنفيذ', 'constr'], ['ارتفاع الأسعار', 'esc'], ['تصميمات واستشاري وتراخيص', 'design', 'consult', 'lic'], ['بيعية وتسويقية', 'sell', 'mkt'], ['عمومية وإدارية', 'ga', 'mgmtS'], ['ضرائب', 'tax'], ['نسبة الإدارة', 'mgmtP']];
     const yh = r.years.map(a => `<th class="n">${a.y === 0 ? 'قبل البدء' : 'سنة ' + a.y}</th>`).join('');
-    const yr = (l, f, cls = '') => `<tr class="${cls}"><td>${l}</td>${r.years.map(a => { const v = f(a); return `<td class="n ${v < 0 ? 'neg' : ''}">${N(v)}</td>`; }).join('')}</tr>`;
-    return `<div class="fs-rep">
-    <div class="fs-rh"><div><div class="m">ريسان للمقاولات · دراسة جدوى مالية مبدئية${I.date ? ' · بداية ' + esc(I.date) : ''}</div><h2>${esc(I.name)}</h2><div class="m">${esc(I.location || '')}${I.type ? ' · ' + esc(I.type) : ''}</div></div>
-    <div class="m">مساحة الأرض ${N(S.land.area)} م² · مدة الدراسة ${r.months} شهر</div></div>
-    <div class="fs-find">
-      <div class="fs-hero"><div class="l">صافي الربح بعد الضرائب ونسبة الإدارة</div><div class="b">${Mn(r.net)}</div><div class="l">هامش ${Pc(r.margin)} · IRR ${Pc(r.irrA)} · NPV ${Mn(r.npv)} عند خصم ${Pc(S.fin.disc)}</div><span class="fs-vd">${verdict(r)}</span></div>
-      <div><table class="fs-rt"><tbody>
-        <tr><td>إجمالي المبيعات المتوقعة</td><td class="n">${Mn(r.revenue)}</td></tr><tr><td>إجمالي التكاليف (شامل الضرائب)</td><td class="n">${Mn(r.totalCost)}</td></tr>
-        <tr><td>أقصى احتياج تمويلي (${mLabel(r.peakMonth)})</td><td class="n">${Mn(r.peak)}</td></tr><tr><td>فترة الاسترداد</td><td class="n">${r.payback == null ? 'لا يسترد' : r.payback + ' شهر'}</td></tr>
-        <tr><td>العائد على أقصى استثمار</td><td class="n">${Pc(r.roi)}</td></tr><tr><td>يتحمل انخفاض أسعار البيع حتى</td><td class="n">${be == null ? '—' : Pc(be)}</td></tr></tbody></table>
-      ${r.gap > 0 ? `<p class="neg"><b>تنبيه:</b> رأس المال المتاح (${Mn(r.equity)}) لا يغطي الاحتياج؛ العجز الأقصى ${Mn(r.gap)}.</p>` : `<p>رأس المال المتاح ${Mn(r.equity)} يغطي الاحتياج التمويلي طوال الدراسة.</p>`}
-      ${I.notes ? `<p>${esc(I.notes)}</p>` : ''}</div></div>
-    <h4>التدفقات النقدية السنوية <small>بالمليون جنيه</small></h4>${chartYears(r)}
-    <div class="fs-leg"><span><i style="background:var(--fb1)"></i>المقبوضات</span><span><i style="background:var(--fb2)"></i>المدفوعات</span><span><i style="background:var(--fcum)"></i>الرصيد التراكمي</span></div>
-    <h4>قائمة الدخل التقديرية</h4>
-    <div class="fs-tw"><table class="fs-rt"><thead><tr><th>البيان</th><th class="n">القيمة (جنيه)</th><th class="n">% من المبيعات</th></tr></thead><tbody>
+    const yr = (l, f, cls = '') => { const v0 = r.years.map(f); return v0.some(v => Math.abs(v) >= 5e3) || cls ? `<tr class="${cls}"><td>${l}</td>${v0.map(v => `<td class="n ${v < -1 ? 'neg' : ''}">${Math.abs(v) < 5e3 ? '–' : M1(v)}</td>`).join('')}</tr>` : ''; };
+    const be = ENG.breakEven(S), wide = r.years.length > 7;
+    return `<div class="fs-rep">${cover(r, 'دراسة جدوى مالية')}${verdictBox(r)}${tiles(r)}
+    ${sec('الخلاصة', story(r))}
+    ${sec('من المبيعات إلى صافي الربح', waterfall(r), '', 'بالمليون جنيه')}
+    ${sec('التدفقات النقدية السنوية', chartYears(r) + leg([[C.in, 'المقبوضات'], [C.out, 'المدفوعات'], [C.cum, 'الرصيد التراكمي', 1]]), 'fs-pb', 'بالمليون جنيه')}
+    ${sec('الرصيد النقدي التراكمي شهرياً', chartCum(r) + leg([[C.bad + '55', 'فترة الصرف من جيب المستثمر'], [C.good + '55', 'فترة الربح'], [C.cum, 'الرصيد التراكمي', 1]]), '', 'بالمليون جنيه')}
+    <section class="fs-sec fs-pb"><div class="fs-c2"><div><h4>هيكل التكاليف</h4>${donut(costItems(r), M1(r.totalCost), 'مليون جنيه')}</div><div><h4>المبيعات حسب التخصيص</h4>${donut(useItems(r), M1(r.revenue), 'مليون جنيه')}</div></div></section>
+    ${sec('قائمة الدخل التقديرية', `<table class="fs-rt"><thead><tr><th>البيان</th><th class="n">مليون جنيه</th><th class="n">% من المبيعات</th></tr></thead><tbody>
       ${pr('إجمالي المبيعات', r.revenue, 's')}${pr('تكلفة الأرض (شاملة الفوائد والأوفر والمصاريف)', -r.landTotal)}${pr('تكاليف الإنشاءات', -r.constr)}${pr('مخصص ارتفاع الأسعار', -r.escalation)}
       ${pr('مجمل الربح', r.gross, 's')}${pr('التصميمات', -r.design)}${pr('الرسوم والتراخيص', -r.lic)}${pr('الاستشاري', -r.consult)}${pr('المصروفات البيعية', -r.selling)}${pr('المصروفات التسويقية', -r.marketing)}${pr('عمومية وإدارية', -r.ga)}${r.mgmtSales ? pr('مقابل إدارة', -r.mgmtSales) : ''}
-      ${pr('صافي الربح قبل الضرائب', r.ebit, 's')}${pr('الضرائب', -r.tax)}${pr('صافي الربح بعد الضرائب', r.npat, 's')}${pr('نسبة الإدارة ' + Pc(S.exp.mgmt) + ' من صافي الربح', -r.mgmtProfit)}${pr('صافي الربح', r.net, 'k')}
-    </tbody></table></div>
-    <h4>معايير التقييم المالي</h4>
-    <div class="fs-tw"><table class="fs-rt"><thead><tr><th>المؤشر</th><th class="n">القيمة</th><th>الدلالة</th></tr></thead><tbody>
-      <tr><td>صافي القيمة الحالية NPV</td><td class="n">${N(r.npv)}</td><td>${r.npv > 0 ? 'موجب: العائد يفوق معدل الخصم' : 'سالب: العائد أقل من معدل الخصم'} (${Pc(S.fin.disc)})</td></tr>
-      <tr><td>معدل العائد الداخلي IRR (سنوي)</td><td class="n">${Pc(r.irrA)}</td><td>من التدفقات الشهرية</td></tr><tr><td>معدل العائد الداخلي المعدل MIRR</td><td class="n">${Pc(r.mirr)}</td><td>بإعادة استثمار ${Pc(S.fin.reinv)}</td></tr>
-      <tr><td>هامش صافي الربح</td><td class="n">${Pc(r.margin)}</td><td>صافي الربح ÷ المبيعات</td></tr><tr><td>صافي الربح إلى إجمالي التكلفة</td><td class="n">${Pc(r.onCost)}</td><td></td></tr>
+      ${pr('صافي الربح قبل الضرائب', r.ebit, 's')}${pr('الضرائب', -r.tax)}${pr('صافي الربح بعد الضرائب', r.npat, 's')}${r.mgmtProfit ? pr('نسبة الإدارة ' + Pc(S.exp.mgmt) + ' من صافي الربح', -r.mgmtProfit) : ''}${pr('صافي الربح', r.net, 'k')}
+    </tbody></table>`)}
+    ${sec('معايير التقييم المالي', `<table class="fs-rt"><thead><tr><th>المؤشر</th><th class="n">القيمة</th><th>المعنى</th></tr></thead><tbody>
+      <tr><td>صافي القيمة الحالية NPV</td><td class="nr ${r.npv < 0 ? 'neg' : ''}">${Mn(r.npv)}</td><td>${r.npv > 0 ? 'موجب: العائد يفوق' : 'سالب: العائد أقل من'} معدل الخصم ${Pc(S.fin.disc)}</td></tr>
+      <tr><td>معدل العائد الداخلي IRR (سنوي)</td><td class="n">${Pc(r.irrA)}</td><td>العائد السنوي الفعلي على الفلوس المصروفة</td></tr><tr><td>معدل العائد الداخلي المعدل MIRR</td><td class="n">${Pc(r.mirr)}</td><td>بإعادة استثمار ${Pc(S.fin.reinv)}</td></tr>
+      <tr><td>هامش صافي الربح</td><td class="n">${Pc(r.margin)}</td><td>صافي الربح ÷ المبيعات</td></tr><tr><td>صافي الربح إلى إجمالي التكلفة</td><td class="n">${Pc(r.onCost)}</td><td>كل 100 جنيه تكلفة تكسب ${Math.round(r.onCost * 100)} جنيه</td></tr>
       <tr><td>صافي الربح إلى تكلفة الأرض</td><td class="n">${Pc(r.onLand)}</td><td></td></tr><tr><td>العائد على أقصى احتياج تمويلي</td><td class="n">${Pc(r.roi)}</td><td>صافي الربح ÷ ${Mn(r.peak)}</td></tr>
       ${r.roiEq != null ? `<tr><td>العائد على رأس المال المتاح</td><td class="n">${Pc(r.roiEq)}</td><td>صافي الربح ÷ ${Mn(r.equity)}</td></tr>` : ''}
-    </tbody></table></div>
-    <div class="fs-c2"><div><h4>هيكل التكاليف</h4>${hbars([['الأرض', r.landTotal], ['الإنشاءات', r.constr], ['ارتفاع الأسعار', r.escalation], ['تصميم وتراخيص واستشاري', r.design + r.lic + r.consult], ['بيعية وتسويقية', r.selling + r.marketing], ['عمومية وإدارية', r.ga + r.mgmtSales], ['ضرائب', r.tax], ['نسبة الإدارة', r.mgmtProfit]].filter(a => a[1]))}</div>
-      <div><h4>المبيعات حسب التخصيص</h4>${hbars(Object.entries(uses).sort((a, b) => b[1] - a[1]))}</div></div>
-    <h4>تكلفة الأرض وجدول الأقساط</h4>
-    <div class="fs-tw"><table class="fs-rt"><tbody>
-      <tr><td>مساحة الأرض × سعر المتر</td><td class="n">${N(S.land.area)} × ${N(r.landPrice)}</td><td class="n">${N(r.landVal)}</td></tr><tr><td>الدفعة المقدمة ${Pc(S.land.down)}</td><td></td><td class="n">${N(r.landDown)}</td></tr>
-      <tr><td>الأوفر + المصاريف الإدارية</td><td></td><td class="n">${N(r.landOver + r.landAdmin)}</td></tr><tr><td>الفوائد على الأقساط (${Pc(S.land.rate)} متناقصة)</td><td></td><td class="n">${N(r.landInterest)}</td></tr>
-      <tr class="t"><td>إجمالي تكلفة الأرض</td><td class="n">${N(r.landTotal / (S.land.area || 1))} للمتر</td><td class="n">${N(r.landTotal)}</td></tr></tbody></table>
-    ${r.inst.length ? `<table class="fs-rt" style="margin-top:10px"><thead><tr><th>القسط</th><th>شهر السداد</th><th class="n">قيمة القسط</th><th class="n">الفائدة</th><th class="n">الإجمالي</th><th class="n">الرصيد بعده</th></tr></thead><tbody>
-      ${r.inst.map(a => `<tr><td>${a.k}</td><td>${mLabel(a.month)}</td><td class="n">${N(a.principal)}</td><td class="n">${N(a.interest)}</td><td class="n">${N(a.total)}</td><td class="n">${N(a.balance)}</td></tr>`).join('')}
-      <tr class="t"><td>الإجمالي</td><td></td><td class="n">${N(r.instTotal)}</td><td class="n">${N(r.landInterest)}</td><td class="n">${N(r.instTotal + r.landInterest)}</td><td></td></tr></tbody></table>` : ''}</div>
-    <h4>الأدوار: التنفيذ والمبيعات</h4>
-    <div class="fs-tw"><table class="fs-rt"><thead><tr><th>الدور</th><th>التخصيص</th><th class="n">النسبة البنائية</th><th class="n">مساحة الدور</th><th class="n">عدد</th><th class="n">تكلفة/م²</th><th class="n">تكلفة التنفيذ</th><th class="n">المساحة البيعية</th><th class="n">سعر البيع/م²</th><th class="n">قيمة المبيعات</th></tr></thead><tbody>
-      ${S.floors.map(f => { const A = (+f.ratio || 0) * (+S.land.area || 0), n = +f.count || 1, sa = A * n * (+f.load || 1); return `<tr><td>${esc(f.name)}</td><td>${esc(f.use)}</td><td class="n">${Pc(+f.ratio)}</td><td class="n">${N(A)}</td><td class="n">${n}</td><td class="n">${N(+f.cost)}</td><td class="n">${N(A * n * (+f.cost || 0))}</td><td class="n">${+f.price ? N(sa) : '—'}</td><td class="n">${+f.price ? N(+f.price) : '—'}</td><td class="n">${+f.price ? N(sa * f.price) : '—'}</td></tr>`; }).join('')}
-      <tr class="t"><td colspan="6">الإجمالي</td><td class="n">${N(r.constr)}</td><td class="n">${N(r.sales.reduce((a, s) => a + s.area, 0))}</td><td></td><td class="n">${N(r.listValue)}</td></tr></tbody></table>
-    <p class="fs-hint">التنفيذ يبدأ ${mLabel(+S.exec.start)} ويوزع: ${S.exec.dist.map((d, i) => 'السنة ' + (i + 1) + ' ' + Pc(d.pct)).join(' · ')}، مع مخصص ارتفاع أسعار ${N(r.escalation)}.</p></div>
-    <h4>خطط البيع والتحصيل</h4>
-    <div class="fs-tw"><table class="fs-rt"><thead><tr><th>الخطة</th><th>توزيع البيع</th><th>شروط السداد</th><th class="n">المبيعات المحققة</th></tr></thead><tbody>
-      ${S.plans.map((p, i) => `<tr><td>${esc(p.name)}</td><td>${p.years.map((v, y) => v ? 'س' + (y + 1) + ' ' + Pc(v) : '').filter(Boolean).join(' · ')}</td><td>${p.plan.filter((_, y) => p.years[y]).map((x, y) => 'س' + (y + 1) + ': ' + Pc(x.down) + ' مقدم + ' + x.months + ' شهر').join(' · ')}</td><td class="n">${N(r.byPlan[i] && r.byPlan[i].sold)}</td></tr>`).join('')}
-    </tbody></table><p class="fs-hint">أول قسط للعميل بعد ${S.grace} شهر من التعاقد${+S.priceInc ? '، وزيادة سعر ' + Pc(S.priceInc) + ' سنوياً' : ''}.</p></div>
-    <h4>الموازنة النقدية السنوية <small>جنيه</small></h4>
-    <div class="fs-tw"><table class="fs-rt" style="min-width:${180 + r.years.length * 115}px"><thead><tr><th>البيان</th>${yh}</tr></thead><tbody>
-      ${yr('دفعات التعاقد', a => a.down)}${yr('الأقساط المحصلة', a => a.inst)}${yr('إجمالي المقبوضات', a => a.rec, 's')}
+      <tr><td>نقطة التعادل في سعر البيع</td><td class="n">${be == null ? '—' : '−' + Pc(be)}</td><td>أقصى انخفاض في الأسعار قبل الخسارة</td></tr>
+    </tbody></table>`)}
+    ${sec('تكلفة الأرض وجدول الأقساط', `<table class="fs-rt"><tbody>
+      <tr><td>مساحة الأرض × سعر المتر</td><td class="nr">${N(S.land.area)} م² × ${N(r.landPrice)} جنيه</td><td class="n">${M2(r.landVal)}</td></tr><tr><td>الدفعة المقدمة ${Pc(S.land.down)}</td><td></td><td class="n">${M2(r.landDown)}</td></tr>
+      <tr><td>الأوفر + المصاريف الإدارية</td><td></td><td class="n">${M2(r.landOver + r.landAdmin)}</td></tr><tr><td>الفوائد على الأقساط (${Pc(S.land.rate)} متناقصة)</td><td></td><td class="n">${M2(r.landInterest)}</td></tr>
+      <tr class="t"><td>إجمالي تكلفة الأرض (مليون جنيه)</td><td class="nr">${N(r.landTotal / (S.land.area || 1))} جنيه للمتر</td><td class="n">${M2(r.landTotal)}</td></tr></tbody></table>
+    ${r.inst.length ? `<table class="fs-rt" style="margin-top:10px"><thead><tr><th>القسط</th><th>موعد السداد</th><th class="n">القسط</th><th class="n">الفائدة</th><th class="n">الإجمالي</th><th class="n">الرصيد بعده</th></tr></thead><tbody>
+      ${r.inst.map(a => `<tr><td>${a.k}</td><td>${mLabel(a.month)}</td><td class="n">${M2(a.principal)}</td><td class="n">${M2(a.interest)}</td><td class="n">${M2(a.total)}</td><td class="n">${M2(a.balance)}</td></tr>`).join('')}
+      <tr class="t"><td>الإجمالي</td><td></td><td class="n">${M2(r.instTotal)}</td><td class="n">${M2(r.landInterest)}</td><td class="n">${M2(r.instTotal + r.landInterest)}</td><td></td></tr></tbody></table>` : ''}`, '', 'المبالغ بالمليون جنيه')}
+    ${sec('الأدوار: التنفيذ والمبيعات', `<table class="fs-rt"><thead><tr><th>الدور</th><th>التخصيص</th><th class="n">مساحة الدور م²</th><th class="n">عدد</th><th class="n">تكلفة/م²</th><th class="n">التنفيذ (مليون)</th><th class="n">المساحة البيعية م²</th><th class="n">سعر البيع/م²</th><th class="n">المبيعات (مليون)</th></tr></thead><tbody>
+      ${S.floors.map(f => { const A = (+f.ratio || 0) * (+S.land.area || 0), n = +f.count || 1, sa = A * n * (+f.load || 1); return `<tr><td>${esc(f.name)}</td><td>${esc(f.use)}</td><td class="n">${N(A)}</td><td class="n">${n}</td><td class="n">${N(+f.cost)}</td><td class="n">${M1(A * n * (+f.cost || 0))}</td><td class="n">${+f.price ? N(sa) : '—'}</td><td class="n">${+f.price ? N(+f.price) : '—'}</td><td class="n">${+f.price ? M1(sa * f.price) : '—'}</td></tr>`; }).join('')}
+      <tr class="t"><td colspan="5">الإجمالي</td><td class="n">${M1(r.constr)}</td><td class="n">${N(r.sales.reduce((a, s) => a + s.area, 0))}</td><td></td><td class="n">${M1(r.listValue)}</td></tr></tbody></table>
+      <p class="fs-hint">التنفيذ يبدأ ${mLabel(+S.exec.start)} على ${S.exec.dist.length} سنة: ${S.exec.dist.map((d, i) => 'السنة ' + (i + 1) + ' ' + Pc(d.pct)).join(' · ')}، مع مخصص ارتفاع أسعار ${Mn(r.escalation)}.</p>`)}
+    ${sec('خطط البيع والتحصيل', `<table class="fs-rt"><thead><tr><th>الخطة</th><th>توزيع البيع على السنوات</th><th>شروط السداد</th><th class="n">المبيعات (مليون)</th></tr></thead><tbody>
+      ${S.plans.map((p, i) => `<tr><td>${esc(p.name)}</td><td>${p.years.map((v, y) => v ? 'س' + (y + 1) + ' ' + Pc(v) : '').filter(Boolean).join(' · ')}</td><td>${p.plan.map((x, y) => p.years[y] ? 'س' + (y + 1) + ': ' + Pc(x.down) + ' مقدم + ' + x.months + ' شهر' : '').filter(Boolean).join(' · ')}</td><td class="n">${M1(r.byPlan[i] && r.byPlan[i].sold)}</td></tr>`).join('')}
+    </tbody></table><p class="fs-hint">أول قسط للعميل بعد ${S.grace} شهر من التعاقد${+S.priceInc ? '، وزيادة سعر ' + Pc(S.priceInc) + ' سنوياً' : ''}.</p>`)}
+    ${sec('الموازنة النقدية السنوية', `<table class="fs-rt fs-cb"><thead><tr><th>البيان</th>${yh}</tr></thead><tbody>
+      ${yr('دفعات التعاقد', a => a.down)}${yr('الأقساط المحصلة', a => a.inst)}${yr('إجمالي المقبوضات', a => a.rec, 's in')}
       ${parts.map(([l, ...k]) => yr(l, a => k.reduce((s, kk) => s + a.parts[kk], 0))).join('')}
-      ${yr('إجمالي المدفوعات', a => a.pay, 's')}${yr('صافي التدفق', a => a.net, 't')}${yr('التراكمي', a => a.cum)}${yr('رصيد النقدية (مع رأس المال)', a => a.bal)}
-    </tbody></table></div>
-    <h4>تحليل الحساسية <small>صافي الربح (مليون) و IRR عند تغير أسعار البيع والتكلفة</small></h4>
-    <div class="fs-tw"><table class="fs-rt fs-sens"><thead><tr><th>التكلفة ↓ / سعر البيع ←</th>${steps.map(p => `<th>${p > 0 ? '+' : ''}${p * 100}%</th>`).join('')}</tr></thead><tbody>
-      ${sens.map((row, i) => `<tr><th>${steps[i] > 0 ? '+' : ''}${steps[i] * 100}%</th>${row.map((c, j) => `<td class="${i === 2 && j === 2 ? 'k' : ''} ${c.net < 0 ? 'neg' : ''}"><div class="n">${nf0.format(Math.round(c.net / 1e6))}</div><small>${Pc(c.irrA)}</small></td>`).join('')}</tr>`).join('')}
-    </tbody></table></div>
-    ${r.warn.length ? `<h4>ملاحظات على المدخلات</h4><ul>${r.warn.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
-    <div class="fs-foot">دراسة مبدئية مبنية على الافتراضات المدخلة. المبيعات تُحسب على ما يُباع فعلاً خلال الدراسة، والضرائب تُسدد نهاية كل سنة بنسبة متحصلاتها، ونسبة الإدارة في نهاية المشروع. أُعدت في ${new Date().toLocaleDateString('ar-EG')}.</div></div>`;
+      ${yr('إجمالي المدفوعات', a => a.pay, 's out')}${yr('صافي التدفق', a => a.net, 't')}${yr('التراكمي', a => a.cum, 'cm')}${S.fin.equity ? yr('رصيد النقدية (مع رأس المال)', a => a.bal) : ''}
+    </tbody></table>`, wide ? 'fs-pb wide' : 'fs-pb', 'بالمليون جنيه')}
+    ${sec('تحليل الحساسية', `<p class="fs-hint" style="margin-top:0">كل خانة = صافي الربح (مليون) والعائد السنوي لو اتغيرت أسعار البيع (أفقي) أو التكلفة (رأسي). الأخضر ربح والأحمر خسارة، والخانة المحددة هي الدراسة الحالية.</p><table class="fs-rt fs-sens"><thead><tr><th>التكلفة ↓ / سعر البيع ←</th>${steps.map(p => `<th>${p > 0 ? '+' : ''}${p * 100}%</th>`).join('')}</tr></thead><tbody>
+      ${sens.map((row, i) => `<tr><th>${steps[i] > 0 ? '+' : ''}${steps[i] * 100}%</th>${row.map((c, j) => `<td class="${i === 2 && j === 2 ? 'cur' : ''}" style="${heat(c.net)}"><b>${nf0.format(Math.round(c.net / 1e6))}</b><small>${Pc(c.irrA)}</small></td>`).join('')}</tr>`).join('')}
+    </tbody></table>`)}
+    ${r.warn.length ? sec('ملاحظات على المدخلات', `<ul>${r.warn.map(w => `<li>${esc(w)}</li>`).join('')}</ul>`) : ''}
+    ${S.info.notes ? sec('ملاحظات', `<p>${esc(S.info.notes)}</p>`) : ''}
+    <div class="fs-foot">المبيعات تُحسب على ما يُباع فعلاً خلال الدراسة، والضرائب تُسدد نهاية كل سنة بنسبة متحصلاتها، ونسبة الإدارة في نهاية المشروع. دراسة مبدئية مبنية على الافتراضات المدخلة؛ أُعدت بواسطة ريسان للمقاولات في ${new Date().toLocaleDateString('ar-EG')}.</div></div>`;
   }
 
   /* ---------- الأحداث ---------- */
-  const NEW = { floors: () => ({ name: 'دور جديد', use: 'تجاري', ratio: 0.5, count: 1, cost: 0, load: 1.15, price: 0, plan: S.plans[0].id }), plans: () => ({ id: 'p' + Date.now().toString(36), name: 'خطة جديدة', start: 1, years: [0.3, 0.4, 0.3], plan: [{ down: 0.1, months: 60 }] }) };
+  const even = n => { const a = Array.from({ length: n }, () => Math.round(10000 / n) / 10000); a[n - 1] = Math.round((1 - a.slice(0, -1).reduce((s, x) => s + x, 0)) * 10000) / 10000; return a; };
+  const NEW = { floors: () => ({ name: 'دور جديد', use: 'تجاري', ratio: 0.5, count: 1, cost: 0, load: 1.15, price: 0, plan: S.plans[0].id }), plans: () => ({ id: 'p' + Date.now().toString(36), name: 'خطة جديدة', start: 1, years: even(S.plans[0].years.length), plan: [{ down: 0.1, months: 60 }] }) };
   function bind() {
     root.oninput = e => { const t = e.target; if (!t.dataset || !t.dataset.p) return; const ty = t.dataset.t;
       if (ty === 'dist') { const es = S.exec.dist[0] ? S.exec.dist[0].esc : 0.1; const v = t.value.split(/[,،\s]+/).map(x => parse(x, 'pct')).filter(x => x > 0); if (v.length) S.exec.dist = v.map(p => ({ pct: p, esc: es })); }
@@ -615,23 +739,35 @@ export async function mount(root, ctx) {
       else if (t.tagName !== 'SELECT') setP(t.dataset.p, parse(t.value, ty));
       else return;
       touch(); recalc(); };
-    root.onchange = e => { const t = e.target; if (t.tagName === 'SELECT' && t.dataset.p) { setP(t.dataset.p, t.value); touch(); recalc(true); } };
+    root.onchange = e => { const t = e.target;
+      if (t.dataset.cnt) { const n = Math.min(15, Math.max(1, Math.round(parse(t.value, 'num')) || 1)), ev = even(n);
+        if (t.dataset.cnt === 'sale') S.plans.forEach(p => { p.years = ev.slice(); while (p.plan.length < n) p.plan.push(clone(p.plan[p.plan.length - 1] || { down: 0.1, months: 60 })); p.plan.length = n; });
+        else { const es = S.exec.dist[0] ? S.exec.dist[0].esc : 0.1; S.exec.dist = ev.map(pct => ({ pct, esc: es })); }
+        touch(); setTimeout(() => { renderForm(); recalc(true); }, 0); return; }
+      if (t.tagName === 'SELECT' && t.dataset.p) { setP(t.dataset.p, t.value); touch(); recalc(true); } };
     if (!root._fsfo) root._fsfo = 1, root.addEventListener('focusout', e => { const t = e.target; if (view === 'list' || !t.dataset || !t.dataset.p) return; if (t.tagName === 'INPUT' && t.dataset.t !== 'text') t.value = fmtIn(getP(t.dataset.p), t.dataset.t); if (/^plans\.\d+\.name$/.test(t.dataset.p)) renderForm(); });
     root.onclick = async e => {
       const b = e.target.closest('button'); if (!b) return; const d = b.dataset;
       if (d.back != null) { if (dirty && !confirm('فيه تعديلات مش محفوظة. ترجع من غير حفظ؟')) return; return showList(); }
       if (d.v) return setView(d.v);
-      if (d.print != null) { setView('rep'); document.body.classList.add('fs-print'); setTimeout(() => { window.print(); document.body.classList.remove('fs-print'); }, 50); return; }
+      if (d.print != null) return printRep();
       if (d.xlsx != null) return exportX();
       if (d.save != null) return save();
       if (d.dup != null) { const c = clone(S); c.info.name = (c.info.name || '') + ' — نسخة'; openStudy(c, ''); touch(); return toast('اتعملت نسخة — احفظها باسم جديد'); }
       if (d.delStudy != null) { if (!confirm('حذف الدراسة دي نهائياً؟')) return; const { error } = await sb.from('feasibility_studies').delete().eq('id', curId); if (error) return toast(error.message); toast('اتحذفت'); dirty = false; return showList(); }
       if (d.add) S[d.add].push(NEW[d.add]());
-      else if (d.addyear != null) S.plans.forEach(p => { p.years.push(0); p.plan.push(clone(p.plan[p.plan.length - 1])); });
       else if (d.del) { const ks = d.del.split('.'); const i = +ks.pop(); getP(ks.join('.')).splice(i, 1); }
       else return;
       touch(); renderForm(); recalc(true);
     };
+  }
+  function printRep() {
+    if (view === 'in') setView('rep');
+    let box = document.getElementById('fsPrint'); if (!box) { box = document.createElement('div'); box.id = 'fsPrint'; document.body.append(box); }
+    box.innerHTML = repOf(view); const t0 = document.title; document.title = (view === 'brief' ? 'ملخص دراسة جدوى - ' : 'دراسة جدوى - ') + (S.info.name || '');
+    document.body.classList.add('fs-print');
+    const done = () => { document.body.classList.remove('fs-print'); box.innerHTML = ''; document.title = t0; window.removeEventListener('afterprint', done); };
+    window.addEventListener('afterprint', done); setTimeout(() => window.print(), 80);
   }
   async function save() {
     R = ENG.compute(S);
