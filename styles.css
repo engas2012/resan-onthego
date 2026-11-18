@@ -268,7 +268,7 @@ h4{margin:16px 0 8px;font-size:15px;display:flex;gap:8px;align-items:center;flex
 .editbar .edd{display:flex;flex-direction:row;align-items:center;gap:6px;color:inherit;font-size:13px}.editbar .edd input{min-height:34px;padding:2px 6px;width:150px}
 .rsrc{font-size:10px;color:var(--mut);white-space:nowrap}
 .k.lyr{position:relative;padding-inline-start:46px}.k.lyr i{position:absolute;inset-inline-start:12px;top:14px;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-style:normal;font-weight:700;font-size:13px;color:#fff}
-.k.c1 i{background:var(--ink)}.k.c2 i{background:var(--acc)}.k.c3 i{background:var(--ok)}
+.k.c1 i{background:var(--ink)}.k.c2 i{background:var(--acc)}.k.c3 i{background:var(--ok)}.k.cb i{background:var(--warn)}
 /* alerts / PWA */
 header .bell{position:relative;display:inline-flex;align-items:center;justify-content:center;width:36px;height:34px;border-radius:99px;border:1px solid currentColor;opacity:.9}
 header .bell.on{background:var(--acc);border-color:var(--acc);color:#fff}header .bell .badge{position:absolute;top:-6px;inset-inline-end:-8px;font-size:11px;line-height:17px;padding:0 5px}
