@@ -13,9 +13,11 @@ const CAN = {
   report: ['site', 'tech'],
   review: ['tech', 'management'],
   log: ['site', 'tech', 'management'],
-  docs: ['site', 'tech', 'finance', 'management'],
+  docs: ['tech', 'finance', 'management'],
   tasks: ['tech', 'finance', 'management', 'consultant'],
-  store: ['site', 'tech', 'finance', 'management', 'store'],
+  store: ['tech', 'finance', 'management', 'store'],
+  sched: ['tech', 'consultant', 'owner', 'finance', 'management', 'store'],
+  fullRep: ['tech', 'consultant', 'owner', 'finance', 'management', 'store'],
   storeMove: ['tech', 'management', 'store'],
   docsUp: ['site', 'tech', 'management'],
   editBoq: ['tech', 'management'],
@@ -56,7 +58,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 3.9.1</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 3.9.2</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -91,7 +93,7 @@ async function afterLogin(user) {
 }
 
 /* ---------------- layout & routing ---------------- */
-const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', 'الجدول الزمني', null], ['tasks', 'مهام المكتب الفني', 'tasks'], ['boq', 'المقايسة والتكلفة', 'boq'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة المكتب الفني', 'review'], ['log', 'سجل التقارير', 'log'], ['store', 'المخزن', 'store'], ['inv', 'المستخلصات', 'inv'], ['docs', 'المستندات', 'docs']];
+const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', 'الجدول الزمني', 'sched'], ['tasks', 'مهام المكتب الفني', 'tasks'], ['boq', 'المقايسة والتكلفة', 'boq'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة المكتب الفني', 'review'], ['log', 'سجل التقارير', 'log'], ['store', 'المخزن', 'store'], ['inv', 'المستخلصات', 'inv'], ['docs', 'المستندات', 'docs']];
 function shell(pid, view) {
   const p = pid && S.projects.find(x => x.id === pid);
   return `<header><div class="hbar"><a class="brandlink" href="${hubOn() ? '#start' : '#home'}" title="الصفحة الرئيسية">${LOGO()}<span class="otg">On the go</span></a>
@@ -111,7 +113,7 @@ async function route() {
     if (view === 'review' && can('review', pid)) return renderReview();
     if (view === 'log' && can('log', pid)) return renderLog();
     if (view === 'boq' && can('boq', pid)) return renderBoq();
-    if (view === 'schedule') return renderSchedule();
+    if (view === 'schedule' && can('sched', pid)) return renderSchedule();
     if (view === 'docs' && can('docs', pid)) return renderDocs();
     if (view === 'tasks' && can('tasks', pid)) return renderTasks();
     if (view === 'store' && can('store', pid)) return renderStore();
@@ -146,7 +148,7 @@ async function loadProject(pid) {
   P.reports = rp.data || [];
   P.vendors = can('boq', pid) || can('tasks', pid) ? ((await S.sb.from('vendors').select('*').order('trade').order('name')).data || []) : [];
   P.guide = can('boq', pid) || can('tasks', pid) ? ((await S.sb.from('price_guide').select('*').order('sort')).data || []) : [];
-  P.docs = can('docs', pid) ? ((await S.sb.from('documents').select('*').eq('project_id', pid).order('doc_date', { ascending: false }).order('created_at', { ascending: false })).data || []) : [];
+  P.docs = can('docs', pid) || can('log', pid) ? ((await (can('docs', pid) ? S.sb.from('documents').select('*') : S.sb.from('documents').select('*').eq('kind', 'report')).eq('project_id', pid).order('doc_date', { ascending: false }).order('created_at', { ascending: false })).data || []) : [];
   P.proj = S.projects.find(x => x.id === pid);
   const ids = [...new Set([...P.reports.flatMap(r => [r.created_by, r.reviewed_by]), ...P.docs.map(d => d.uploaded_by)].filter(x => x && !(x in S.names)))];
   if (ids.length) { const { data } = await S.sb.from('profiles').select('id,full_name,email').in('id', ids); (data || []).forEach(u => S.names[u.id] = u.full_name || u.email); }
@@ -612,8 +614,8 @@ async function renderHome() {
   <dl class="who"><dt>المالك</dt><dd>${esc(p.owner_name)}</dd><dt>المقاول العام</dt><dd>${esc(p.contractor_name)}</dd><dt>الاستشاري</dt><dd>${esc(p.consultant_name)}</dd></dl>
   <div class="mbars">${list.map(x => `<div><span>${x.n}. ${esc(x.name)}</span><div class="bar${x.pct >= 1 ? ' full' : ''}"><u style="width:${Math.min(x.pct, 1) * 100}%"></u></div><em>${Math.round(x.pct * 100)}%</em></div>`).join('')}</div>
   ${liveWork(p, work, upd)}
-  <div class="acts" style="margin-top:0"><a class="btn p" href="#p/${p.id}/status">فتح المشروع</a>${can('report', p.id) ? `<a class="btn" href="#p/${p.id}/report">تقرير يومي</a>` : ''}${can('review', p.id) ? `<a class="btn" href="#p/${p.id}/review">المراجعة</a>` : ''}<button type="button" data-rep="${p.id}">📄 تقرير شامل</button></div></article>`).join('')}</div>`;
-  $('#main').onclick = e => { const rp = e.target.closest('[data-rep]'); if (rp) return projectReport(rp.dataset.rep, rp); const t = e.target.closest('[data-lt]'); if (!t) return; const box = t.closest('.live'); box.querySelectorAll('[data-lt]').forEach(b => b.classList.toggle('on', b === t)); box.querySelectorAll('[data-lp]').forEach(x => x.hidden = x.dataset.lp !== t.dataset.lt); };
+  <div class="acts" style="margin-top:0"><a class="btn p" href="#p/${p.id}/status">فتح المشروع</a>${can('report', p.id) ? `<a class="btn" href="#p/${p.id}/report">تقرير يومي</a>` : ''}${can('review', p.id) ? `<a class="btn" href="#p/${p.id}/review">المراجعة</a>` : ''}${can('fullRep', p.id) ? `<button type="button" data-rep="${p.id}">📄 تقرير شامل</button>` : ''}</div></article>`).join('')}</div>`;
+  $('#main').onclick = e => { const rp = e.target.closest('[data-rep]'); if (rp && can('fullRep', rp.dataset.rep)) return projectReport(rp.dataset.rep, rp); const t = e.target.closest('[data-lt]'); if (!t) return; const box = t.closest('.live'); box.querySelectorAll('[data-lt]').forEach(b => b.classList.toggle('on', b === t)); box.querySelectorAll('[data-lp]').forEach(x => x.hidden = x.dataset.lp !== t.dataset.lt); };
 }
 const CRANE = `<svg class="crane" viewBox="0 0 64 56" aria-hidden="true"><path d="M10 54V8M4 54h14M10 8l44 0M10 8 22 2l32 6M10 18l12-10M18 8v0" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g class="trolley"><rect x="36" y="6" width="8" height="5" rx="1" fill="currentColor"/><line class="cable" x1="40" y1="11" x2="40" y2="30" stroke="currentColor" stroke-width="1.4"/><g class="hook"><rect x="35" y="30" width="10" height="8" rx="1.5" fill="var(--acc)"/></g></g></svg>`;
 function liveWork(p, work, upd) {
