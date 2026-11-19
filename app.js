@@ -25,6 +25,9 @@ const CAN = {
   boq: ['tech', 'finance', 'management'],
   inv: ['tech', 'finance', 'management', 'owner', 'consultant'],
   invEdit: ['tech', 'finance', 'management'],
+  quotes: ['tech', 'finance', 'management', 'consultant', 'owner'],
+  quoteEd: ['tech', 'management'],
+  quoteRev: ['consultant', 'management'],
 };
 const FLOORS = { sheraton: { ground: 2, list: [['البدروم السفلي', 'SH-4-04', 'SH-4-06'], ['البدروم العلوي', 'SH-4-07', 'SH-4-08'], ['الأرضي', 'SH-4-09', 'SH-4-10'], ['الأول', 'SH-4-11', 'SH-4-12'], ['الثاني', 'SH-4-14', 'SH-4-15'], ['الثالث', 'SH-4-16', 'SH-4-17'], ['الرابع', 'SH-4-18', 'SH-4-19'], ['الخامس', 'SH-4-20', 'SH-4-21'], ['السطح', null, 'SH-4-22']] } };
 const DISC = ['انشائي', 'مباني', 'معماري / تشطيبات', 'كهرباء', 'ميكانيكا / صحي', 'واجهات', 'لاندسكيب', 'عام'];
@@ -58,7 +61,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 3.9.2</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.0.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -93,20 +96,31 @@ async function afterLogin(user) {
 }
 
 /* ---------------- layout & routing ---------------- */
-const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', 'الجدول الزمني', 'sched'], ['tasks', 'مهام المكتب الفني', 'tasks'], ['boq', 'المقايسة والتكلفة', 'boq'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة المكتب الفني', 'review'], ['log', 'سجل التقارير', 'log'], ['store', 'المخزن', 'store'], ['inv', 'المستخلصات', 'inv'], ['docs', 'المستندات', 'docs']];
+const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', 'الجدول الزمني', 'sched'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة التقارير', 'review'], ['log', 'سجل التقارير', 'log'], ['tasks', 'مهام المكتب الفني', 'tasks'], ['boq', 'المقايسة والتكلفة', 'boq'], ['quotes', 'عروض الأسعار', 'quotes'], ['inv', 'المستخلصات', 'inv'], ['store', 'المخزن', 'store'], ['docs', 'المستندات', 'docs']];
+const NAVG = [['متابعة المشروع', '📊', ['status', 'schedule']], ['التقارير اليومية', '📝', ['report', 'review', 'log']], ['المكتب الفني والتسعير', '📐', ['tasks', 'boq', 'quotes']], ['المستخلصات والمخزن', '💼', ['inv', 'store']], ['المستندات', '📁', ['docs']]];
+const BADGE = { review: 'pendN', tasks: 'taskN', quotes: 'quoteN' };
+function projNav(pid, view) {
+  const vis = VIEWS.filter(v => !v[2] || can(v[2], pid)), lab = Object.fromEntries(vis.map(v => [v[0], v[1]]));
+  const G = NAVG.map(([t, ic, vs]) => [t, ic, vs.filter(v => v in lab)]).filter(g => g[2].length), cur = G.find(g => g[2].includes(view)) || G[0];
+  const bn = id => (S.bn || {})[id] || 0, bd = (n, x) => `<span class="badge"${x}${n ? '' : ' hidden'}>${n > 999 ? '999+' : n || ''}</span>`;
+  const a = (v, l, cls = '') => `<a href="#p/${pid}/${v}" class="${cls}">${l}${BADGE[v] ? ' ' + bd(bn(BADGE[v]), ` id="${BADGE[v]}"`) : ''}</a>`;
+  return `<div class="ngrp">${G.map(g => g[2].length === 1 ? a(g[2][0], `<i>${g[1]}</i>${g[0]}`, g === cur ? 'on' : '') : `<a href="#p/${pid}/${g === cur && g[2].includes(view) ? view : g[2][0]}" class="${g === cur ? 'on' : ''}"><i>${g[1]}</i>${g[0]}${g[2].some(v => BADGE[v]) ? ' ' + bd(g[2].reduce((t, v) => t + bn(BADGE[v]), 0), ` data-gb="${g[2].filter(v => BADGE[v]).join(' ')}"`) : ''}</a>`).join('')}</div>${cur && cur[2].length > 1 ? `<div class="nsub">${cur[2].map(v => a(v, lab[v], v === view ? 'on' : '')).join('')}</div>` : ''}`;
+}
+const setBadge = (id, n) => { (S.bn ||= {})[id] = n; const b = document.getElementById(id); if (b) { b.hidden = !n; b.textContent = n > 999 ? '999+' : n; }
+  document.querySelectorAll('[data-gb]').forEach(g => { const t = g.dataset.gb.split(' ').reduce((a, v) => a + (S.bn[BADGE[v]] || 0), 0); g.hidden = !t; g.textContent = t > 999 ? '999+' : t; }); };
 function shell(pid, view) {
   const p = pid && S.projects.find(x => x.id === pid);
   return `<header><div class="hbar"><a class="brandlink" href="${hubOn() ? '#start' : '#home'}" title="الصفحة الرئيسية">${LOGO()}<span class="otg">On the go</span></a>
   <div class="who2"><a class="bell${view === 'alerts' ? ' on' : ''}" href="#alerts" title="التنبيهات"><svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span class="badge" id="bellN" hidden></span></a><a class="homeb${!p && (view === 'start' || (!hubOn() && !['admin', 'staff', 'alerts', 'hr', 'ops', 'study'].includes(view))) ? ' on' : ''}" href="${hubOn() ? '#start' : '#home'}"><svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M5.5 9.5V20h5v-6h3v6h5V9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>الرئيسية</a>${p ? `<span class="roleTag">${ROLE[role(pid)] || ''}</span>` : ''}<span class="uname">${esc(S.profile.full_name || S.profile.email)}</span>${S.admin ? '<a href="#admin" class="adm">المستخدمين</a>' : ''}<button id="out">خروج</button></div></div>
   ${p ? `<div class="ptitle">${modCrumb('home')}<h1>${esc(p.name + ' – ' + p.place)}</h1><p>المالك: ${esc(p.owner_name)} · المقاول العام: ${esc(p.contractor_name)} · الاستشاري: ${esc(p.consultant_name)}</p></div>` : `<div class="ptitle">${modCrumb(view)}<h1>${esc(MODT[modOf(view)] || 'متابعة مشروعات الغردقة')}</h1></div>`}
-  <nav>${p ? VIEWS.filter(v => !v[2] || can(v[2], pid)).map(([v, l]) => `<a href="#p/${pid}/${v}" class="${v === view ? 'on' : ''}">${l}${v === 'review' ? ' <span class="badge" id="pendN" hidden></span>' : ''}${v === 'tasks' ? ' <span class="badge" id="taskN" hidden></span>' : ''}</a>`).join('') : ''}</nav></header><main id="main"><p class="mut">جاري التحميل…</p></main>`;
+  <nav class="${p ? 'pnav' : ''}">${p ? projNav(pid, view) : ''}</nav></header><main id="main"><p class="mut">جاري التحميل…</p></main>`;
 }
 async function route() {
   document.querySelector('.selbar')?.remove();
   const h = location.hash.slice(1) || (hubOn() ? 'start' : myMods()[0] || 'home'), m = h.match(/^p\/([a-z0-9_-]+)\/([a-z]+)$/);
   if (m && S.projects.some(p => p.id === m[1])) {
     const [, pid, view] = m;
-    $('#app').innerHTML = shell(pid, view); bindOut();
+    $('#app').innerHTML = shell(pid, view); bindOut(); document.querySelectorAll('nav.pnav a.on').forEach(a => a.scrollIntoView({ block: 'nearest', inline: 'center' }));
     if (!S.P || S.P.id !== pid) { S.P = { id: pid }; S.open.clear(); S.q = ''; S.bsel = ''; S.bq = { ph: '', b: '', miss: false, q: '', edit: false, pend: new Map() }; }
     await loadProject(pid);
     if (view === 'report' && can('report', pid)) return renderReport();
@@ -115,6 +129,7 @@ async function route() {
     if (view === 'boq' && can('boq', pid)) return renderBoq();
     if (view === 'schedule' && can('sched', pid)) return renderSchedule();
     if (view === 'docs' && can('docs', pid)) return renderDocs();
+    if (view === 'quotes' && can('quotes', pid)) return renderQuotes();
     if (view === 'tasks' && can('tasks', pid)) return renderTasks();
     if (view === 'store' && can('store', pid)) return renderStore();
     if (view === 'inv' && can('inv', pid)) return renderInv();
@@ -138,13 +153,13 @@ async function loadProject(pid) {
   const P = S.P, wantItems = can('items', pid), wantReports = can('log', pid);
   const jobs = [S.sb.rpc('phase_progress', { p_project: pid }), S.sb.from('phases').select('*').eq('project_id', pid).order('n')];
   jobs.push(wantItems ? S.sb.from('boq_progress').select('*').eq('project_id', pid).order('sort') : Promise.resolve({ data: [] }));
-  jobs.push(wantItems ? S.sb.from('boq_rates').select('item_id,rate,contract_amount,rate_source,rate_doc_id,rate_updated_at') : Promise.resolve({ data: [] }));
+  jobs.push(wantItems ? S.sb.from('boq_rates').select('item_id,rate,contract_amount,rate_source,rate_doc_id,rate_quote_id,rate_updated_at') : Promise.resolve({ data: [] }));
   jobs.push(wantReports ? S.sb.from('daily_reports').select('*').eq('project_id', pid).order('report_date', { ascending: false }).limit(400) : Promise.resolve({ data: [] }));
   const [pp, ph, it, rt, rp] = await Promise.all(jobs);
   P.phaseProg = pp.data || []; P.phases = ph.data || [];
   const rates = Object.fromEntries((rt.data || []).map(r => [r.item_id, +r.rate])), camts = Object.fromEntries((rt.data || []).map(r => [r.item_id, +r.contract_amount || 0])), rmeta = Object.fromEntries((rt.data || []).map(r => [r.item_id, r]));
   P.showRates = ['tech', 'finance', 'management'].includes(role(pid));
-  P.items = (it.data || []).map(i => { const q = +i.qty || 0, ex = +i.executed || 0, rate = rates[i.id] || 0; const pct = q > 0 ? ex / q : (i.pct_override != null ? +i.pct_override : 0); const camt = camts[i.id] || 0, rm = rmeta[i.id] || {}; return { ...i, ex, rate, camt, rsrc: rm.rate_source, rdoc: rm.rate_doc_id, rdate: rm.rate_updated_at, crate: q > 0 ? camt / q : camt, pct: Math.max(0, pct), rem: q - ex, val: q * rate, w: camt > 0 ? camt : q * rate, known: q > 0 || i.pct_override != null }; });
+  P.items = (it.data || []).map(i => { const q = +i.qty || 0, ex = +i.executed || 0, rate = rates[i.id] || 0; const pct = q > 0 ? ex / q : (i.pct_override != null ? +i.pct_override : 0); const camt = camts[i.id] || 0, rm = rmeta[i.id] || {}; return { ...i, ex, rate, camt, rsrc: rm.rate_source, rdoc: rm.rate_doc_id, rqid: rm.rate_quote_id, rdate: rm.rate_updated_at, crate: q > 0 ? camt / q : camt, pct: Math.max(0, pct), rem: q - ex, val: q * rate, w: camt > 0 ? camt : q * rate, known: q > 0 || i.pct_override != null }; });
   P.reports = rp.data || [];
   P.vendors = can('boq', pid) || can('tasks', pid) ? ((await S.sb.from('vendors').select('*').order('trade').order('name')).data || []) : [];
   P.guide = can('boq', pid) || can('tasks', pid) ? ((await S.sb.from('price_guide').select('*').order('sort')).data || []) : [];
@@ -152,9 +167,12 @@ async function loadProject(pid) {
   P.proj = S.projects.find(x => x.id === pid);
   const ids = [...new Set([...P.reports.flatMap(r => [r.created_by, r.reviewed_by]), ...P.docs.map(d => d.uploaded_by)].filter(x => x && !(x in S.names)))];
   if (ids.length) { const { data } = await S.sb.from('profiles').select('id,full_name,email').in('id', ids); (data || []).forEach(u => S.names[u.id] = u.full_name || u.email); }
-  const pend = P.reports.filter(r => r.status === 'submitted').length, b = $('#pendN'); if (b) { b.hidden = !pend; b.textContent = pend; }
+  setBadge('pendN', can('review', pid) ? P.reports.filter(r => r.status === 'submitted').length : 0);
+  if (can('quotes', pid)) { const [qq, qi] = await Promise.all([S.sb.from('quotes').select('*').eq('project_id', pid).order('created_at'), S.sb.rpc('quote_items', { p_project: pid })]); P.quotes = qq.data || []; P.qitems = qi.data || [];
+    if (!can('docs', pid)) { const qd = P.quotes.map(q => q.doc_id).filter(Boolean); if (qd.length) { const { data } = await S.sb.from('documents').select('*').in('id', qd); P.docs = [...P.docs, ...(data || [])]; } } } else { P.quotes = []; P.qitems = []; }
+  setBadge('quoteN', can('quoteRev', pid) && role(pid) === 'consultant' ? P.quotes.filter(q => q.status === 'submitted').length : can('quoteEd', pid) ? P.quotes.filter(q => q.status === 'rejected' && q.adopted).length : 0);
   P.check = can('tasks', pid) ? ((await S.sb.from('phase_checklist').select('*').eq('project_id', pid).order('phase_n').order('sort').order('created_at')).data || []) : [];
-  const open = can('tasks', pid) ? P.items.filter(lacks).length + P.check.filter(c => c.status !== 'approved').length : 0, tb = $('#taskN'); if (tb) { tb.hidden = !open; tb.textContent = open > 999 ? '999+' : open; }
+  setBadge('taskN', can('tasks', pid) ? P.items.filter(lacks).length + P.check.filter(c => c.status !== 'approved').length : 0);
 }
 const overall = list => { const W = list.reduce((s, x) => s + (+x.weight || 0), 0); return W ? list.reduce((s, x) => s + (+x.pct || 0) * (+x.weight || 0), 0) / W : 0; };
 const groupPct = rows => { const v = rows.filter(r => r.w > 0), avg = v.length ? v.reduce((s, r) => s + r.w, 0) / v.length : 1; let a = 0, b = 0; rows.forEach(r => { const w = r.w > 0 ? r.w : avg; a += w * Math.min(r.pct, 1); b += w; }); return b ? a / b : 0; };
@@ -1038,7 +1056,7 @@ function vendorsFor(i) {
   return (S.P.vendors || []).filter(v => v.status !== 'blocked' && (!v.phases || !v.phases.length || v.phases.includes(i.phase_n)) && (() => { try { const re = new RegExp(v.pattern, 'i'); return re.test(t) || re.test(tn); } catch { return false; } })())
     .sort((x, y) => (x.status === 'approved' ? 0 : 1) - (y.status === 'approved' ? 0 : 1) || (y.rating || 0) - (x.rating || 0));
 }
-const vendLink = i => { if (!(S.P.vendors || []).length) return ''; const n = vendorsFor(i).length; return ` <a href="#" class="vlink" data-vend="${esc(i.id)}" title="الشركات اللي ممكن تسعّر البند">🏢${n || '+'}</a>`; };
+const vendLink = i => { if (!(S.P.vendors || []).length) return ''; const n = vendorsFor(i).length, nq = (S.P.quotes || []).filter(q => q.item_id === i.id).length; return ` <a href="#" class="vlink" data-vend="${esc(i.id)}" title="الشركات اللي ممكن تسعّر البند">🏢${n || '+'}</a>${nq ? ` <a href="#" class="vlink" data-vend="${esc(i.id)}" title="عروض الأسعار المسجلة للبند">📑${nq}</a>` : ''}`; };
 const gq = q => 'https://www.google.com/search?q=' + encodeURIComponent(q);
 const gmaps = q => 'https://www.google.com/maps/search/' + encodeURIComponent(q);
 /* ---- phones & whatsapp ---- */
@@ -1068,16 +1086,16 @@ function guideDialog(id) {
 document.addEventListener('click', e => { const g = e.target.closest('[data-guide]'); if (g) { e.preventDefault(); e.stopPropagation(); guideDialog(g.dataset.guide); } }, true);
 function vendorPanel(id) {
   const P = S.P, i = P.items.find(x => x.id === id); if (!i) return;
-  const V = vendorsFor(i), Q = (P.docs || []).filter(d => d.item_id === id && d.kind === 'quote'), ed = can('editBoq', P.id);
+  const V = vendorsFor(i), Q = (P.quotes || []).filter(q => q.item_id === id).sort((a, b) => qVat(a) - qVat(b)), ed = can('editBoq', P.id);
   const msg = v => encodeURIComponent(`السلام عليكم، شركة ريسان للمقاولات – مشروع ${P.proj.name}.\nمطلوب عرض سعر ${VK[v.kind] === 'توريد' ? 'توريد' : 'توريد وتنفيذ'} للبند:\n${i.name}\nالكمية: ${+i.qty ? nf(i.qty) + ' ' + (i.unit || '') : 'حسب المقايسة'}\nبرجاء إرسال السعر ومدة التوريد. شكراً.`);
   const dlg = document.createElement('dialog'); dlg.className = 'adlg';
   dlg.innerHTML = `<div class="dh"><div><div class="mut" style="font-size:12px">${esc(i.code)} · ${i.phase_n}. ${esc(P.phaseProg.find(x => x.n === i.phase_n)?.name || '')}</div><h3 style="margin:2px 0 0;font-size:16px;line-height:1.5">${esc(i.name.length > 120 ? i.name.slice(0, 120) + '…' : i.name)}</h3><div class="mut" style="font-size:13px">${+i.qty ? nf(i.qty) + ' ' + esc(i.unit || '') : 'مقطوعية'}${i.rate > 0 ? ' · السعر الحالي ' + nf(i.rate) + ' ج.م' : ' · <b style="color:var(--bad)">مش متسعّر</b>'}</div></div><button type="button" class="dx">✕</button></div>
   ${(() => { const g = guideFor(i); return g ? `<a href="#" class="gbox" data-guide="${esc(i.id)}"><span>سعر استرشادي من متوسطات السوق</span><b>≈ ${nf(g.rate)} ج.م / ${esc(i.unit || '')}</b><small>المدى ${nf(g.rmin)} – ${nf(g.rmax)} · اضغط لتفاصيل الحساب</small></a>` : ''; })()}
   <h4>الشركات المناسبة للبند (${V.length})</h4>${V.length < 2 ? `<div class="note" style="margin-top:0">الشركات المسجلة للبند ده أقل من اتنين. <a target="_blank" rel="noopener" href="${gmaps((i.group_name || i.name).slice(0, 40) + ' الغردقة')}">🗺 دوّر على شركات في الغردقة</a> (خرايط جوجل بتعرض الرقم مباشرة)${ed ? ` أو <a href="#" data-vnew="${esc(i.id)}">+ ضيف شركة للنوع ده</a>` : ''}.</div>` : ''}${V.length ? `<div class="vlist">${V.map(v => `<div class="vrow"><div style="flex:1;min-width:0"><b>${esc(v.name)}</b> <span class="st ${VS[v.status][0]}">${VS[v.status][1]}</span> <span class="tag">${VK[v.kind]}</span>${v.rating ? ' <span style="color:var(--warn)">' + '★'.repeat(v.rating) + '</span>' : ''}<div class="mut" style="font-size:12px">${esc(v.trade)}${v.contact ? ' · ' + esc(v.contact) : ''}${v.notes ? ' · ' + esc(v.notes) : ''}</div>${PHS(v).length || v.whatsapp ? `<div class="vphs">${phLinks(v)}${v.whatsapp && !PHS(v).includes(v.whatsapp) ? `<a class="vph" href="tel:${esc(v.whatsapp)}" dir="ltr">📱 ${esc(v.whatsapp)}</a>` : ''}</div>` : '<div class="mut" style="font-size:12px">مفيش رقم متسجل لسه</div>'}</div><div class="vacts">${PHS(v)[0] ? `<a class="btn" href="tel:${esc(PHS(v)[0].replace(/[\s-]/g, ''))}">📞 اتصال</a>` : ''}${vWA(v) ? `<a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/${waNum(vWA(v))}?text=${msg(v)}">واتساب – طلب سعر</a>` : PHS(v).length ? '<span class="mut" style="font-size:12px;align-self:center">خط أرضي/ساخن – اتصال بس</span>' : ''}${v.website ? `<a class="btn" target="_blank" rel="noopener" href="${esc(/^https?:/.test(v.website) ? v.website : 'https://' + v.website)}">الموقع</a>` : `<a class="btn" target="_blank" rel="noopener" href="${gq(v.name + ' مصر')}">بحث</a>`}</div></div>`).join('')}</div>` : '<p class="mut">مفيش شركات متسجلة لنوع البند ده لسه.</p>'}
-  ${Q.length ? `<h4>عروض الأسعار المرفوعة للبند</h4><div class="vlist">${Q.map(d => `<div class="vrow"><div style="flex:1"><b>${esc(d.supplier || d.title)}</b><div class="mut" style="font-size:12px">${fmtD(d.doc_date)}${d.amount != null ? ' · ' + nf(d.amount, 0) + ' ج.م' + (+i.qty > 0 ? ' · ' + nf(d.amount / i.qty) + ' ج.م/' + esc(i.unit || '') : '') : ''}</div></div><a href="#" class="btn" data-open="${d.id}">فتح</a></div>`).join('')}</div>` : ''}
-  <div class="acts" style="margin-top:14px"><a class="btn" target="_blank" rel="noopener" href="${gq('سعر ' + i.name.slice(0, 80) + ' ' + (i.unit || '') + ' مصر ' + new Date().getFullYear())}">🔎 ابحث عن سعر السوق</a>${ed ? `<a class="btn" href="#p/${P.id}/docs">⬆ رفع عرض سعر</a><a class="btn" href="#p/${P.id}/tasks" data-gov>🏢 إدارة الشركات</a>` : ''}</div>`;
+  <h4>عروض الأسعار للبند (${Q.length})</h4>${Q.length ? `<div class="vlist">${Q.map(q => `<div class="vrow"><div style="flex:1"><b>${esc(q.supplier || '')}</b>${q.option_label ? ' – ' + esc(q.option_label) : ''} <span class="st ${QST[q.status][0]}">${QST[q.status][1]}</span>${q.adopted ? ' <span class="st appr">✔ السعر المثبت</span>' : ''}<div class="mut" style="font-size:12px">${nf(qVat(q), 0)} ج.م / ${esc(i.unit || 'مقطوع')} شامل الضريبة${q.valid_until ? ' · صالح لحد ' + fmtD(q.valid_until) : ''}</div></div></div>`).join('')}</div>` : '<p class="mut" style="margin:0">لسه مفيش عروض متسجلة للبند.</p>'}
+  <div class="acts" style="margin-top:14px"><a class="btn" target="_blank" rel="noopener" href="${gq('سعر ' + i.name.slice(0, 80) + ' ' + (i.unit || '') + ' مصر ' + new Date().getFullYear())}">🔎 ابحث عن سعر السوق</a>${can('quotes', P.id) ? `<a class="btn${ed ? ' p' : ''}" href="#p/${P.id}/quotes" data-qgo>${ed ? '+ سجّل عرض سعر' : '📑 عروض الأسعار'}</a>` : ''}${ed ? `<a class="btn" href="#p/${P.id}/tasks" data-gov>🏢 إدارة الشركات</a>` : ''}</div>`;
   document.body.append(dlg); dlg.showModal();
-  dlg.onclick = e => { if (e.target === dlg || e.target.closest('.dx')) { dlg.close(); dlg.remove(); } const vn = e.target.closest('[data-vnew]'); if (vn) { e.preventDefault(); dlg.close(); dlg.remove(); const kw = normAr(i.group_name || '').replace(/^(ال)?اعمال\s*/, '').split(/\s+/).filter(w => w.length > 2).slice(0, 2).join('|'); return vendorEdit(null, async () => { P.vendors = (await S.sb.from('vendors').select('*').order('trade').order('name')).data || []; vendorPanel(id); }, { trade: i.group_name || '', pattern: kw, phases: [i.phase_n], status: 'approved', kind: 'both' }); } if (e.target.closest('[data-gov]')) { (S.tk ||= { tab: 'price', ph: '' }).tab = 'vendors'; dlg.close(); dlg.remove(); if (location.hash === `#p/${P.id}/tasks`) { e.preventDefault(); renderTasks(); } } if (e.target.closest('[data-open]')) { dlg.close(); dlg.remove(); docClick(e); } };
+  dlg.onclick = e => { if (e.target === dlg || e.target.closest('.dx')) { dlg.close(); dlg.remove(); } const vn = e.target.closest('[data-vnew]'); if (vn) { e.preventDefault(); dlg.close(); dlg.remove(); const kw = normAr(i.group_name || '').replace(/^(ال)?اعمال\s*/, '').split(/\s+/).filter(w => w.length > 2).slice(0, 2).join('|'); return vendorEdit(null, async () => { P.vendors = (await S.sb.from('vendors').select('*').order('trade').order('name')).data || []; vendorPanel(id); }, { trade: i.group_name || '', pattern: kw, phases: [i.phase_n], status: 'approved', kind: 'both' }); } if (e.target.closest('[data-gov]')) { (S.tk ||= { tab: 'price', ph: '' }).tab = 'vendors'; dlg.close(); dlg.remove(); if (location.hash === `#p/${P.id}/tasks`) { e.preventDefault(); renderTasks(); } } if (e.target.closest('[data-open]')) { dlg.close(); dlg.remove(); docClick(e); } if (e.target.closest('[data-qgo]')) { const F = (S.qF ||= { st: '', q: '', item: '', form: null }); F.item = id; F.form = ed ? { item: id } : null; dlg.close(); dlg.remove(); if (location.hash === `#p/${P.id}/quotes`) { e.preventDefault(); renderQuotes(); } } };
 }
 document.addEventListener('click', e => { const v = e.target.closest('[data-vend]'); if (v) { e.preventDefault(); e.stopPropagation(); vendorPanel(v.dataset.vend); } }, true);
 
@@ -1575,8 +1593,8 @@ async function uploadDocs(files, meta) {
     if (!mime) { toast(`نوع الملف ${f.name} مش مسموح`); continue; } if (f.size > 25 * 1048576) { toast(`${f.name} أكبر من 25 ميجا`); continue; }
     toast(`جاري رفع ${f.name}…`); const path = `${P.id}/${meta.kind}/${crypto.randomUUID()}.${ext}`;
     const up = await S.sb.storage.from('docs').upload(path, f, { contentType: mime }); if (up.error) { toast('مقدرتش أرفع: ' + up.error.message); continue; }
-    const { error } = await S.sb.from('documents').insert({ project_id: P.id, path, file_name: f.name, mime, size: f.size, title: meta.title && files.length === 1 ? meta.title : f.name.replace(/\.[^.]+$/, ''), kind: meta.kind, doc_date: meta.doc_date || today(), report_id: meta.report_id || null, item_id: meta.item_id || null, supplier: meta.supplier || null, amount: meta.amount ?? null, notes: meta.notes || null });
-    if (error) { await S.sb.storage.from('docs').remove([path]); toast('مقدرتش أسجل الملف: ' + error.message); continue; } ok++;
+    const { data: dr, error } = await S.sb.from('documents').insert({ project_id: P.id, path, file_name: f.name, mime, size: f.size, title: meta.title && files.length === 1 ? meta.title : f.name.replace(/\.[^.]+$/, ''), kind: meta.kind, doc_date: meta.doc_date || today(), report_id: meta.report_id || null, item_id: meta.item_id || null, supplier: meta.supplier || null, amount: meta.amount ?? null, notes: meta.notes || null }).select('id').single();
+    if (error) { await S.sb.storage.from('docs').remove([path]); toast('مقدرتش أسجل الملف: ' + error.message); continue; } ok++; (meta.ids ||= []).push(dr?.id);
   }
   if (ok) toast(ok === 1 ? 'اترفع الملف' : `اترفع ${ok} ملف`); return ok;
 }
@@ -1623,6 +1641,90 @@ function renderDocs() {
     const del = e.target.closest('[data-del]'); if (del) { if (del.dataset.sure !== '1') { del.dataset.sure = '1'; del.textContent = 'متأكد؟'; return; } const d = P.docs.find(x => x.id === del.dataset.del);
       const { error } = await S.sb.from('documents').delete().eq('id', d.id); if (error) return toast(error.message); await S.sb.storage.from('docs').remove([d.path]); toast('اتحذف'); await loadProject(P.id); return renderDocs(); }
     docClick(e); };
+}
+
+/* ---------------- quotes: fixed price per item + suppliers' offers, consultant review, owner view ---------------- */
+const QST = { draft: ['', 'مسودة – مش ظاهرة للاستشاري'], submitted: ['pend', 'بانتظار الاستشاري'], approved: ['appr', 'معتمد من الاستشاري'], rejected: ['ret', 'مرفوض من الاستشاري'] };
+const qVat = q => +q.unit_rate * (q.vat_included ? 1 : 1.14);
+const RSRC = { quote: 'من عرض سعر', manual: 'سعر متسجل يدوي', sheet: 'من شيت الأسعار' };
+function askNote(title, ph = '', need = true) {
+  return new Promise(res => { const d = document.createElement('dialog'); d.className = 'adlg';
+    d.innerHTML = `<form method="dialog"><h3 style="margin:0 0 10px;font-size:16px">${esc(title)}</h3><textarea name="t" rows="3" style="width:100%" placeholder="${esc(ph)}"></textarea><div class="acts"><button class="p" value="ok">تأكيد</button><button value="">إلغاء</button></div></form>`;
+    document.body.append(d); d.showModal(); d.onclose = () => { const v = d.returnValue === 'ok' ? d.querySelector('textarea').value.trim() : null; d.remove(); res(v === null || (need && !v) ? null : v); }; });
+}
+function renderQuotes() {
+  const P = S.P, F = (S.qF ||= { st: '', q: '', item: '', form: null }), ed = can('quoteEd', P.id), rev = can('quoteRev', P.id), Q = P.quotes || [], r0 = role(P.id);
+  const itemOf = id => (P.qitems || []).find(x => x.id === id) || P.items.find(x => x.id === id) || { id, code: id, name: '', unit: '' };
+  const byItem = {}; Q.forEach(q => (byItem[q.item_id] ||= []).push(q));
+  const vis = it => (!F.item || it.id === F.item) && (!F.st || byItem[it.id].some(q => q.status === F.st)) && (!F.q || normAr(it.code + ' ' + it.name + ' ' + (it.building || '') + ' ' + byItem[it.id].map(q => (q.supplier || '') + ' ' + (q.option_label || '')).join(' ')).includes(normAr(F.q)));
+  const items = Object.keys(byItem).map(itemOf).filter(vis).sort((a, b) => String(a.code).localeCompare(String(b.code), 'ar', { numeric: true }));
+  const cnt = st => Q.filter(q => q.status === st).length, exp = q => q.valid_until && q.valid_until < today();
+  const fixedOf = it => { const pi = P.items.find(x => x.id === it.id), rate = pi && P.showRates ? pi.rate : +it.rate || 0, src = pi && P.showRates ? pi.rsrc : it.rate_source, qid = pi?.rqid || it.rate_quote_id; return { rate, src, q: qid && Q.find(x => x.id === qid) }; };
+  const intro = r0 === 'owner' ? 'عروض الأسعار اللي قدمتها الشركات لبنود المشروع، ورأي الاستشاري في كل عرض، والسعر اللي اتثبت للبند.' : rev && r0 === 'consultant' ? 'راجع كل عرض واعتمده أو ارفضه مع ذكر السبب. العروض اللي بانتظارك عليها علامة صفرا.' : 'لكل بند: سجّل عروض الشركات المقدمة، ابعتها للاستشاري يراجعها، وبعدين ثبّت سعر البند من العرض المناسب. الأسعار في المقارنة كلها شاملة ضريبة القيمة المضافة 14%.';
+  const form = () => { const f = F.form, q = f.id ? Q.find(x => x.id === f.id) : {}, it = P.items.find(x => x.id === (q.item_id || f.item)), V = it ? [...vendorsFor(it), ...P.vendors.filter(v => !vendorsFor(it).includes(v))] : P.vendors;
+    return `<div class="card qform"><b>${f.id ? 'تعديل عرض سعر' : '+ عرض سعر جديد'}</b><form id="qF" class="grid" style="margin-top:10px">
+      <label class="wide">البند<select name="item" required><option value="">— اختار البند —</option>${P.phaseProg.map(ph => `<optgroup label="${ph.n}. ${esc(ph.name)}">${P.items.filter(i => i.phase_n === ph.n).map(i => `<option value="${esc(i.id)}"${i.id === (q.item_id || f.item) ? ' selected' : ''}>${esc(i.code + ' ' + (i.name.length > 70 ? i.name.slice(0, 70) + '…' : i.name) + (i.building ? ' – ' + i.building : ''))}</option>`).join('')}</optgroup>`).join('')}</select></label>
+      <label>الشركة<select name="vendor"><option value="">— شركة مش في القائمة —</option>${V.map(v => `<option value="${v.id}"${v.id === q.vendor_id ? ' selected' : ''}>${esc(v.name)}</option>`).join('')}</select></label>
+      <label>أو اسم الشركة<input name="supplier" value="${esc(q.vendor_id ? '' : q.supplier || '')}" placeholder="لو مش في القائمة"></label>
+      <label>البديل / المواصفة<input name="opt" value="${esc(q.option_label || '')}" placeholder="مثلاً: أبواب إيطالي"></label>
+      <label>السعر<input name="price" type="number" step="any" inputmode="decimal" required value="${q.unit_rate ?? ''}"></label>
+      <label>السعر ده<select name="mode"><option value="u">للوحدة</option><option value="t">إجمالي العرض</option></select></label>
+      <label>الكمية في العرض<input name="qty" type="number" step="any" value="${q.qty ?? (it ? +it.qty || '' : '')}"></label>
+      <label class="chk"><input type="checkbox" name="vat"${q.id ? (q.vat_included ? ' checked' : '') : ''}> السعر شامل الضريبة 14%</label>
+      <label>تاريخ العرض<input type="date" name="date" value="${q.quote_date || today()}"></label><label>صالح لحد<input type="date" name="valid" value="${q.valid_until || ''}"></label>
+      <label class="wide">شروط الدفع والتوريد<input name="terms" value="${esc(q.terms || '')}"></label>
+      <label class="wide">ملاحظات (اللي مش داخل في السعر، إضافات…)<input name="notes" value="${esc(q.notes || '')}"></label>
+      <label class="wide">ملف العرض (PDF أو صورة)${q.doc_id ? ' – <span class="mut">فيه ملف مرفوع، ارفع جديد لو عاوز تغيّره</span>' : ''}<input type="file" name="file" accept="${DOC_ACCEPT}"></label>
+      ${!q.id || q.status === 'draft' ? '<label class="chk wide"><input type="checkbox" name="send" checked> ابعته للاستشاري يراجعه</label>' : ''}
+      <label class="chk wide"><input type="checkbox" name="adopt"${q.adopted ? ' checked disabled' : ''}> ثبّت السعر ده كسعر البند</label>
+      <div class="acts wide" style="margin:0"><button class="p" id="qGo">حفظ</button><button type="button" id="qX">إلغاء</button></div></form></div>`; };
+  const row = (q, lo, it, fx) => { const [c, l] = QST[q.status], vr = qVat(q), tot = vr * (+q.qty || +it.qty || 1), d = q.doc_id && P.docs.find(x => x.id === q.doc_id), mine = ed;
+    const acts = [d ? docChip(d) : '', ed && q.status === 'draft' ? `<button data-qsend="${q.id}">إرسال للاستشاري</button>` : '', ed && !q.adopted && q.status !== 'rejected' ? `<button data-qadopt="${q.id}" class="p">تثبيت السعر</button>` : '',
+      rev && q.status === 'submitted' ? `<button data-qok="${q.id}" class="p">✔ اعتماد</button><button data-qno="${q.id}" class="danger">✕ رفض</button>` : '', rev && r0 === 'management' && ['approved', 'rejected'].includes(q.status) ? `<button data-qback="${q.id}">رجّعه للمراجعة</button>` : '',
+      mine ? `<button data-qed="${q.id}">تعديل</button><button data-qdel="${q.id}" class="danger">حذف</button>` : ''].filter(Boolean).join('');
+    return `<tr class="${q.adopted ? 'qad' : ''}${q.status === 'submitted' && rev ? ' qwait' : ''}"><td><b>${esc(q.supplier || '—')}</b>${q.option_label ? `<div class="mut">${esc(q.option_label)}</div>` : ''}</td>
+      <td class="n" data-l="سعر الوحدة"><b>${nf(vr, 0)}</b>${vr === lo && byItem[it.id].length > 1 ? ' <span class="st appr">الأقل</span>' : vr > lo ? ` <small class="mut">+${Math.round((vr - lo) / lo * 100)}%</small>` : ''}${q.vat_included ? '' : `<div class="mut" style="font-size:11px">${nf(q.unit_rate, 0)} + ض</div>`}</td>
+      <td class="n" data-l="الإجمالي">${nf(tot, 0)}</td><td data-l="صالح لحد">${q.valid_until ? `<span${exp(q) ? ' style="color:var(--bad)"' : ''}>${fmtD(q.valid_until)}${exp(q) ? ' – منتهي' : ''}</span>` : '–'}</td>
+      <td data-l="الحالة"><span class="st ${c}">${l}</span>${q.adopted ? ' <span class="st appr">✔ السعر المثبت</span>' : ''}${q.review_note ? `<div class="mut" style="font-size:12px">الاستشاري: ${esc(q.review_note)}</div>` : ''}</td><td class="qa">${acts}</td></tr>
+      ${q.terms || q.notes ? `<tr class="qsub"><td colspan="6">${q.terms ? '📄 ' + esc(q.terms) : ''}${q.terms && q.notes ? '<br>' : ''}${q.notes ? '⚠ ' + esc(q.notes) : ''}</td></tr>` : ''}`; };
+  const card = it => { const L = [...byItem[it.id]].sort((a, b) => qVat(a) - qVat(b)), lo = qVat(L[0]), fx = fixedOf(it), pi = P.items.find(x => x.id === it.id);
+    return `<div class="card qcard"><div class="qh"><div><div class="mut" style="font-size:12px">${esc(it.code)}${it.building ? ' · ' + esc(it.building) : ''}${it.group_name ? ' · ' + esc(it.group_name) : ''}</div><b>${esc(it.name.length > 140 ? it.name.slice(0, 140) + '…' : it.name)}</b><div class="mut" style="font-size:13px">${+it.qty ? nf(it.qty) + ' ' + esc(it.unit || '') : 'مقطوعية'} · ${L.length} ${L.length === 1 ? 'عرض' : 'عروض'}</div></div>
+      <div class="qfix${fx.rate > 0 ? '' : ' none'}">${fx.rate > 0 ? `<small>السعر المثبت للبند</small><b>${nf(fx.rate, 0)} ج.م</b><small>/ ${esc(it.unit || 'مقطوع')}${+it.qty ? ' · إجمالي ' + money(fx.rate * it.qty) : ''}</small><small>${fx.q ? 'من عرض ' + esc(fx.q.supplier || '') + (fx.q.option_label ? ' – ' + esc(fx.q.option_label) : '') + (fx.q.status === 'approved' ? ' ✔ معتمد' : fx.q.status === 'submitted' ? ' · لسه بانتظار الاستشاري' : fx.q.status === 'rejected' ? '<br><b style="color:var(--bad)">⚠ العرض ده اترفض – ثبّت عرض تاني</b>' : '') : RSRC[fx.src] || ''}</small>` : '<small>لسه ماتثبتش سعر للبند</small>'}</div></div>
+      <div class="scroll"><table class="qt stack"><thead><tr><th>الشركة والبديل</th><th class="n">سعر الوحدة شامل الضريبة</th><th class="n">الإجمالي</th><th>صالح لحد</th><th>الحالة</th><th></th></tr></thead><tbody>${L.map(q => row(q, lo, it, fx)).join('')}</tbody></table></div>
+      ${ed && pi ? `<div class="acts" style="margin-top:8px"><button data-qadd="${esc(it.id)}">+ عرض تاني للبند</button><button data-vend="${esc(it.id)}">🏢 الشركات المناسبة</button></div>` : ''}</div>`; };
+  $('#main').innerHTML = `<h2>عروض الأسعار</h2><p class="mut">${intro}</p>
+  <div class="kpis"><div class="kpi"><b>${Object.keys(byItem).length}</b><span>بند عليه عروض</span></div><div class="kpi${cnt('submitted') ? ' k-warn' : ''}" data-qst="submitted"><b>${cnt('submitted')}</b><span>بانتظار الاستشاري</span></div><div class="kpi" data-qst="approved"><b>${cnt('approved')}</b><span>معتمد</span></div><div class="kpi${cnt('rejected') ? ' k-bad' : ''}" data-qst="rejected"><b>${cnt('rejected')}</b><span>مرفوض</span></div></div>
+  ${ed ? (F.form ? form() : '<div class="acts"><button class="p" id="qNew">+ عرض سعر جديد</button></div>') : ''}
+  <div class="filters" style="margin-top:14px"><div class="sttabs" style="margin:0;max-width:100%"><div class="seg">${[['', 'الكل'], ['submitted', 'بانتظار الاستشاري'], ['approved', 'معتمد'], ['rejected', 'مرفوض'], ...(ed ? [['draft', 'مسودات']] : [])].map(([k, l]) => `<button type="button" data-qst="${k}" class="${F.st === k ? 'on' : ''}">${l}</button>`).join('')}</div></div><input id="qQ" type="search" placeholder="بحث بالبند أو الشركة" value="${esc(F.q)}">${F.item ? `<button id="qXi">✕ ${esc(itemOf(F.item).code)}</button>` : ''}</div>
+  ${items.length ? items.map(card).join('') : `<p class="mut">${Q.length ? 'مفيش عروض بالفلتر ده.' : ed ? 'لسه مفيش عروض أسعار. دوس "+ عرض سعر جديد".' : 'لسه مفيش عروض أسعار معروضة.'}</p>`}`;
+  const go = async msg => { if (msg) toast(msg); await loadProject(P.id); renderQuotes(); };
+  $('#qNew') && ($('#qNew').onclick = () => { F.form = { item: F.item || '' }; renderQuotes(); });
+  const f = $('#qF'); if (f) { $('#qX').onclick = () => { F.form = null; renderQuotes(); }; f.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    f.item.onchange = () => { F.form.item = f.item.value; const it = P.items.find(x => x.id === f.item.value); if (it && !f.qty.value) f.qty.value = +it.qty || ''; };
+    f.onsubmit = async e => { e.preventDefault(); const g = n => f[n].value, it = P.items.find(x => x.id === g('item')); if (!it) return toast('اختار البند');
+      const v = P.vendors.find(x => x.id === g('vendor')), sup = v ? v.name : g('supplier').trim(); if (!sup) return toast('اختار الشركة أو اكتب اسمها');
+      const qty = +g('qty') || +it.qty || 1, price = +g('price'); if (!(price > 0)) return toast('اكتب السعر');
+      const rec = { project_id: P.id, item_id: it.id, vendor_id: v ? v.id : null, supplier: sup, option_label: g('opt').trim() || null, unit_rate: g('mode') === 't' ? Math.round(price / qty * 100) / 100 : price, qty, vat_included: f.vat.checked, quote_date: g('date') || today(), valid_until: g('valid') || null, terms: g('terms').trim() || null, notes: g('notes').trim() || null };
+      $('#qGo').disabled = true; const file = f.file.files[0];
+      if (file) { const m = { kind: 'quote', title: 'عرض ' + sup + (rec.option_label ? ' – ' + rec.option_label : ''), doc_date: rec.quote_date, item_id: it.id, supplier: sup, amount: qVat(rec) * qty }; await uploadDocs([file], m); if (m.ids?.[0]) rec.doc_id = m.ids[0]; }
+      const old = F.form.id && Q.find(x => x.id === F.form.id); if (!old || old.status === 'draft') rec.status = f.send?.checked ? 'submitted' : 'draft';
+      const { data, error } = old ? await S.sb.from('quotes').update(rec).eq('id', old.id).select().single() : await S.sb.from('quotes').insert(rec).select().single();
+      if (error) { $('#qGo').disabled = false; return toast(error.message); }
+      if (f.adopt.checked && !f.adopt.disabled) { const { error: e2 } = await S.sb.rpc('adopt_quote', { p_id: data.id }); if (e2) toast(e2.message); }
+      F.form = null; F.item = it.id; go(old ? 'اتحفظ التعديل' + (old.status !== 'draft' && old.status !== data.status ? ' ورجع للاستشاري يراجعه' : '') : 'اتسجل العرض' + (rec.status === 'submitted' ? ' واتبعت للاستشاري' : '')); }; }
+  document.querySelectorAll('[data-qst]').forEach(b => b.onclick = () => { F.st = b.dataset.qst; renderQuotes(); });
+  $('#qQ').onchange = e => { F.q = e.target.value.trim(); renderQuotes(); }; $('#qXi') && ($('#qXi').onclick = () => { F.item = ''; renderQuotes(); });
+  $('#main').onclick = async e => { const b = e.target.closest('button[data-qsend],button[data-qadopt],button[data-qok],button[data-qno],button[data-qback],button[data-qed],button[data-qdel],button[data-qadd]'); if (!b) return docClick(e);
+    const k = Object.keys(b.dataset)[0], id = b.dataset[k], q = Q.find(x => x.id === id);
+    if (k === 'qadd') { F.form = { item: id }; return renderQuotes(); }
+    if (k === 'qed') { F.form = { id }; return renderQuotes(); }
+    if (k === 'qsend') { const { error } = await S.sb.from('quotes').update({ status: 'submitted' }).eq('id', id); return error ? toast(error.message) : go('اتبعت للاستشاري'); }
+    if (k === 'qadopt') { const it = itemOf(q.item_id); if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = `متأكد؟ ${nf(qVat(q), 0)} / ${it.unit || 'مقطوع'}`; return; } const { error } = await S.sb.rpc('adopt_quote', { p_id: id }); return error ? toast(error.message) : go('اتثبت سعر البند من العرض ده'); }
+    if (k === 'qok') { const n = await askNote('اعتماد العرض – ملاحظة (اختياري)', 'مثلاً: مطابق للمواصفات', false); if (n === null) return; const { error } = await S.sb.rpc('review_quote', { p_id: id, p_status: 'approved', p_note: n || null }); return error ? toast(error.message) : go('اتعتمد العرض'); }
+    if (k === 'qno') { const n = await askNote('سبب رفض العرض', 'مثلاً: المواصفات مش مطابقة / السعر أعلى من السوق'); if (!n) return; const { error } = await S.sb.rpc('review_quote', { p_id: id, p_status: 'rejected', p_note: n }); return error ? toast(error.message) : go('اترفض العرض'); }
+    if (k === 'qback') { const { error } = await S.sb.rpc('review_quote', { p_id: id, p_status: 'submitted', p_note: null }); return error ? toast(error.message) : go('رجع للمراجعة'); }
+    if (k === 'qdel') { if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'متأكد؟'; return; } if (q.adopted) return toast('ده السعر المثبت للبند – ثبّت عرض تاني الأول'); const { error } = await S.sb.from('quotes').delete().eq('id', id); return error ? toast(error.message) : go('اتحذف العرض'); }
+  };
 }
 
 /* ---------------- staff & attendance (admin only) ---------------- */
