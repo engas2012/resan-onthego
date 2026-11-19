@@ -66,7 +66,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.5.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.6.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -101,9 +101,9 @@ async function afterLogin(user) {
 }
 
 /* ---------------- layout & routing ---------------- */
-const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', 'الجدول الزمني', 'sched'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة التقارير', 'review'], ['log', 'سجل التقارير', 'log'], ['tasks', 'مهام المكتب الفني', 'tasks'], ['boq', 'المقايسة والتكلفة', 'boq'], ['quotes', 'عروض الأسعار', 'quotes'], ['subs', 'عقود المقاولين', 'subs'], ['acct', 'ملخص الحسابات', 'acct'], ['ledger', 'القيود والمصروفات', 'ledgerEd'], ['custody', 'العهدة', 'custody'], ['inv', 'المستخلصات', 'inv'], ['store', 'المخزن', 'store'], ['docs', 'المستندات', 'docs']];
+const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', 'الجدول الزمني', 'sched'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة التقارير', 'review'], ['log', 'سجل التقارير', 'log'], ['tasks', 'مهام المكتب الفني', 'tasks'], ['boq', 'المقايسة والتكلفة', 'boq'], ['quotes', 'عروض الأسعار', 'quotes'], ['subs', 'عقود المقاولين', 'subs'], ['acct', 'ملخص الحسابات', 'acct'], ['phfin', 'حساب المراحل', 'ledger'], ['ledger', 'القيود والمصروفات', 'ledgerEd'], ['custody', 'العهدة', 'custody'], ['inv', 'المستخلصات', 'inv'], ['store', 'المخزن', 'store'], ['docs', 'المستندات', 'docs']];
 const NAVG = [['متابعة المشروع', '📊', ['status', 'schedule']], ['التقارير اليومية', '📝', ['report', 'review', 'log']], ['المكتب الفني والتسعير', '📐', ['tasks', 'boq', 'quotes', 'subs']], ['المخزن والمستندات', '📦', ['store', 'docs']]];
-const FINV = ['acct', 'ledger', 'inv', 'custody'], FINC = { acct: 'acct', ledger: 'ledgerEd', inv: 'inv', custody: 'custody' };
+const FINV = ['acct', 'phfin', 'ledger', 'inv', 'custody'], FINC = { acct: 'acct', phfin: 'ledger', ledger: 'ledgerEd', inv: 'inv', custody: 'custody' };
 const finViews = pid => FINV.filter(v => can(FINC[v], pid)), finPids = () => S.projects.filter(p => finViews(p.id).length).map(p => p.id);
 function finNav(pid, view) {
   const lab = Object.fromEntries(VIEWS.map(v => [v[0], v[1]])), PS = finPids(), bn = id => (S.bn || {})[id] || 0;
@@ -143,6 +143,7 @@ async function route() {
     if (view === 'docs' && can('docs', pid)) return renderDocs();
     if (view === 'quotes' && can('quotes', pid)) return renderQuotes();
     if (view === 'acct' && can('acct', pid)) return renderAcct();
+    if (view === 'phfin' && can('ledger', pid)) return renderPhFin();
     if (view === 'subs' && can('subs', pid)) return renderSubs();
     if (view === 'ledger' && can('ledgerEd', pid)) return renderLedger();
     if (view === 'custody' && can('custody', pid)) return renderCustody();
@@ -1439,6 +1440,90 @@ const invSum = i => +i.amt_design + +i.amt_contract + +i.amt_supply + +i.amt_ext
 const invPay = i => { const w = invSum(i); return { works: w, worksPay: w * +i.pay_pct, fee: w * +i.fee_pct, net: w * +i.pay_pct + w * +i.fee_pct }; };
 /* ---------------- accounts: invoices, payments received per invoice, advance payments, actual cost ---------------- */
 const PAYK = { advance: 'دفعة مقدمة', invoice: 'دفعة مستخلص', other: 'دفعة أخرى' }, PAYM = ['تحويل بنكي', 'شيك', 'نقدي', 'إيداع'];
+async function payForm(kind, x = {}, inv = null, done, pre = {}) {
+  const P = S.P, [iv, py] = await Promise.all([S.sb.from('owner_invoices').select('*').eq('project_id', P.id).order('no'), S.sb.from('owner_payments').select('*').eq('project_id', P.id)]);
+  const R = (iv.data || []).map(i => { const p = invPay(i), paid = (py.data || []).filter(y => y.kind === 'invoice' && y.invoice_id === i.id && y.status === 'received' && y.id !== x.id).reduce((s, y) => s + +y.amount, 0); return { i, rem: Math.max(p.net - paid, 0) }; });
+  const d = document.createElement('dialog'); d.className = 'adlg'; const r0 = inv && R.find(r => r.i.id === inv);
+    d.innerHTML = `<div class="dh"><h3 style="margin:0;font-size:17px">${x.id ? 'تعديل دفعة' : pre.title || '+ وارد – ' + PAYK[kind]}</h3><button type="button" class="dx">✕</button></div><form class="grid" style="margin-top:12px">
+      <label>النوع<select name="kind">${Object.entries(PAYK).map(([k, l]) => `<option value="${k}"${k === (x.kind || kind) ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label data-k="invoice">المستخلص<select name="inv">${R.filter(r => r.i.status !== 'draft').map(r => `<option value="${r.i.id}"${r.i.id === (x.invoice_id || inv) ? ' selected' : ''}>مستخلص ${r.i.no} – متبقي ${nf(r.rem, 0)}</option>`).join('')}</select></label>
+      <label>المبلغ (ج.م)<input name="amount" type="number" step="any" inputmode="decimal" required value="${x.amount ?? pre.amount ?? (r0 ? Math.round(r0.rem) || '' : '')}"></label>
+      <label>التاريخ<input type="date" name="date" value="${x.pay_date || today()}"></label>
+      <label>الحالة<select name="status"><option value="received">مستلمة</option><option value="requested"${(x.status || pre.status) === 'requested' ? ' selected' : ''}>مطلوبة – لسه ماوصلتش</option></select></label>
+      <label>طريقة الدفع<select name="method"><option value="">—</option>${PAYM.map(m => `<option${m === x.method ? ' selected' : ''}>${m}</option>`).join('')}</select></label>
+      <label>رقم التحويل / الشيك<input name="ref" value="${esc(x.ref || '')}"></label>
+      <fieldset data-k="advance" class="wide phs"><legend>الدفعة المقدمة على مرحلة</legend>${P.phaseProg.map(ph => `<label class="chk"><input type="checkbox" name="ph" value="${ph.n}"${(x.phase_ns || pre.phases || []).includes(ph.n) ? ' checked' : ''}> ${ph.n}. ${esc(ph.name)}</label>`).join('')}</fieldset>
+      <label class="wide">ملاحظات<input name="notes" value="${esc(x.notes || pre.notes || '')}"></label>
+      <div class="acts wide" style="margin:0"><button class="p">حفظ</button></div></form>`;
+    document.body.append(d); d.showModal(); const f = d.querySelector('form'), sync = () => d.querySelectorAll('[data-k]').forEach(e => e.hidden = e.dataset.k !== f.kind.value); f.kind.onchange = sync; sync();
+    f.inv.onchange = () => { const r = R.find(r => r.i.id === f.inv.value); if (r && !x.id) f.amount.value = Math.round(r.rem) || ''; };
+    d.onclick = e => { if (e.target === d || e.target.closest('.dx')) { d.close(); d.remove(); } };
+    f.onsubmit = async e => { e.preventDefault(); const k = f.kind.value, rec = { project_id: P.id, kind: k, invoice_id: k === 'invoice' ? f.inv.value || null : null, phase_ns: k === 'advance' ? [...f.querySelectorAll('[name=ph]:checked')].map(c => +c.value) : null, amount: +f.amount.value, pay_date: f.date.value || null, status: f.status.value, method: f.method.value || null, ref: f.ref.value.trim() || null, notes: f.notes.value.trim() || null };
+      if (!(rec.amount > 0)) return toast('اكتب المبلغ'); if (k === 'invoice' && !rec.invoice_id) return toast('اختار المستخلص');
+      const { error } = x.id ? await S.sb.from('owner_payments').update(rec).eq('id', x.id) : await S.sb.from('owner_payments').insert(rec); if (error) return toast(error.message);
+      d.close(); d.remove(); toast('اتسجلت الدفعة'); (done || renderAcct)(); };
+}
+
+/* ---------------- phase cash statement: advances vs inflow vs outflow ---------------- */
+async function renderPhFin() {
+  const P = S.P, ed = can('acctEdit', P.id), proj = S.projects.find(p => p.id === P.id);
+  $('#main').innerHTML = '<p class="mut">جاري التحميل…</p>';
+  const [pj, ph, iv, py, lg] = await Promise.all([S.sb.from('projects').select('adv_pct,fee_rate').eq('id', P.id).single(), S.sb.from('phases').select('*').eq('project_id', P.id).order('n'), S.sb.from('owner_invoices').select('*').eq('project_id', P.id).order('no'), S.sb.from('owner_payments').select('*').eq('project_id', P.id), S.sb.rpc('ledger_summary', { p_project: P.id })]);
+  const AP = +(pj.data?.adv_pct ?? 0.5), PH = ph.data || [], I = (iv.data || []).filter(i => i.status !== 'draft'), PY = py.data || [], LG = lg.data || [];
+  const { data: LN } = I.length ? await S.sb.from('owner_invoice_lines').select('invoice_id,cat,kind,rate,prev_qty,cur_qty,pct,prev_value,phase_n').in('invoice_id', I.map(i => i.id)) : { data: [] };
+  const sum = (A, f) => A.reduce((s, x) => s + (+f(x) || 0), 0), got = x => x.status === 'received', Z = () => Object.fromEntries(PH.map(p => [p.n, 0]));
+  const exp = Z(); let expNone = 0; LG.forEach(x => { if (x.phase_n && x.phase_n in exp) exp[x.phase_n] += +x.expense; else expNone += +x.expense; });
+  const expTot = sum(PH, p => exp[p.n]) || 1, ledRev = sum(LG, x => x.revenue);
+  // works per phase for each invoice: lines → manual split → estimate by actual cost
+  const W = {}; I.forEach(i => { const w = invSum(i), L = (LN || []).filter(l => l.invoice_id === i.id && l.kind === 'line'), m = Z(); let src;
+    if (i.phase_split && Object.keys(i.phase_split).length) { Object.entries(i.phase_split).forEach(([n, v]) => { if (n in m) m[n] += +v; }); src = 'manual'; }
+    else if (L.length) { L.forEach(l => { if (l.phase_n in m) m[l.phase_n] += lnCur(l); }); src = 'lines'; }
+    else { PH.forEach(p => m[p.n] = w * exp[p.n] / expTot); src = 'est'; }
+    const t = sum(PH, p => m[p.n]); if (src !== 'manual' && t > 0 && Math.abs(t - w) > 1) PH.forEach(p => m[p.n] *= w / t);
+    const q = invPay(i), L2 = PY.filter(y => y.kind === 'invoice' && y.invoice_id === i.id), paid = sum(L2.filter(got), y => y.amount), ratio = !L2.length && i.status === 'paid' ? 1 : q.net ? Math.min(paid / q.net, 1) : 0;
+    W[i.id] = { m, src, ratio, w }; });
+  const advSplit = y => { const ns = (y.phase_ns || []).filter(n => n in exp); if (!ns.length) return {}; const b = sum(ns, n => +PH.find(p => p.n === n).budget_rev || 1); return Object.fromEntries(ns.map(n => [n, +y.amount * (+PH.find(p => p.n === n).budget_rev || 1) / b])); };
+  const advGot = Z(), advAsk = Z(); let advNone = 0; PY.filter(y => y.kind === 'advance').forEach(y => { const sp = advSplit(y); if (!Object.keys(sp).length) { if (got(y)) advNone += +y.amount; return; } Object.entries(sp).forEach(([n, v]) => (got(y) ? advGot : advAsk)[n] += v); });
+  const rows = PH.map(p => { const price = +p.budget_rev || 0, works = sum(I, i => W[i.id].m[p.n]), ded = sum(I, i => W[i.id].m[p.n] * (1 - +i.pay_pct)), wDue = sum(I, i => W[i.id].m[p.n] * +i.pay_pct), wGot = sum(I, i => W[i.id].m[p.n] * +i.pay_pct * W[i.id].ratio);
+    const inflow = advGot[p.n] + wGot, out = exp[p.n], bal = inflow - out, req = AP * price, advRem = Math.max(req - advGot[p.n] - advAsk[p.n], 0), def = Math.max(-bal, 0), over = out > price && price > 0 ? out - price : 0;
+    return { p, price, works, ded, wDue, wGot, inflow, out, bal, req, advRem, def, over, claim: Math.max(advRem, def - advAsk[p.n], 0), got: advGot[p.n], ask: advAsk[p.n], advBal: advGot[p.n] - ded, est: I.some(i => W[i.id].src === 'est' && W[i.id].m[p.n] > 0) }; });
+  const T = k => sum(rows, r => r[k]), payRecv = sum(PY.filter(got), y => y.amount), unclass = ledRev - payRecv, feeGot = sum(I, i => invPay(i).fee * W[i.id].ratio), anyEst = I.some(i => W[i.id].src === 'est');
+  const live = rows.filter(r => r.price || r.out || r.inflow || r.works);
+  const c = (v, cls = '') => `<td class="n ${cls}">${Math.abs(v) < 1 ? '–' : nf(v, 0)}</td>`;
+  $('#main').innerHTML = `<div class="sthead"><div><h2 style="margin:0">حساب المراحل – الوارد والمنصرف</h2><p class="mut" style="margin:2px 0 0;font-size:13px">الاتفاق: دفعة مقدمة <b>${Math.round(AP * 100)}%</b> من السعر التقديري لكل مرحلة، وكل مستخلص بيتصرف منه ${Math.round(+(I[0]?.pay_pct ?? 0.5) * 100)}% من قيمة الأعمال (والباقي بيتخصم من المقدم) + 100% من أتعاب الشركة. الأتعاب مش داخلة في تمويل المراحل.</p></div>${ed ? `<div class="acts" style="margin:0"><button class="p" data-padd="advance">+ وارد دفعة مقدمة</button><button data-padd="invoice">+ وارد دفعة مستخلص</button><button id="pfAp">نسبة المقدم ${Math.round(AP * 100)}%</button></div>` : ''}</div>
+  ${unclass > 1 ? `<div class="note">في شيت الحسابات <b>وارد ${money(ledRev)}</b>، والمتسجل هنا كدفعات من المالك ${money(payRecv)} بس. الفرق <b>${money(unclass)}</b> لازم يتسجل كدفعات (مقدمة على مرحلة / دفعة مستخلص) عشان حساب كل مرحلة يطلع صح – لحد ما ده يحصل، المراحل هتبان فيها عجز أكبر من الحقيقي.</div>` : ''}
+  <div class="kpis">
+    <div class="kpi k-ok"><b>${money(T('inflow'))}</b><span>الوارد للمراحل<br><small>مقدم ${money(T('got'))} + من المستخلصات ${money(T('wGot'))}${advNone ? `<br><b class="bad">+ مقدم مش متوزع ${money(advNone)}</b>` : ''}</small></span></div>
+    <div class="kpi"><b>${money(T('out'))}</b><span>المنصرف على المراحل<br><small>${expNone ? 'غير موزع على مرحلة ' + money(expNone) : 'من القيود المعتمدة'}</small></span></div>
+    <div class="kpi${T('bal') < 0 ? ' k-bad' : ''}"><b>${money(T('bal'))}</b><span>${T('bal') < 0 ? 'عجز' : 'فائض'} (الوارد − المنصرف)</span></div>
+    <div class="kpi k-warn"><b>${money(Math.max(T('claim') - advNone, 0))}</b><span>ممكن نطالب بيه كدفعات مقدمة<br><small>${advNone ? 'بعد خصم المقدم اللي مش متوزع ' + money(advNone) + ' – وزّعه عشان الرقم يبقى دقيق لكل مرحلة' : 'متبقي مقدم ' + money(T('advRem'))}</small></span></div>
+    <div class="kpi"><b>${money(feeGot)}</b><span>أتعاب الشركة المحصّلة<br><small>بره تمويل المراحل</small></span></div></div>
+  <div class="card" style="padding:0"><div class="scroll"><table class="actb pft"><thead><tr><th>المرحلة</th><th class="n">السعر التقديري</th><th class="n">المقدم المستحق ${Math.round(AP * 100)}%</th><th class="n">المقدم المستلم</th><th class="n">أعمال مستخلصة</th><th class="n">اتخصم من المقدم</th><th class="n">رصيد المقدم</th><th class="n">وارد المستخلصات</th><th class="n">إجمالي الوارد</th><th class="n">المنصرف</th><th class="n">الفرق</th><th class="n">المطالبة</th><th></th></tr></thead><tbody>
+  ${live.map(r => `<tr><td><b>${r.p.n}. ${esc(r.p.name)}</b>${r.over ? `<div class="bad" style="font-size:11px">المنصرف عدّى السعر التقديري بـ ${nf(r.over, 0)} – حدّث السعر</div>` : ''}${r.est ? '<div class="mut" style="font-size:11px">* فيه مستخلصات متوزعة تقديري</div>' : ''}</td>${c(r.price)}${c(r.req)}<td class="n">${r.got ? nf(r.got, 0) : '–'}${r.ask ? `<div class="mut" style="font-size:11px">مطلوب ${nf(r.ask, 0)}</div>` : ''}</td>${c(r.works)}${c(r.ded)}${c(r.advBal, r.advBal < 0 ? 'bad' : '')}${c(r.wGot)}${c(r.inflow)}${c(r.out)}${c(r.bal, r.bal < 0 ? 'bad' : 'ok')}<td class="n">${r.claim > 1 ? `<b>${nf(r.claim, 0)}</b><div class="mut" style="font-size:11px">${r.def > r.advRem ? 'تغطية العجز' : 'باقي المقدم'}</div>` : '✔'}</td>
+    <td class="qa">${r.claim > 1 ? `<button class="xs" data-claim="${r.p.n}">مطالبة</button>` : ''}${ed ? `<button class="xs" data-padd="advance" data-ph="${r.p.n}">+ مقدم</button>` : ''}</td></tr>`).join('')}
+  <tr class="tot"><td>الإجمالي</td>${['price', 'req', 'got', 'works', 'ded', 'advBal', 'wGot', 'inflow', 'out', 'bal', 'claim'].map(k => c(T(k), k === 'bal' && T(k) < 0 ? 'bad' : '')).join('')}<td></td></tr></tbody></table></div></div>
+  <p class="mut" style="font-size:12px">المطالبة = الأكبر بين: باقي المقدم المستحق (${Math.round(AP * 100)}% × السعر التقديري − المستلم − المطلوب) أو العجز الفعلي في المرحلة. لو المرحلة فيها بنود مستجدة، حدّث سعرها التقديري من إعدادات المرحلة والمقدم المستحق هيزيد معاه.</p>
+  ${advNone ? `<div class="secT">دفعات مقدمة مش متوزعة على مراحل – ${money(advNone)}</div><div class="note" style="margin-top:0">الدفعات دي مستلمة بس مش معروف هي مقدم لأنهي مرحلة، فمش داخلة في حساب أي مرحلة. دوس "توزيع" واختار المرحلة (أو أكتر من مرحلة وهتتقسم بنسبة السعر التقديري).</div>
+  <div class="card" style="padding:0"><div class="scroll"><table class="stack"><thead><tr><th>التاريخ</th><th class="n">المبلغ</th><th>ملاحظات</th><th></th></tr></thead><tbody>${PY.filter(y => y.kind === 'advance' && got(y) && !Object.keys(advSplit(y)).length).sort((a, b) => (a.pay_date || '9') < (b.pay_date || '9') ? -1 : 1).map(y => `<tr><td data-l="التاريخ">${y.pay_date ? fmtD(y.pay_date) : 'بدون تاريخ'}</td><td class="n" data-l="المبلغ"><b>${nf(y.amount, 0)}</b></td><td data-l="ملاحظات" style="font-size:12px">${esc(y.notes || '')}</td><td class="qa">${ed ? `<button class="xs" data-ped="${y.id}">توزيع</button>` : ''}</td></tr>`).join('')}</tbody></table></div></div>` : ''}
+  <div class="secT">توزيع المستخلصات على المراحل</div>
+  <div class="card" style="padding:0"><div class="scroll"><table class="stack"><thead><tr><th>المستخلص</th><th class="n">الأعمال</th><th>التوزيع</th><th>الأساس</th><th></th></tr></thead><tbody>${I.map(i => `<tr><td data-l="المستخلص"><b>${i.no}</b> ${esc(i.title || '')}</td><td class="n" data-l="الأعمال">${nf(W[i.id].w, 0)}</td><td data-l="التوزيع" style="font-size:12px">${PH.filter(p => W[i.id].m[p.n] > 1).map(p => `${p.n}: ${nf(W[i.id].m[p.n], 0)}`).join(' · ') || '–'}</td><td data-l="الأساس">${{ lines: 'من بنود المستخلص', manual: 'توزيع يدوي', est: '<span class="tag">تقديري حسب المصروف</span>' }[W[i.id].src]}</td><td class="qa">${ed && W[i.id].src !== 'lines' ? `<button class="xs" data-split="${i.id}">توزيع</button>` : ''}</td></tr>`).join('')}</tbody></table></div></div>
+  ${anyEst ? '<p class="mut" style="font-size:12px">المستخلصات القديمة مالهاش بنود بمراحل، فاتوزعت بنسبة المصروف الفعلي لكل مرحلة (لأن الشغل بالتكلفة + 15%). لو عندك التوزيع الحقيقي دوس "توزيع" ودخّله.</p>' : ''}`;
+  const claimDoc = r => { const w = open('', '_blank'); if (!w) return toast('افتح النوافذ المنبثقة'); w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>مطالبة دفعة – ${esc(r.p.name)}</title><style>body{font-family:"Segoe UI",Tahoma,sans-serif;margin:30px;color:#111}h1{font-size:20px}table{border-collapse:collapse;width:100%;margin-top:14px}td{border:1px solid #999;padding:7px 10px}td:first-child{background:#f3f1ec;font-weight:700;width:55%}.big td{font-size:18px;font-weight:700;color:#b3261e}.sig{display:flex;justify-content:space-around;margin-top:60px;font-weight:700}@page{size:A4;margin:16mm}</style></head><body>
+    <h1>مطالبة بدفعة مقدمة – ${esc(proj.name)}</h1><p>السادة / ${esc(proj.owner_name)}<br>التاريخ: ${fmtD(today())}</p><p>بالإشارة للاتفاق على صرف دفعة مقدمة بنسبة ${Math.round(AP * 100)}% من السعر التقديري لكل مرحلة، نرجو صرف الدفعة الموضحة لمرحلة <b>${r.p.n}. ${esc(r.p.name)}</b>:</p>
+    <table><tr><td>السعر التقديري للمرحلة</td><td>${nf(r.price, 0)} ج.م</td></tr><tr><td>الدفعة المقدمة المستحقة (${Math.round(AP * 100)}%)</td><td>${nf(r.req, 0)} ج.م</td></tr><tr><td>المستلم من الدفعات المقدمة للمرحلة</td><td>${nf(r.got, 0)} ج.م</td></tr>${r.ask ? `<tr><td>مطالبات سابقة لم تصرف</td><td>${nf(r.ask, 0)} ج.م</td></tr>` : ''}<tr><td>المخصوم من المقدم في المستخلصات</td><td>${nf(r.ded, 0)} ج.م</td></tr><tr><td>المنصرف الفعلي على المرحلة</td><td>${nf(r.out, 0)} ج.م</td></tr><tr><td>إجمالي الوارد للمرحلة (مقدم + مستخلصات)</td><td>${nf(r.inflow, 0)} ج.م</td></tr>${r.def ? `<tr><td>العجز في تمويل المرحلة</td><td>${nf(r.def, 0)} ج.م</td></tr>` : ''}<tr class="big"><td>المطلوب صرفه</td><td>${nf(r.claim, 0)} ج.م</td></tr></table>
+    <div class="sig"><span>الحسابات</span><span>المدير التنفيذي</span></div><script>onload=()=>print()<\/script></body></html>`); w.document.close(); };
+  const splitForm = i => { const d = document.createElement('dialog'); d.className = 'adlg'; const m = W[i.id].m;
+    d.innerHTML = `<div class="dh"><h3 style="margin:0;font-size:17px">توزيع مستخلص ${i.no} على المراحل</h3><button type="button" class="dx">✕</button></div><p class="mut" style="font-size:13px">قيمة الأعمال ${nf(W[i.id].w, 0)} – المجموع لازم يساويها.</p><form class="grid">${PH.map(p => `<label>${p.n}. ${esc(p.name)}<input type="number" step="any" data-n="${p.n}" value="${m[p.n] > 1 ? Math.round(m[p.n]) : ''}"></label>`).join('')}<p class="wide" id="spT"></p><div class="acts wide" style="margin:0"><button class="p">حفظ</button>${i.phase_split ? '<button type="button" id="spClr">رجّع للتقديري</button>' : ''}</div></form>`;
+    document.body.append(d); d.showModal(); const f = d.querySelector('form'), tot = () => [...f.querySelectorAll('[data-n]')].reduce((s, e) => s + (+e.value || 0), 0), upd = () => { const t = tot(), df = W[i.id].w - t; d.querySelector('#spT').innerHTML = `المجموع ${nf(t, 0)}${Math.abs(df) > 1 ? ` · <span class="bad">${df > 0 ? 'ناقص' : 'زيادة'} ${nf(Math.abs(df), 0)}</span>` : ' ✔'}`; }; f.oninput = upd; upd();
+    const save = async v => { const { error } = await S.sb.from('owner_invoices').update({ phase_split: v }).eq('id', i.id); if (error) return toast(error.message); d.close(); d.remove(); toast('اتحفظ التوزيع'); renderPhFin(); };
+    d.onclick = e => { if (e.target === d || e.target.closest('.dx')) { d.close(); d.remove(); } if (e.target.id === 'spClr') save(null); };
+    f.onsubmit = e => { e.preventDefault(); if (Math.abs(W[i.id].w - tot()) > 1) return toast('المجموع لازم يساوي قيمة الأعمال'); save(Object.fromEntries([...f.querySelectorAll('[data-n]')].filter(e => +e.value).map(e => [e.dataset.n, +e.value]))); }; };
+  $('#pfAp') && ($('#pfAp').onclick = async () => { const v = prompt('نسبة الدفعة المقدمة من السعر التقديري للمرحلة %', Math.round(AP * 100)); if (v == null || !(+v >= 0 && +v <= 100)) return; const { error } = await S.sb.from('projects').update({ adv_pct: +v / 100 }).eq('id', P.id); if (error) return toast(error.message); renderPhFin(); });
+  $('#main').onclick = e => { const a = e.target.closest('[data-padd]'); if (a) { const n = a.dataset.ph && +a.dataset.ph, r = n && rows.find(x => x.p.n === n); return payForm(a.dataset.padd, {}, null, renderPhFin, n ? { phases: [n], amount: r.advRem ? Math.round(r.advRem) : '' } : {}); }
+    const cl = e.target.closest('[data-claim]'); if (cl) { const r = rows.find(x => x.p.n === +cl.dataset.claim); if (ed && confirm('تسجّل المطالبة كدفعة مقدمة "مطلوبة" عشان تتابعها؟')) payForm('advance', {}, null, renderPhFin, { title: 'مطالبة دفعة مقدمة', phases: [r.p.n], amount: Math.round(r.claim), status: 'requested', notes: 'مطالبة ' + fmtD(today()) }); return claimDoc(r); }
+    const pe = e.target.closest('[data-ped]'); if (pe) return payForm(null, PY.find(y => y.id === pe.dataset.ped), null, renderPhFin);
+    const sp = e.target.closest('[data-split]'); if (sp) splitForm(I.find(i => i.id === sp.dataset.split)); };
+}
 async function renderFinAll() {
   const PS = finPids(), sum = (A, f) => A.reduce((s, x) => s + (+f(x) || 0), 0), got = x => x.status === 'received';
   const rows = await Promise.all(PS.map(async pid => { const p = S.projects.find(x => x.id === pid), A = can('acct', pid), cost = can('ledger', pid), rv = can('ledgerEd', pid);
@@ -1478,7 +1563,7 @@ async function renderAcct() {
   const acts = x => ed ? `<button data-ped="${x.id}">تعديل</button><button class="danger" data-pdel="${x.id}">حذف</button>` : '';
   const LIST = PY.filter(x => V.list === 'all' || x.kind === V.list).slice().reverse();
   const costRows = (() => { const m = {}; LG.forEach(x => { const k = x.phase_n || 0; (m[k] ||= { n: k, e: 0, r: 0 }); m[k].e += +x.expense; m[k].r += +x.revenue; }); return Object.values(m).sort((a, b) => (a.n || 99) - (b.n || 99)); })();
-  $('#main').innerHTML = `<div class="sthead"><div><h2 style="margin:0">الحسابات</h2><p class="mut" style="margin:2px 0 0;font-size:13px">المستخلصات والدفعات المستلمة من المالك على كل مستخلص، والدفعات المقدمة واللي اتخصم منها${cost ? '، والمصروف الفعلي من شيت الحسابات' : ''}.</p></div>${ed ? '<div class="acts" style="margin:0"><button class="p" data-padd="invoice">+ دفعة مستخلص</button><button data-padd="advance">+ دفعة مقدمة</button></div>' : ''}</div>
+  $('#main').innerHTML = `<div class="sthead"><div><h2 style="margin:0">الحسابات</h2><p class="mut" style="margin:2px 0 0;font-size:13px">المستخلصات والدفعات المستلمة من المالك على كل مستخلص، والدفعات المقدمة واللي اتخصم منها${cost ? '، والمصروف الفعلي من شيت الحسابات' : ''}.</p></div>${ed ? '<div class="acts" style="margin:0"><button class="p" data-padd="invoice">+ وارد دفعة مستخلص</button><button data-padd="advance">+ وارد دفعة مقدمة</button><button data-padd="other">+ وارد آخر</button></div>' : ''}</div>
   <div class="kpis">
     <div class="kpi"><b>${money(billed)}</b><span>قيمة المستخلصات المقدمة<br><small>أعمال ${money(sum(live, r => r.works))} + أتعاب ${money(sum(live, r => r.fee))}</small></span></div>
     <div class="kpi k-ok"><b>${money(recv)}</b><span>إجمالي المحصّل من المالك<br><small>مقدم ${money(advGot)} + مستخلصات ${money(invPaid)}${other ? ' + أخرى ' + money(other) : ''}</small></span></div>
@@ -1504,30 +1589,11 @@ async function renderAcct() {
   ${cost ? `<div class="secT">المصروف الفعلي من شيت الحسابات</div><div class="card">${costRows.length ? `<div class="scroll"><table class="stack"><thead><tr><th>المرحلة</th><th class="n">المصروفات</th><th class="n">الإيرادات المسجلة في الشيت</th></tr></thead><tbody>${costRows.map(x => `<tr><td data-l="المرحلة">${x.n ? x.n + '. ' + esc(phName(x.n)) : 'بدون مرحلة'}</td><td class="n" data-l="المصروفات">${nf(x.e, 0)}</td><td class="n" data-l="الإيرادات">${x.r ? nf(x.r, 0) : '–'}</td></tr>`).join('')}<tr class="tot"><td>الإجمالي</td><td class="n" data-l="المصروفات">${nf(exp, 0)}</td><td class="n" data-l="الإيرادات">${nf(lrev, 0)}</td></tr></tbody></table></div>
     ${Math.abs(lrev - recv) > 1 ? `<p class="mut" style="font-size:12px;margin:6px 0 0">الإيرادات في شيت الحسابات ${money(lrev)}، والمحصّل المتسجل هنا ${money(recv)}. الفرق ${money(Math.abs(lrev - recv))} – غالباً دفعات لسه ماتسجلتش هنا.</p>` : ''}` : '<p class="mut" style="margin:0">لسه مفيش شيت حسابات مرفوع.</p>'}
     <div class="acts"><label class="btn" title="شيت الحسابات بنفس شكل شيت الغردقة. بيستبدل بيانات الإكسل القديمة.">رفع شيت الحسابات<input type="file" id="lgF" accept=".xlsx,.xls" hidden></label></div><div id="lgBox"></div></div>` : ''}`;
-  const form = (kind, x = {}, inv = null) => { const d = document.createElement('dialog'); d.className = 'adlg'; const r0 = inv && R.find(r => r.i.id === inv);
-    d.innerHTML = `<div class="dh"><h3 style="margin:0;font-size:17px">${x.id ? 'تعديل دفعة' : '+ ' + PAYK[kind]}</h3><button type="button" class="dx">✕</button></div><form class="grid" style="margin-top:12px">
-      <label>النوع<select name="kind">${Object.entries(PAYK).map(([k, l]) => `<option value="${k}"${k === (x.kind || kind) ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
-      <label data-k="invoice">المستخلص<select name="inv">${R.filter(r => r.i.status !== 'draft').map(r => `<option value="${r.i.id}"${r.i.id === (x.invoice_id || inv) ? ' selected' : ''}>مستخلص ${r.i.no} – متبقي ${nf(r.rem, 0)}</option>`).join('')}</select></label>
-      <label>المبلغ (ج.م)<input name="amount" type="number" step="any" inputmode="decimal" required value="${x.amount ?? (r0 ? Math.round(r0.rem) || '' : '')}"></label>
-      <label>التاريخ<input type="date" name="date" value="${x.pay_date || today()}"></label>
-      <label>الحالة<select name="status"><option value="received">مستلمة</option><option value="requested"${x.status === 'requested' ? ' selected' : ''}>مطلوبة – لسه ماوصلتش</option></select></label>
-      <label>طريقة الدفع<select name="method"><option value="">—</option>${PAYM.map(m => `<option${m === x.method ? ' selected' : ''}>${m}</option>`).join('')}</select></label>
-      <label>رقم التحويل / الشيك<input name="ref" value="${esc(x.ref || '')}"></label>
-      <fieldset data-k="advance" class="wide phs"><legend>الدفعة المقدمة على مرحلة</legend>${P.phaseProg.map(ph => `<label class="chk"><input type="checkbox" name="ph" value="${ph.n}"${(x.phase_ns || []).includes(ph.n) ? ' checked' : ''}> ${ph.n}. ${esc(ph.name)}</label>`).join('')}</fieldset>
-      <label class="wide">ملاحظات<input name="notes" value="${esc(x.notes || '')}"></label>
-      <div class="acts wide" style="margin:0"><button class="p">حفظ</button></div></form>`;
-    document.body.append(d); d.showModal(); const f = d.querySelector('form'), sync = () => d.querySelectorAll('[data-k]').forEach(e => e.hidden = e.dataset.k !== f.kind.value); f.kind.onchange = sync; sync();
-    f.inv.onchange = () => { const r = R.find(r => r.i.id === f.inv.value); if (r && !x.id) f.amount.value = Math.round(r.rem) || ''; };
-    d.onclick = e => { if (e.target === d || e.target.closest('.dx')) { d.close(); d.remove(); } };
-    f.onsubmit = async e => { e.preventDefault(); const k = f.kind.value, rec = { project_id: P.id, kind: k, invoice_id: k === 'invoice' ? f.inv.value || null : null, phase_ns: k === 'advance' ? [...f.querySelectorAll('[name=ph]:checked')].map(c => +c.value) : null, amount: +f.amount.value, pay_date: f.date.value || null, status: f.status.value, method: f.method.value || null, ref: f.ref.value.trim() || null, notes: f.notes.value.trim() || null };
-      if (!(rec.amount > 0)) return toast('اكتب المبلغ'); if (k === 'invoice' && !rec.invoice_id) return toast('اختار المستخلص');
-      const { error } = x.id ? await S.sb.from('owner_payments').update(rec).eq('id', x.id) : await S.sb.from('owner_payments').insert(rec); if (error) return toast(error.message);
-      d.close(); d.remove(); toast('اتسجلت الدفعة'); renderAcct(); }; };
   $('#lgF') && ($('#lgF').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) importLedger(f); });
   document.querySelectorAll('[data-pl]').forEach(b => b.onclick = () => { V.list = b.dataset.pl; renderAcct(); });
   $('#main').onclick = async e => { const iv2 = e.target.closest('[data-iv]'); if (iv2) { e.preventDefault(); (S.iv ||= {}).pid = P.id; S.iv.id = iv2.dataset.iv; S.iv.tab = 'summary'; S.iv.edit = false; location.hash = `#p/${P.id}/inv`; return; }
-    const a = e.target.closest('[data-padd]'); if (a) return form(a.dataset.padd, {}, a.dataset.inv || null);
-    const ed2 = e.target.closest('[data-ped]'); if (ed2) return form(null, PY.find(x => x.id === ed2.dataset.ped));
+    const a = e.target.closest('[data-padd]'); if (a) return payForm(a.dataset.padd, {}, a.dataset.inv || null, renderAcct);
+    const ed2 = e.target.closest('[data-ped]'); if (ed2) return payForm(null, PY.find(x => x.id === ed2.dataset.ped), null, renderAcct);
     const dl = e.target.closest('[data-pdel]'); if (dl) { if (dl.dataset.sure !== '1') { dl.dataset.sure = '1'; dl.textContent = 'متأكد؟'; return; } const { error } = await S.sb.from('owner_payments').delete().eq('id', dl.dataset.pdel); if (error) return toast(error.message); toast('اتحذفت'); renderAcct(); } };
 }
 
@@ -1781,7 +1847,7 @@ async function renderLedger() {
   const ok = rows.filter(r => r.status === 'approved'), tot = ok.reduce((s, r) => s + +r.expense, 0), pend = (R || []).filter(r => r.status === 'submitted');
   const byCat = {}; ok.forEach(r => byCat[r.category || '—'] = (byCat[r.category || '—'] || 0) + +r.expense);
   const phN = n => n ? n + '. ' + (P.phaseProg.find(p => p.n === n)?.name || '') : '—', code = id => P.items.find(i => i.id === id)?.code || '';
-  $('#main').innerHTML = `<div class="sthead"><div><h2 style="margin:0">القيود والمصروفات</h2><p class="mut" style="margin:2px 0 0;font-size:13px">كل مصروف بمرحلته ونوعه وبند المقايسة ورقم المستخلص. القيود المعتمدة بس هي اللي بتدخل في تكاليف المراحل ومستخلص المالك.</p></div><div class="acts" style="margin:0"><button class="p" id="lgNew">+ قيد مصروف</button>${pend.length ? `<a class="btn" href="#p/${P.id}/custody">مراجعة العُهد (${pend.length})</a>` : ''}</div></div>
+  $('#main').innerHTML = `<div class="sthead"><div><h2 style="margin:0">القيود والمصروفات</h2><p class="mut" style="margin:2px 0 0;font-size:13px">كل مصروف بمرحلته ونوعه وبند المقايسة ورقم المستخلص. القيود المعتمدة بس هي اللي بتدخل في تكاليف المراحل ومستخلص المالك.</p></div><div class="acts" style="margin:0"><button class="p" id="lgNew">+ قيد مصروف</button>${can('acctEdit', P.id) ? '<button id="lgIn">+ وارد من المالك</button>' : ''}<a class="btn" href="#p/${P.id}/phfin">حساب المراحل</a>${pend.length ? `<a class="btn" href="#p/${P.id}/custody">مراجعة العُهد (${pend.length})</a>` : ''}</div></div>
   <div class="kpis"><div class="kpi"><b>${money(tot)}</b><span>إجمالي المعتمد بالفلتر الحالي<br><small>${ok.length} قيد</small></span></div>${Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([c, v]) => `<div class="kpi"><b>${money(v)}</b><span>${esc(lcat(c))}</span></div>`).join('')}</div>
   <div class="filters" style="margin-top:12px"><select id="fPh"><option value="">كل المراحل</option>${P.phaseProg.map(p => `<option value="${p.n}"${String(p.n) === F.ph ? ' selected' : ''}>${p.n}. ${esc(p.name)}</option>`).join('')}<option value="0"${F.ph === '0' ? ' selected' : ''}>بدون مرحلة</option></select>
     <select id="fCat"><option value="">كل الأنواع</option>${LCAT.map(c => `<option value="${c}"${c === F.cat ? ' selected' : ''}>${lcat(c)}</option>`).join('')}</select>
@@ -1796,7 +1862,7 @@ async function renderLedger() {
   ${rows.length > F.lim ? `<div class="acts"><button id="lgMoreRows">عرض المزيد (${rows.length - F.lim})</button></div>` : ''}`;
   const set = (k, v) => { F[k] = v; F.lim = 200; renderLedger(); };
   [['fPh', 'ph'], ['fCat', 'cat'], ['fInv', 'inv'], ['fSrc', 'src'], ['fSt', 'st']].forEach(([id, k]) => $('#' + id).onchange = e => set(k, e.target.value)); $('#fQ').onchange = e => set('q', e.target.value.trim());
-  $('#lgNew').onclick = () => ledgerForm(null, 'acct', sugg, renderLedger); $('#lgMoreRows') && ($('#lgMoreRows').onclick = () => { F.lim += 500; renderLedger(); });
+  $('#lgNew').onclick = () => ledgerForm(null, 'acct', sugg, renderLedger); $('#lgIn') && ($('#lgIn').onclick = () => payForm('invoice', {}, null, () => toast('اتسجل الوارد – هتلاقيه في ملخص الحسابات وحساب المراحل'))); $('#lgMoreRows') && ($('#lgMoreRows').onclick = () => { F.lim += 500; renderLedger(); });
   $('#main').onclick = async e => { const a = e.target.closest('[data-led]'); if (a) return ledgerForm(R.find(r => String(r.id) === a.dataset.led), 'acct', sugg, renderLedger);
     const b = e.target.closest('[data-ldl]'); if (b) { if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'متأكد؟'; return; } const { error } = await S.sb.from('ledger_entries').delete().eq('id', b.dataset.ldl); if (error) return toast(error.message); toast('اتحذف'); return renderLedger(); }
     docClick(e); };

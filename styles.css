@@ -461,3 +461,4 @@ fieldset.phs{border:1px solid var(--line);border-radius:10px;display:flex;flex-w
 @media(max-width:640px){.pkrow{grid-template-columns:24px minmax(0,1fr) 80px}.pkc{grid-column:2}.pkn{grid-column:2/4}.pkq{grid-column:2}.pkr{grid-column:3}}
 table.ivph th.c{text-align:center}
 a.btn.xs{display:inline-flex;align-items:center;min-height:28px;padding:0 9px;font-size:12px;margin:2px 0;text-decoration:none}
+table.pft{font-size:13px}table.pft td,table.pft th{white-space:nowrap}table.pft td:first-child{white-space:normal;min-width:170px}td.n.ok{color:var(--ok)}
