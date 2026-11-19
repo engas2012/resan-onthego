@@ -446,3 +446,9 @@ table.qt td.qa button,table.qt td.qa .dchip{min-height:34px;padding:2px 10px;fon
 .qform{border:2px solid var(--acc)}
 .kpis .kpi[data-qst]{cursor:pointer}
 @media(max-width:600px){table.qt.stack tr.qsub{display:block}table.qt.stack tr.qsub td::before{content:none}table.qt.stack td.qa{white-space:normal;display:flex;flex-wrap:wrap;justify-content:flex-start}table.qt.stack td.qa::before{content:none}table.qt.stack td:first-child::before{content:none}.qfix{width:100%}}
+/* accounts */
+.secT{margin:26px 0 10px;font-size:17px;font-weight:700}
+table.actb tr.dim td{opacity:.55}
+td.bad,.n.bad{color:var(--bad);font-weight:700}
+.advbar{height:12px;background:var(--bg);border:1px solid var(--line);border-radius:99px;overflow:hidden}.advbar>div{height:100%;background:var(--acc)}
+fieldset.phs{border:1px solid var(--line);border-radius:10px;display:flex;flex-wrap:wrap;gap:4px 14px;padding:8px 12px}fieldset.phs legend{font-size:13px;color:var(--mut);padding:0 6px}
