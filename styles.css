@@ -462,3 +462,5 @@ fieldset.phs{border:1px solid var(--line);border-radius:10px;display:flex;flex-w
 table.ivph th.c{text-align:center}
 a.btn.xs{display:inline-flex;align-items:center;min-height:28px;padding:0 9px;font-size:12px;margin:2px 0;text-decoration:none}
 table.pft{font-size:13px}table.pft td,table.pft th{white-space:nowrap}table.pft td:first-child{white-space:normal;min-width:170px}td.n.ok{color:var(--ok)}
+.acgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin:12px 0}
+.accard{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:right;min-height:96px;padding:12px 14px}.accard i{font-style:normal;font-size:20px}.accard b{font-size:15px}.accard span{font-size:18px;font-weight:700}.accard small{color:var(--mut);font-size:11px}.accard.on{border-color:var(--acc,#f26b1d);box-shadow:0 0 0 2px rgba(242,107,29,.25)}.accard.dim{opacity:.55}
