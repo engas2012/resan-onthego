@@ -452,3 +452,11 @@ table.actb tr.dim td{opacity:.55}
 td.bad,.n.bad{color:var(--bad);font-weight:700}
 .advbar{height:12px;background:var(--bg);border:1px solid var(--line);border-radius:99px;overflow:hidden}.advbar>div{height:100%;background:var(--acc)}
 fieldset.phs{border:1px solid var(--line);border-radius:10px;display:flex;flex-wrap:wrap;gap:4px 14px;padding:8px 12px}fieldset.phs legend{font-size:13px;color:var(--mut);padding:0 6px}
+/* invoice phases + picker */
+.lnmeta{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}.lnmeta select{min-height:32px;font-size:12px;padding:2px 6px;max-width:260px}.lnmeta .psel.miss{border-color:var(--warn)}
+.tag.ph{background:var(--acc2)}
+.pklist{max-height:56vh;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.pkrow{display:grid;grid-template-columns:24px 76px minmax(0,1fr) 110px 90px;gap:8px;align-items:start;padding:8px 10px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px}
+.pkrow:hover{background:var(--bg)}.pkrow.used{opacity:.5;cursor:default}.pkc{font-weight:700;direction:ltr;text-align:right}.pkq,.pkr{text-align:left;direction:ltr}
+@media(max-width:640px){.pkrow{grid-template-columns:24px minmax(0,1fr) 80px}.pkc{grid-column:2}.pkn{grid-column:2/4}.pkq{grid-column:2}.pkr{grid-column:3}}
+table.ivph th.c{text-align:center}

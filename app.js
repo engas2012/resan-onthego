@@ -63,7 +63,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.1.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.2.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -1514,10 +1514,51 @@ async function renderInv() {
     const { data: nw, error } = await S.sb.from('owner_invoices').insert({ project_id: P.id, no, title: 'مستخلص جاري ' + no, inv_date: today(), period_from: last?.period_to || last?.inv_date || null, period_to: today(), pay_pct: last?.pay_pct ?? 0.5, fee_pct: last?.fee_pct ?? 0.15, status: 'draft' }).select().single();
     if (error) { $('#ivNew').disabled = false; return toast(error.message); }
     if (last) { const { data: LL } = await S.sb.from('owner_invoice_lines').select('*').eq('invoice_id', last.id).order('sort');
-      const rows = (LL || []).filter(l => ICUM(l.cat)).map(l => ({ invoice_id: nw.id, cat: l.cat, kind: l.kind, name: l.name, description: l.description, unit: l.unit, rate: l.rate, prev_qty: +l.prev_qty + +l.cur_qty, cur_qty: 0, pct: l.pct, prev_value: lnVal(l), notes: null, item_id: l.item_id, line_key: l.line_key, sort: l.sort }));
+      const rows = (LL || []).filter(l => ICUM(l.cat)).map(l => ({ invoice_id: nw.id, cat: l.cat, kind: l.kind, name: l.name, description: l.description, unit: l.unit, rate: l.rate, prev_qty: +l.prev_qty + +l.cur_qty, cur_qty: 0, pct: l.pct, prev_value: lnVal(l), notes: null, item_id: l.item_id, phase_n: l.phase_n, line_key: l.line_key, sort: l.sort }));
       for (let k = 0; k < rows.length; k += 300) { const { error: e2 } = await S.sb.from('owner_invoice_lines').insert(rows.slice(k, k + 300)); if (e2) toast(e2.message); }
       toast(rows.length ? `اتعمل مستخلص ${no} واتنقلت ${rows.filter(r => r.kind === 'line').length} بند من مستخلص ${last.no}` : `اتعمل مستخلص ${no}`); }
     V.id = nw.id; V.tab = 'contract'; V.edit = true; renderInv(); });
+}
+
+/* invoice: pick lines from BOQ items by phase */
+function invPick(cat, L, done) {
+  const P = S.P, used = new Set(L.filter(l => l.cat === cat && l.item_id).map(l => l.item_id)), cum = ICUM(cat), F = (S.ivPick ||= { ph: '', q: '' });
+  const d = document.createElement('dialog'); d.className = 'adlg wide';
+  const list = () => { const ph = +F.ph || null, q = normAr(F.q); const R = P.items.filter(i => (!ph || i.phase_n === ph) && (!q || normAr(i.code + ' ' + i.name + ' ' + (i.building || '')).includes(q)));
+    return R.length ? `<div class="pklist">${R.map(i => `<label class="pkrow${used.has(i.id) ? ' used' : ''}"><input type="checkbox" value="${esc(i.id)}"${used.has(i.id) ? ' disabled' : ''}><span class="pkc">${esc(i.code)}</span><span class="pkn">${esc(i.name.length > 110 ? i.name.slice(0, 110) + '…' : i.name)}${i.building ? ` <small class="mut">– ${esc(i.building)}</small>` : ''}${used.has(i.id) ? ' <small class="mut">(موجود في المستخلص)</small>' : ''}</span><span class="pkq">${+i.qty ? nf(i.qty) + ' ' + esc(i.unit || '') : esc(i.unit || 'مقطوعية')}${i.ex > 0 ? `<br><small>منفذ ${nf(i.ex)}</small>` : ''}</span><span class="pkr">${i.rate > 0 ? nf(i.rate, 0) : '<small class="mut">مش متسعّر</small>'}</span></label>`).join('')}</div>` : '<p class="mut">مفيش بنود.</p>'; };
+  d.innerHTML = `<div class="dh"><div><h3 style="margin:0;font-size:17px">إضافة بنود من المقايسة – ${ICAT[cat]}</h3><div class="mut" style="font-size:13px">اختار المرحلة وعلّم على البنود. الاسم والوحدة والسعر هيتنقلوا من المقايسة${cum ? '، والكمية الحالية = المنفذ من التقارير المعتمدة' : ''}، وتقدر تعدّلهم بعد الإضافة.</div></div><button type="button" class="dx">✕</button></div>
+    <div class="filters" style="margin:12px 0 8px"><select id="pkPh"><option value="">كل المراحل</option>${P.phaseProg.map(x => `<option value="${x.n}"${String(x.n) === F.ph ? ' selected' : ''}>${x.n}. ${esc(x.name)}</option>`).join('')}</select><input id="pkQ" type="search" placeholder="بحث بالكود أو الاسم" value="${esc(F.q)}"><label class="chk"><input type="checkbox" id="pkAll"> تحديد الكل</label></div>
+    <div id="pkBox">${list()}</div><div class="acts"><button class="p" id="pkGo">إضافة البنود المختارة</button><span class="mut" id="pkN"></span></div>`;
+  document.body.append(d); d.showModal();
+  const cnt = () => { const n = d.querySelectorAll('#pkBox input:checked').length; d.querySelector('#pkN').textContent = n ? `${n} بند مختار` : ''; };
+  const redraw = () => { d.querySelector('#pkBox').innerHTML = list(); d.querySelector('#pkAll').checked = false; cnt(); };
+  d.querySelector('#pkPh').onchange = e => { F.ph = e.target.value; redraw(); }; d.querySelector('#pkQ').oninput = e => { F.q = e.target.value; redraw(); };
+  d.querySelector('#pkAll').onchange = e => { d.querySelectorAll('#pkBox input:not(:disabled)').forEach(c => c.checked = e.target.checked); cnt(); }; d.querySelector('#pkBox').onchange = cnt;
+  d.onclick = e => { if (e.target === d || e.target.closest('.dx')) { d.close(); d.remove(); } };
+  d.querySelector('#pkGo').onclick = () => { const ids = [...d.querySelectorAll('#pkBox input:checked')].map(c => c.value); if (!ids.length) return toast('علّم على بند واحد على الأقل');
+    let mx = Math.max(0, ...L.filter(l => l.cat === cat).map(l => +l.sort || 0)); const byPh = {}; ids.map(id => P.items.find(i => i.id === id)).forEach(i => (byPh[i.phase_n] ||= []).push(i));
+    Object.keys(byPh).sort((a, b) => a - b).forEach(n => { n = +n; const has = L.some(l => l.cat === cat && +l.phase_n === n);
+      if (!has) L.push({ cat, kind: 'head1', name: `${n}. ${P.phaseProg.find(x => x.n === n)?.name || 'المرحلة ' + n}`, unit: '', rate: 0, prev_qty: 0, cur_qty: 0, pct: 1, prev_value: 0, phase_n: n, sort: mx += 10, _new: true });
+      byPh[n].forEach(i => L.push({ cat, kind: 'line', name: i.name, unit: i.unit || 'مقطوعية', rate: i.rate > 0 ? Math.round(i.rate * 100) / 100 : 0, prev_qty: 0, cur_qty: cum ? Math.max(+i.ex || 0, 0) : (+i.qty || 1), pct: 1, prev_value: 0, item_id: i.id, phase_n: n, notes: null, sort: mx += 10, _new: true })); });
+    d.close(); d.remove(); toast(`اتضاف ${ids.length} بند – راجع الفئة والكميات واحفظ`); done(); };
+}
+/* invoice: split by phase (this invoice + cumulative to date) */
+async function invPhases(inv, L, useLines, amt) {
+  const P = S.P, box = $('#ivBody'); const cats = Object.keys(ICAT);
+  const { data: prevInv } = await S.sb.from('owner_invoices').select('*').eq('project_id', P.id).lt('no', inv.no).order('no');
+  const ids = (prevInv || []).map(i => i.id); let PL = [];
+  if (ids.length) { const { data } = await S.sb.from('owner_invoice_lines').select('invoice_id,cat,kind,rate,prev_qty,cur_qty,pct,prev_value,phase_n').in('invoice_id', ids); PL = data || []; }
+  const M = {}, add = (n, k, cur, cum) => { const r = (M[n ?? 0] ||= { n: n ?? 0, cur: {}, cum: {} }); r.cur[k] = (r.cur[k] || 0) + cur; r.cum[k] = (r.cum[k] || 0) + cum; };
+  if (useLines) L.filter(l => l.kind === 'line').forEach(l => add(l.phase_n, l.cat, lnCur(l), ICUM(l.cat) ? lnVal(l) : lnCur(l)));
+  else cats.forEach(k => add(null, k, amt(k), 0));
+  PL.filter(l => l.kind === 'line' && !ICUM(l.cat)).forEach(l => add(l.phase_n, l.cat, 0, lnCur(l)));
+  (prevInv || []).filter(i => !PL.some(l => l.invoice_id === i.id)).forEach(i => cats.forEach(k => { if (!ICUM(k) || !useLines) add(null, k, 0, +i['amt_' + k]); }));
+  const rows = Object.values(M).sort((a, b) => (a.n || 99) - (b.n || 99)), t = (r, w) => cats.reduce((s, k) => s + (r[w][k] || 0), 0), T = (w, k) => rows.reduce((s, r) => s + (k ? r[w][k] || 0 : t(r, w)), 0);
+  const nm = n => n ? `${n}. ${esc(P.phaseProg.find(x => x.n === n)?.name || '')}` : '<span class="mut">غير موزّع على مرحلة</span>';
+  box.innerHTML = `<div class="card" style="padding:0"><div class="scroll"><table class="stack ivph"><thead><tr><th rowspan="2">المرحلة</th><th colspan="${cats.length + 1}" class="c">المستخلص الحالي</th><th class="c" rowspan="2">التراكمي حتى المستخلص ده</th></tr><tr>${cats.map(k => `<th class="n">${ICAT[k]}</th>`).join('')}<th class="n">الإجمالي</th></tr></thead><tbody>
+    ${rows.map(r => `<tr><td data-l="المرحلة">${nm(r.n)}</td>${cats.map(k => `<td class="n" data-l="${ICAT[k]}">${r.cur[k] ? nf(r.cur[k], 0) : '–'}</td>`).join('')}<td class="n" data-l="الإجمالي"><b>${nf(t(r, 'cur'), 0)}</b></td><td class="n" data-l="التراكمي">${nf(t(r, 'cum'), 0)}</td></tr>`).join('')}
+    <tr class="tot"><td>الإجمالي</td>${cats.map(k => `<td class="n" data-l="${ICAT[k]}">${nf(T('cur', k), 0)}</td>`).join('')}<td class="n" data-l="الإجمالي">${nf(T('cur'), 0)}</td><td class="n" data-l="التراكمي">${nf(T('cum'), 0)}</td></tr></tbody></table></div></div>
+    ${rows.some(r => !r.n) ? '<p class="mut" style="font-size:12px">"غير موزّع" = بنود من غير مرحلة، أو مستخلصات سابقة متسجلة بالإجماليات بس. حدد المرحلة لكل بند من "تعديل" عشان التقسيم يكمل.</p>' : ''}`;
 }
 async function renderInvOne() {
   const P = S.P, V = S.iv, ed = can('invEdit', P.id);
@@ -1531,27 +1572,28 @@ async function renderInvOne() {
   L.forEach((l, k) => l._i = k);
   const catTable = c => { const R = L.filter(l => l.cat === c), cum = ICUM(c);
     const row = l => l.kind !== 'line' ? `<tr class="${l.kind}"><td colspan="${cum ? 10 : 8}">${E ? `<input data-l="${l._i}" data-f="name" value="${esc(l.name)}" style="width:70%;font-weight:700"> <button type="button" class="danger xs" data-ldel="${l._i}">✕</button>` : esc(l.name)}</td></tr>`
-      : `<tr><td>${E ? `<textarea data-l="${l._i}" data-f="name" rows="1" style="width:100%;min-width:220px">${esc(l.name)}</textarea>` : esc(l.name)}${!E && l.item_id ? ` <span class="tag">${esc(P.items.find(i => i.id === l.item_id)?.code || '')}</span>` : ''}${E && c === 'contract' ? `<select data-l="${l._i}" data-f="item_id" class="isel"><option value="">— ربط ببند مقايسة —</option>${P.items.map(i => `<option value="${esc(i.id)}"${i.id === l.item_id ? ' selected' : ''}>${esc(i.code + ' ' + i.name.slice(0, 50))}</option>`).join('')}</select>` : ''}</td>
+      : `<tr><td>${E ? `<textarea data-l="${l._i}" data-f="name" rows="1" style="width:100%;min-width:220px">${esc(l.name)}</textarea>` : esc(l.name)}${!E && l.item_id ? ` <span class="tag">${esc(P.items.find(i => i.id === l.item_id)?.code || '')}</span>` : ''}${!E && l.phase_n ? ` <span class="tag ph">م${l.phase_n}</span>` : ''}${E ? `<div class="lnmeta"><select data-l="${l._i}" data-f="phase_n" class="psel${l.phase_n ? '' : ' miss'}" title="المرحلة"><option value="">— المرحلة —</option>${P.phaseProg.map(x => `<option value="${x.n}"${x.n === +l.phase_n ? ' selected' : ''}>${x.n}. ${esc(x.name)}</option>`).join('')}</select><select data-l="${l._i}" data-f="item_id" class="isel"><option value="">— ربط ببند مقايسة —</option>${P.items.filter(i => !l.phase_n || i.phase_n === +l.phase_n || i.id === l.item_id).map(i => `<option value="${esc(i.id)}"${i.id === l.item_id ? ' selected' : ''}>${esc(i.code + ' ' + i.name.slice(0, 50))}</option>`).join('')}</select></div>` : ''}</td>
         <td>${E ? inp(l, 'unit', 60, 'text') : esc(l.unit || '')}</td><td class="n">${E ? inp(l, 'rate', 95) : nf(l.rate)}</td>
         ${cum ? `<td class="n">${E ? inp(l, 'prev_qty', 80) : nf(l.prev_qty)}</td>` : ''}<td class="n cur">${E ? inp(l, 'cur_qty', 80) : (+l.cur_qty ? nf(l.cur_qty) : '–')}</td>${cum ? `<td class="n">${nf(+l.prev_qty + +l.cur_qty)}</td>` : ''}
         <td class="n">${E ? `<input data-l="${l._i}" data-f="pct" type="number" step="any" value="${Math.round(l.pct * 1000) / 10}" style="width:62px">%` : Math.round(l.pct * 100) + '%'}</td><td class="n" id="lv${l._i}"><b>${nf(lnVal(l), 0)}</b>${cum && Math.abs(lnCur(l)) > 0.5 ? `<div class="cur" style="font-size:11px">الحالي ${nf(lnCur(l), 0)}</div>` : ''}</td>
         <td>${E ? inp(l, 'notes', 130, 'text') : esc(l.notes || '')}</td>${E ? `<td><button type="button" class="danger xs" data-ldel="${l._i}">✕</button></td>` : ''}</tr>`;
     return `<div class="scroll"><table class="ivt"><thead><tr><th>البند</th><th>الوحدة</th><th class="n">الفئة</th>${cum ? '<th class="n">السابق</th>' : ''}<th class="n">الحالي</th>${cum ? '<th class="n">إجمالي الكميات</th>' : ''}<th class="n">${cum ? 'نسبة الإنجاز' : 'نسبة الصرف'}</th><th class="n">قيمة الصرف</th><th>ملاحظات</th>${E ? '<th></th>' : ''}</tr></thead><tbody>${R.map(row).join('') || `<tr><td colspan="10" class="mut">مفيش بنود.</td></tr>`}</tbody></table></div>
       <div class="ivfoot">${cum ? `<span>الإجمالي التراكمي <b>${nf(c === 'contract' ? T.cumContract : T.cumDesign, 0)}</b></span><span>السابق <b>${nf(c === 'contract' ? T.prevContract : T.prevDesign, 0)}</b></span>` : ''}<span class="cur">الحالي <b id="ivCurT">${nf(T[c], 0)}</b></span></div>
-      ${E ? `<div class="acts"><button type="button" data-add="line|${c}">+ بند</button><button type="button" data-add="head1|${c}">+ عنوان رئيسي</button><button type="button" data-add="head2|${c}">+ عنوان فرعي</button>${c === 'contract' ? '<button type="button" id="ivPull">⬇ الكميات الحالية من التقارير المعتمدة</button>' : ''}${c === 'supply' || c === 'extra' ? '<button type="button" id="ivLedger">⬇ من قيود الحسابات</button>' : ''}</div>` : ''}`; };
+      ${E ? `<div class="acts"><button type="button" class="p" data-pick="${c}">+ بنود من المقايسة</button><button type="button" data-add="line|${c}">+ بند يدوي</button><button type="button" data-add="head1|${c}">+ عنوان رئيسي</button><button type="button" data-add="head2|${c}">+ عنوان فرعي</button>${c === 'contract' ? '<button type="button" id="ivPull">⬇ الكميات الحالية من التقارير المعتمدة</button>' : ''}${c === 'supply' || c === 'extra' ? '<button type="button" id="ivLedger">⬇ من قيود الحسابات</button>' : ''}</div>` : ''}`; };
   const summary = `<div class="ivpay card"><table><tbody>${Object.entries(ICAT).map(([k, l]) => `<tr><td>${l}</td><td class="n">${nf(amt(k), 0)}</td></tr>`).join('')}<tr class="tot"><td>إجمالي الأعمال عن ${esc(inv.title || '')}</td><td class="n">${nf(works, 0)}</td></tr>
     <tr><td>نسبة الصرف من الأعمال ${E ? `<input id="ivPay" type="number" step="any" value="${Math.round(inv.pay_pct * 100)}" style="width:70px">%` : `<b>${Math.round(inv.pay_pct * 100)}%</b>`} <span class="mut" style="font-size:12px">(الباقي مخصوم من الدفعة المقدمة)</span></td><td class="n">${nf(pay, 0)}</td></tr>
     <tr><td>نسبة الشركة ${E ? `<input id="ivFee" type="number" step="any" value="${Math.round(inv.fee_pct * 1000) / 10}" style="width:70px">%` : `<b>${Math.round(inv.fee_pct * 1000) / 10}%</b>`} من الأعمال – تُصرف 100%</td><td class="n">${nf(fee, 0)}</td></tr>
     <tr class="net"><td>المستحق صرفه</td><td class="n">${nf(pay + fee, 0)}</td></tr></tbody></table>
     ${inv.legacy && !L.length ? `<p class="mut" style="margin:8px 0 0;font-size:13px">ده مستخلص سابق متسجل بالإجماليات بس. عشان المستخلص الجاي يكمّل الكميات تلقائياً لازم بنوده التفصيلية تتسجل، ممكن ترفع إكسل المستخلص.</p>` : ''}</div>`;
-  const tabs = [['summary', 'الملخص'], ...Object.entries(ICAT).map(([k, l]) => [k, `${l} <small>(${nf(amt(k) / 1000, 0)} ألف)</small>`])];
+  const tabs = [['summary', 'الملخص'], ['phases', 'حسب المراحل'], ...Object.entries(ICAT).map(([k, l]) => [k, `${l} <small>(${nf(amt(k) / 1000, 0)} ألف)</small>`])];
   $('#main').innerHTML = `<div class="sthead"><div><a href="#" id="ivBack" class="mut" style="font-size:13px">← كل المستخلصات</a><h2 style="margin:2px 0">${E ? `<input id="ivTitle" value="${esc(inv.title || '')}" style="font-size:20px;font-weight:700;max-width:320px">` : esc(inv.title || 'مستخلص ' + inv.no)} <span class="st ${IST[inv.status][0]}">${IST[inv.status][1]}</span></h2>
     <div class="mut" style="font-size:13px">${E ? `التاريخ <input id="ivDate" type="date" value="${inv.inv_date || ''}" style="width:auto"> · الفترة من <input id="ivFrom" type="date" value="${inv.period_from || ''}" style="width:auto"> لـ <input id="ivTo" type="date" value="${inv.period_to || ''}" style="width:auto">` : `${inv.inv_date ? fmtD(inv.inv_date) : ''}${inv.period_from ? ' · الفترة ' + fmtD(inv.period_from) + ' – ' + fmtD(inv.period_to) : ''}`}</div></div>
     <div class="acts" style="margin:0">${canEd && !V.edit ? '<button id="ivEd" class="p">تعديل</button>' : ''}${E ? '<button id="ivSave" class="p">حفظ</button><button id="ivCancel">إلغاء</button>' : ''}${!E ? '<button id="ivPrint">🖨 طباعة / PDF</button><button id="ivXls">⬇ Excel</button>' : ''}${ed && !E ? `<select id="ivSt" style="width:auto">${Object.entries(IST).map(([k, [, l]]) => `<option value="${k}"${k === inv.status ? ' selected' : ''}>${l}</option>`).join('')}</select>` : ''}${E ? '<label class="btn" style="margin:0">⬆ استيراد إكسل<input id="ivImp" type="file" accept=".xlsx,.xls" hidden></label>' : ''}</div></div>
   ${lock && ed ? '<div class="note" style="margin-top:8px">المستخلص اتقدّم – عشان تعدّل فيه رجّع حالته لـ"مسودة".</div>' : ''}
   <div class="sttabs"><div class="seg">${tabs.map(([k, l]) => `<button type="button" data-tab="${k}" class="${V.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>
-  <div style="margin-top:12px">${V.tab === 'summary' ? summary : catTable(V.tab)}</div>`;
-  const keep = () => { document.querySelectorAll('[data-l][data-f]').forEach(x => { const l = L[+x.dataset.l]; if (!l) return; const f = x.dataset.f; l[f] = ['rate', 'prev_qty', 'cur_qty'].includes(f) ? (x.value === '' ? 0 : +x.value) : f === 'pct' ? (x.value === '' ? 1 : +x.value / 100) : f === 'item_id' ? x.value || null : x.value; }); };
+  <div style="margin-top:12px" id="ivBody">${V.tab === 'summary' ? summary : V.tab === 'phases' ? '<p class="mut">جاري الحساب…</p>' : catTable(V.tab)}</div>`;
+  if (V.tab === 'phases') invPhases(inv, L, useLines, amt);
+  const keep = () => { document.querySelectorAll('[data-l][data-f]').forEach(x => { const l = L[+x.dataset.l]; if (!l) return; const f = x.dataset.f; l[f] = ['rate', 'prev_qty', 'cur_qty'].includes(f) ? (x.value === '' ? 0 : +x.value) : f === 'pct' ? (x.value === '' ? 1 : +x.value / 100) : f === 'item_id' ? x.value || null : f === 'phase_n' ? (x.value === '' ? null : +x.value) : x.value; }); };
   const meta = () => { const g = id => $('#' + id)?.value; const m = {}; if ($('#ivTitle')) m.title = g('ivTitle'); if ($('#ivDate')) { m.inv_date = g('ivDate') || null; m.period_from = g('ivFrom') || null; m.period_to = g('ivTo') || null; } if ($('#ivPay')) m.pay_pct = (+g('ivPay') || 0) / 100; if ($('#ivFee')) m.fee_pct = (+g('ivFee') || 0) / 100; return m; };
   if (E) { V.meta = { ...(V.meta || {}), ...{} }; }
   const re = () => { keep(); Object.assign(inv, meta()); V.metaPend = { ...(V.metaPend || {}), ...meta() }; renderInvOne(); };
@@ -1562,10 +1604,13 @@ async function renderInvOne() {
   if (E && V.metaPend) { const m = V.metaPend; if ('title' in m && $('#ivTitle')) $('#ivTitle').value = m.title; if (m.inv_date !== undefined && $('#ivDate')) { $('#ivDate').value = m.inv_date || ''; $('#ivFrom').value = m.period_from || ''; $('#ivTo').value = m.period_to || ''; } if ('pay_pct' in m && $('#ivPay')) $('#ivPay').value = Math.round(m.pay_pct * 100); if ('fee_pct' in m && $('#ivFee')) $('#ivFee').value = Math.round(m.fee_pct * 1000) / 10; }
   $('#main').onclick = async e => {
     const ad = e.target.closest('[data-add]'); if (ad) { keep(); const [kind, cat] = ad.dataset.add.split('|'); const mx = Math.max(0, ...L.filter(l => l.cat === cat).map(l => l.sort)); L.push({ cat, kind, name: kind === 'line' ? '' : (kind === 'head1' ? 'عنوان رئيسي' : 'عنوان فرعي'), unit: ICUM(cat) ? 'م3' : 'مقطوعية', rate: 0, prev_qty: 0, cur_qty: ICUM(cat) ? 0 : 1, pct: 1, prev_value: 0, sort: mx + 10, _new: true }); return renderInvOne(); }
+    const pk = e.target.closest('[data-pick]'); if (pk) { keep(); return invPick(pk.dataset.pick, L, re); }
     const dl = e.target.closest('[data-ldel]'); if (dl) { keep(); const l = L[+dl.dataset.ldel]; if (l.id) V.del.push(l.id); L.splice(+dl.dataset.ldel, 1); return renderInvOne(); }
   };
   $('#main').oninput = e => { if (e.target.matches('[data-l][data-f]') && ['rate', 'prev_qty', 'cur_qty', 'pct'].includes(e.target.dataset.f)) { /* live total on blur */ } };
   $('#main').onchange = e => { if (!E) return; if (e.target.matches('#ivPay, #ivFee')) return re();
+    if (e.target.matches('[data-f="item_id"],[data-f="phase_n"]')) { keep(); const l = L[+e.target.dataset.l], it = l.item_id && P.items.find(i => i.id === l.item_id);
+      if (it && e.target.dataset.f === 'item_id') { l.phase_n = it.phase_n; if (!l.name?.trim()) l.name = it.name; if (!l.unit || l.unit === 'م3' || l.unit === 'مقطوعية') l.unit = it.unit || l.unit; if (!+l.rate && it.rate > 0) l.rate = it.rate; } return re(); }
     if (e.target.matches('[data-l][data-f]')) { keep(); const l = L[+e.target.dataset.l], c = $('#lv' + l._i); if (c) c.innerHTML = `<b>${nf(lnVal(l), 0)}</b>${ICUM(l.cat) && Math.abs(lnCur(l)) > 0.5 ? `<div class="cur" style="font-size:11px">الحالي ${nf(lnCur(l), 0)}</div>` : ''}`; const t = $('#ivCurT'); if (t) t.textContent = nf(invTot(L)[l.cat], 0); } };
   $('#ivPull') && ($('#ivPull').onclick = async () => { keep(); const ids = [...new Set(L.filter(l => l.cat === 'contract' && l.item_id).map(l => l.item_id))]; if (!ids.length) return toast('اربط بنود المستخلص ببنود المقايسة الأول');
     const { data: pe } = await S.sb.from('progress_entries').select('item_id,qty').in('item_id', ids); const ex = {}; (pe || []).forEach(x => ex[x.item_id] = (ex[x.item_id] || 0) + +x.qty);
@@ -1582,7 +1627,7 @@ async function renderInvOne() {
     if (inv.legacy && !L.length) { delete head.amt_design; delete head.amt_contract; delete head.amt_supply; delete head.amt_extra; }
     let { error: er } = await S.sb.from('owner_invoices').update(head).eq('id', inv.id);
     if (!er && V.del.length) ({ error: er } = await S.sb.from('owner_invoice_lines').delete().in('id', V.del));
-    const clean = l => { const o = { invoice_id: inv.id }; ['cat', 'kind', 'name', 'description', 'unit', 'rate', 'prev_qty', 'cur_qty', 'pct', 'prev_value', 'notes', 'item_id', 'sort'].forEach(k => o[k] = l[k] ?? (k === 'name' ? '' : null)); ['rate', 'prev_qty', 'cur_qty', 'prev_value'].forEach(k => o[k] = +o[k] || 0); o.pct = o.pct == null ? 1 : +o.pct; o.sort = +o.sort || 0; if (l.line_key) o.line_key = l.line_key; return o; };
+    const clean = l => { const o = { invoice_id: inv.id }; ['cat', 'kind', 'name', 'description', 'unit', 'rate', 'prev_qty', 'cur_qty', 'pct', 'prev_value', 'notes', 'item_id', 'phase_n', 'sort'].forEach(k => o[k] = l[k] ?? (k === 'name' ? '' : null)); ['rate', 'prev_qty', 'cur_qty', 'prev_value'].forEach(k => o[k] = +o[k] || 0); o.pct = o.pct == null ? 1 : +o.pct; o.sort = +o.sort || 0; if (l.line_key) o.line_key = l.line_key; return o; };
     const up = L.filter(l => l.id).map(l => ({ id: l.id, ...clean(l) })), ins = L.filter(l => !l.id).map(clean);
     for (let k = 0; k < up.length && !er; k += 300) ({ error: er } = await S.sb.from('owner_invoice_lines').upsert(up.slice(k, k + 300)));
     for (let k = 0; k < ins.length && !er; k += 300) ({ error: er } = await S.sb.from('owner_invoice_lines').insert(ins.slice(k, k + 300)));
