@@ -26,10 +26,10 @@ h3{font-size:19px;margin:26px 0 10px}
 .sec{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:4px;justify-content:flex-end}
 .fl{display:grid;grid-template-columns:96px minmax(0,1fr) 120px;gap:10px;align-items:center;font-size:13px}
 .fl .bx{position:relative;height:30px}
-.cols{position:absolute;inset:0 0 7px 0;display:flex;justify-content:space-between;padding:0 6%}
+.cols{position:absolute;inset:7px 0 0 0;display:flex;justify-content:space-between;padding:0 6%}
 .cols i{width:7px;background:var(--conc);position:relative;overflow:hidden;border-radius:1px}
 .cols i u{position:absolute;bottom:0;left:0;right:0;background:var(--acc)}
-.slab{position:absolute;left:0;right:0;bottom:0;height:7px;background:var(--conc);border-radius:2px;overflow:hidden}
+.slab{position:absolute;left:0;right:0;top:0;height:7px;background:var(--conc);border-radius:2px;overflow:hidden}
 .slab u{position:absolute;top:0;bottom:0;right:0;background:var(--ink)}
 .fl em{font-style:normal;color:var(--mut);text-align:left;font-variant-numeric:tabular-nums;white-space:nowrap}
 .ground{border-top:2px dashed var(--mut);margin:4px 0;font-size:12px;color:var(--mut);padding-top:2px}
