@@ -28,6 +28,8 @@ const CAN = {
   quotes: ['tech', 'finance', 'management', 'consultant', 'owner'],
   acct: ['finance', 'management', 'owner'],
   subs: ['tech', 'finance', 'management'],
+  ledgerEd: ['finance', 'management'],
+  custody: ['site', 'tech', 'store', 'finance', 'management'],
   acctEdit: ['finance', 'management'],
   quoteEd: ['tech', 'management'],
   quoteRev: ['consultant', 'management'],
@@ -64,7 +66,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.3.1</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.4.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -99,9 +101,9 @@ async function afterLogin(user) {
 }
 
 /* ---------------- layout & routing ---------------- */
-const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', 'الجدول الزمني', 'sched'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة التقارير', 'review'], ['log', 'سجل التقارير', 'log'], ['tasks', 'مهام المكتب الفني', 'tasks'], ['boq', 'المقايسة والتكلفة', 'boq'], ['quotes', 'عروض الأسعار', 'quotes'], ['subs', 'عقود المقاولين', 'subs'], ['acct', 'ملخص الحسابات', 'acct'], ['inv', 'المستخلصات', 'inv'], ['store', 'المخزن', 'store'], ['docs', 'المستندات', 'docs']];
-const NAVG = [['متابعة المشروع', '📊', ['status', 'schedule']], ['التقارير اليومية', '📝', ['report', 'review', 'log']], ['المكتب الفني والتسعير', '📐', ['tasks', 'boq', 'quotes', 'subs']], ['الحسابات', '💰', ['acct', 'inv']], ['المخزن والمستندات', '📦', ['store', 'docs']]];
-const BADGE = { review: 'pendN', tasks: 'taskN', quotes: 'quoteN' };
+const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', 'الجدول الزمني', 'sched'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة التقارير', 'review'], ['log', 'سجل التقارير', 'log'], ['tasks', 'مهام المكتب الفني', 'tasks'], ['boq', 'المقايسة والتكلفة', 'boq'], ['quotes', 'عروض الأسعار', 'quotes'], ['subs', 'عقود المقاولين', 'subs'], ['acct', 'ملخص الحسابات', 'acct'], ['ledger', 'القيود والمصروفات', 'ledgerEd'], ['custody', 'العهدة', 'custody'], ['inv', 'المستخلصات', 'inv'], ['store', 'المخزن', 'store'], ['docs', 'المستندات', 'docs']];
+const NAVG = [['متابعة المشروع', '📊', ['status', 'schedule']], ['التقارير اليومية', '📝', ['report', 'review', 'log']], ['المكتب الفني والتسعير', '📐', ['tasks', 'boq', 'quotes', 'subs']], ['الحسابات', '💰', ['acct', 'ledger', 'inv', 'custody']], ['المخزن والمستندات', '📦', ['store', 'docs']]];
+const BADGE = { review: 'pendN', tasks: 'taskN', quotes: 'quoteN', custody: 'custN' };
 function projNav(pid, view) {
   const vis = VIEWS.filter(v => !v[2] || can(v[2], pid)), lab = Object.fromEntries(vis.map(v => [v[0], v[1]]));
   const G = NAVG.map(([t, ic, vs]) => [t, ic, vs.filter(v => v in lab)]).filter(g => g[2].length), cur = G.find(g => g[2].includes(view)) || G[0];
@@ -135,6 +137,8 @@ async function route() {
     if (view === 'quotes' && can('quotes', pid)) return renderQuotes();
     if (view === 'acct' && can('acct', pid)) return renderAcct();
     if (view === 'subs' && can('subs', pid)) return renderSubs();
+    if (view === 'ledger' && can('ledgerEd', pid)) return renderLedger();
+    if (view === 'custody' && can('custody', pid)) return renderCustody();
     if (view === 'tasks' && can('tasks', pid)) return renderTasks();
     if (view === 'store' && can('store', pid)) return renderStore();
     if (view === 'inv' && can('inv', pid)) return renderInv();
@@ -177,6 +181,7 @@ async function loadProject(pid) {
     if (!can('docs', pid)) { const qd = P.quotes.map(q => q.doc_id).filter(Boolean); if (qd.length) { const { data } = await S.sb.from('documents').select('*').in('id', qd); P.docs = [...P.docs, ...(data || [])]; } } } else { P.quotes = []; P.qitems = []; }
   setBadge('quoteN', can('quoteRev', pid) && role(pid) === 'consultant' ? P.quotes.filter(q => q.status === 'submitted').length : can('quoteEd', pid) ? P.quotes.filter(q => q.status === 'rejected' && q.adopted).length : 0);
   P.check = can('tasks', pid) ? ((await S.sb.from('phase_checklist').select('*').eq('project_id', pid).order('phase_n').order('sort').order('created_at')).data || []) : [];
+  if (can('ledgerEd', pid)) S.sb.from('ledger_entries').select('id', { count: 'exact', head: true }).eq('project_id', pid).eq('status', 'submitted').then(r => setBadge('custN', r.count || 0)); else if (can('custody', pid)) S.sb.from('ledger_entries').select('id', { count: 'exact', head: true }).eq('project_id', pid).eq('custody_user', S.user.id).eq('status', 'rejected').then(r => setBadge('custN', r.count || 0));
   setBadge('taskN', can('tasks', pid) ? P.items.filter(lacks).length + P.check.filter(c => c.status !== 'approved').length : 0);
 }
 const overall = list => { const W = list.reduce((s, x) => s + (+x.weight || 0), 0); return W ? list.reduce((s, x) => s + (+x.pct || 0) * (+x.weight || 0), 0) / W : 0; };
@@ -1685,6 +1690,127 @@ async function invFromSubs(inv, L, done) {
 }
 let V_subPulled = [];
 
+/* ---------------- accounting entries (ledger) + site custody settlement ---------------- */
+const LCAT = ['توريدات', 'مصنعيات', 'توريدوتركيب', 'تصميمات', 'استشارات', 'تراخيص', 'اكراميات_وعمالة', 'نثريات', 'موقع', 'دعايا'];
+const lcat = c => (c || '').replace(/_/g, ' ').replace('توريدوتركيب', 'توريد وتركيب');
+const LPAY = ['نقدي', 'تحويل بنكي', 'شيك', 'عهدة'], LEST = { draft: ['', 'مسودة'], submitted: ['pend', 'بانتظار الحسابات'], approved: ['appr', 'معتمد'], rejected: ['ret', 'مرجّع'] };
+const LSRC = { excel: 'شيت الحسابات', odoo: 'أودو', manual: 'قيد يدوي', custody: 'عهدة', archived: 'أرشيف' };
+async function ledDocs(rows) { const P = S.P, ids = [...new Set(rows.map(r => r.doc_id).filter(Boolean))].filter(id => !P.docs.some(d => d.id === id)); if (ids.length) { const { data } = await S.sb.from('documents').select('*').in('id', ids); P.docs = [...P.docs, ...(data || [])]; } }
+function ledgerForm(x, mode, sugg, done) {
+  const P = S.P, d = document.createElement('dialog'); d.className = 'adlg'; x ||= {}; const cust = mode === 'custody', fin = can('ledgerEd', P.id);
+  const subs = n => [...new Set([...(sugg.sub[n] || []), ...P.items.filter(i => i.phase_n === +n).map(i => i.group_name)])].filter(Boolean);
+  d.innerHTML = `<div class="dh"><h3 style="margin:0;font-size:17px">${x.id ? 'تعديل مصروف' : cust ? '+ مصروف من العهدة' : '+ قيد مصروف'}</h3><button type="button" class="dx">✕</button></div>
+    ${x.review_note && x.status === 'rejected' ? `<div class="note" style="margin-top:10px">الحسابات رجّعته: ${esc(x.review_note)}</div>` : ''}<form class="grid" style="margin-top:12px">
+    <label>التاريخ<input type="date" name="date" required value="${x.entry_date || today()}"></label>
+    <label>القيمة (ج.م)<input name="amount" type="number" step="any" inputmode="decimal" required value="${x.expense ?? ''}"></label>
+    <label>المرحلة<select name="ph" required><option value="">— اختار —</option>${P.phaseProg.map(p => `<option value="${p.n}"${p.n === x.phase_n ? ' selected' : ''}>${p.n}. ${esc(p.name)}</option>`).join('')}</select></label>
+    <label>المرحلة الفرعية<input name="sub" list="lgSub" value="${esc(x.sub_phase || '')}" placeholder="مثلاً: خوازيق، كرفانات"><datalist id="lgSub"></datalist></label>
+    <label>النوع<select name="cat" required><option value="">— اختار —</option>${LCAT.map(c => `<option value="${c}"${c === x.category ? ' selected' : ''}>${lcat(c)}</option>`).join('')}</select></label>
+    <label>الفرعي<input name="subcat" list="lgSc" value="${esc(x.sub_category || '')}" placeholder="مثلاً: حديد، أسمنت، مياه"><datalist id="lgSc">${(sugg.sc || []).map(s => `<option value="${esc(s)}">`).join('')}</datalist></label>
+    <label class="wide">البيان<input name="desc" required value="${esc(x.description || '')}" placeholder="اكتب المصروف بوضوح"></label>
+    <label>المورد / المقاول<input name="sup" list="lgV" value="${esc(x.supplier || '')}"><datalist id="lgV">${[...new Set([...(P.vendors || []).map(v => v.name), ...(sugg.sup || [])])].map(s => `<option value="${esc(s)}">`).join('')}</datalist></label>
+    <label>بند المقايسة (اختياري)<select name="item"><option value="">—</option></select></label>
+    <label>الكمية<input name="qty" type="number" step="any" value="${x.qty ?? ''}"></label><label>الوحدة<input name="unit" value="${esc(x.unit || '')}"></label>
+    ${cust ? '' : `<label>طريقة الدفع<select name="pay"><option value="">—</option>${LPAY.map(m => `<option${m === x.pay_method ? ' selected' : ''}>${m}</option>`).join('')}</select></label>
+    <label>رقم المستخلص<select name="inv"><option value="">— لسه —</option>${(sugg.inv || []).map(n => `<option value="${n}"${n === x.owner_invoice_no ? ' selected' : ''}>مستخلص ${n}</option>`).join('')}</select></label>
+    <label>رقم الإيصال / التحويل<input name="ref" value="${esc(x.ref || '')}"></label>`}
+    <label class="wide">${cust ? '📷 صورة الفاتورة / الإيصال' : 'مرفق (اختياري)'}${x.doc_id ? ' – <span class="mut">فيه مرفق، ارفع جديد لو عاوز تغيّره</span>' : ''}<input type="file" name="file" accept="image/*,.pdf"${cust ? ' capture="environment"' : ''}></label>
+    <div class="acts wide" style="margin:0"><button class="p">${cust ? 'حفظ' : 'حفظ القيد'}</button>${cust && !x.id ? '<button type="button" id="lgMore">حفظ وإضافة غيره</button>' : ''}</div></form>`;
+  document.body.append(d); d.showModal(); const f = d.querySelector('form');
+  const fillPh = () => { const n = f.ph.value; d.querySelector('#lgSub').innerHTML = subs(n).map(s => `<option value="${esc(s)}">`).join(''); f.item.innerHTML = '<option value="">—</option>' + P.items.filter(i => i.phase_n === +n).map(i => `<option value="${esc(i.id)}"${i.id === x.item_id ? ' selected' : ''}>${esc(i.code + ' ' + i.name.slice(0, 60))}</option>`).join(''); };
+  f.ph.onchange = fillPh; fillPh(); f.item.onchange = () => { const i = P.items.find(y => y.id === f.item.value); if (i && !f.unit.value) f.unit.value = i.unit || ''; if (i && !f.sub.value) f.sub.value = i.group_name || ''; };
+  d.onclick = e => { if (e.target === d || e.target.closest('.dx')) { d.close(); d.remove(); } };
+  let more = false; d.querySelector('#lgMore') && (d.querySelector('#lgMore').onclick = () => { more = true; f.requestSubmit(); });
+  f.onsubmit = async e => { e.preventDefault(); const ph = P.phaseProg.find(p => p.n === +f.ph.value);
+    const rec = { project_id: P.id, entry_date: f.date.value, expense: +f.amount.value, revenue: 0, phase_n: ph?.n || null, main_phase: ph?.name || null, sub_phase: f.sub.value.trim() || null, category: f.cat.value, sub_category: f.subcat.value.trim() || null, description: f.desc.value.trim(), supplier: f.sup.value.trim() || null, item_id: f.item.value || null, qty: f.qty.value === '' ? null : +f.qty.value, unit: f.unit.value.trim() || null };
+    const v = (P.vendors || []).find(y => y.name === rec.supplier); rec.vendor_id = v?.id || null;
+    if (!(rec.expense > 0)) return toast('اكتب القيمة');
+    if (cust) { if (!x.id) Object.assign(rec, { source: 'custody', custody_user: x.custody_user || S.user.id, pay_method: 'عهدة', status: 'draft' }); else if (x.status === 'rejected' && x.custody_user === S.user.id) rec.status = 'draft'; }
+    else { Object.assign(rec, { pay_method: f.pay.value || null, owner_invoice_no: f.inv.value ? +f.inv.value : null, ref: f.ref.value.trim() || null }); if (!x.id) Object.assign(rec, { source: 'manual', status: 'approved' }); }
+    const file = f.file.files[0]; if (file) { const m = { kind: 'receipt', title: 'إيصال – ' + rec.description.slice(0, 60), doc_date: rec.entry_date, supplier: rec.supplier, amount: rec.expense }; await uploadDocs([file], m); if (m.ids?.[0]) rec.doc_id = m.ids[0]; }
+    const { error } = x.id ? await S.sb.from('ledger_entries').update(rec).eq('id', x.id) : await S.sb.from('ledger_entries').insert(rec); if (error) return toast(error.message);
+    toast(x.id ? 'اتحفظ' : 'اتسجل'); d.close(); d.remove(); done(); if (more) ledgerForm({ entry_date: rec.entry_date, phase_n: rec.phase_n, sub_phase: rec.sub_phase, category: rec.category }, mode, sugg, done); };
+}
+async function ledgerSugg(pid) {
+  const [{ data: le }, { data: iv }] = await Promise.all([S.sb.from('ledger_entries').select('phase_n,sub_phase,sub_category,supplier').eq('project_id', pid).limit(2000), can('inv', pid) ? S.sb.from('owner_invoices').select('no').eq('project_id', pid).order('no') : Promise.resolve({ data: [] })]);
+  const sub = {}; (le || []).forEach(r => { if (r.sub_phase) (sub[r.phase_n] ||= new Set()).add(r.sub_phase.trim()); });
+  const nxt = (iv || []).length ? Math.max(...iv.map(i => i.no)) + 1 : 1;
+  return { sub: Object.fromEntries(Object.entries(sub).map(([k, v]) => [k, [...v]])), sc: [...new Set((le || []).map(r => r.sub_category).filter(Boolean))], sup: [...new Set((le || []).map(r => r.supplier).filter(Boolean))].slice(0, 300), inv: [...(iv || []).map(i => i.no), nxt] };
+}
+async function renderLedger() {
+  const P = S.P, F = (S.lg ||= { ph: '', cat: '', inv: '', src: '', st: '', q: '', lim: 200 }); if (F.pid !== P.id) Object.assign(F, { pid: P.id, ph: '', cat: '', inv: '', src: '', st: '', q: '', lim: 200 });
+  $('#main').innerHTML = '<p class="mut">جاري التحميل…</p>';
+  let q = S.sb.from('ledger_entries').select('*').eq('project_id', P.id).gt('expense', 0);
+  if (F.ph) q = F.ph === '0' ? q.is('phase_n', null) : q.eq('phase_n', +F.ph); if (F.cat) q = q.eq('category', F.cat); if (F.inv) q = F.inv === '0' ? q.is('owner_invoice_no', null) : q.eq('owner_invoice_no', +F.inv); if (F.src) q = q.eq('source', F.src); if (F.st) q = q.eq('status', F.st); else q = q.neq('status', 'draft');
+  const [{ data: R, error }, sugg, { data: ppl }] = await Promise.all([q.order('entry_date', { ascending: false, nullsFirst: false }).order('id', { ascending: false }).limit(5000), ledgerSugg(P.id), S.sb.rpc('project_people', { p_project: P.id })]);
+  if (error) return $('#main').innerHTML = `<div class="note">${esc(error.message)}</div>`;
+  const nm = Object.fromEntries((ppl || []).map(p => [p.user_id, p.name])), qq = normAr(F.q);
+  const rows = (R || []).filter(r => !qq || normAr([r.description, r.supplier, r.sub_phase, r.sub_category, r.ref].join(' ')).includes(qq)), shown = rows.slice(0, F.lim); await ledDocs(shown);
+  const ok = rows.filter(r => r.status === 'approved'), tot = ok.reduce((s, r) => s + +r.expense, 0), pend = (R || []).filter(r => r.status === 'submitted');
+  const byCat = {}; ok.forEach(r => byCat[r.category || '—'] = (byCat[r.category || '—'] || 0) + +r.expense);
+  const phN = n => n ? n + '. ' + (P.phaseProg.find(p => p.n === n)?.name || '') : '—', code = id => P.items.find(i => i.id === id)?.code || '';
+  $('#main').innerHTML = `<div class="sthead"><div><h2 style="margin:0">القيود والمصروفات</h2><p class="mut" style="margin:2px 0 0;font-size:13px">كل مصروف بمرحلته ونوعه وبند المقايسة ورقم المستخلص. القيود المعتمدة بس هي اللي بتدخل في تكاليف المراحل ومستخلص المالك.</p></div><div class="acts" style="margin:0"><button class="p" id="lgNew">+ قيد مصروف</button>${pend.length ? `<a class="btn" href="#p/${P.id}/custody">مراجعة العُهد (${pend.length})</a>` : ''}</div></div>
+  <div class="kpis"><div class="kpi"><b>${money(tot)}</b><span>إجمالي المعتمد بالفلتر الحالي<br><small>${ok.length} قيد</small></span></div>${Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([c, v]) => `<div class="kpi"><b>${money(v)}</b><span>${esc(lcat(c))}</span></div>`).join('')}</div>
+  <div class="filters" style="margin-top:12px"><select id="fPh"><option value="">كل المراحل</option>${P.phaseProg.map(p => `<option value="${p.n}"${String(p.n) === F.ph ? ' selected' : ''}>${p.n}. ${esc(p.name)}</option>`).join('')}<option value="0"${F.ph === '0' ? ' selected' : ''}>بدون مرحلة</option></select>
+    <select id="fCat"><option value="">كل الأنواع</option>${LCAT.map(c => `<option value="${c}"${c === F.cat ? ' selected' : ''}>${lcat(c)}</option>`).join('')}</select>
+    <select id="fInv"><option value="">كل المستخلصات</option>${sugg.inv.map(n => `<option value="${n}"${String(n) === F.inv ? ' selected' : ''}>مستخلص ${n}</option>`).join('')}<option value="0"${F.inv === '0' ? ' selected' : ''}>من غير مستخلص</option></select>
+    <select id="fSrc"><option value="">كل المصادر</option>${Object.entries(LSRC).map(([k, l]) => `<option value="${k}"${k === F.src ? ' selected' : ''}>${l}</option>`).join('')}</select>
+    <select id="fSt"><option value="">معتمد + تحت المراجعة</option>${Object.entries(LEST).map(([k, [, l]]) => `<option value="${k}"${k === F.st ? ' selected' : ''}>${l}</option>`).join('')}</select>
+    <input id="fQ" type="search" placeholder="بحث في البيان أو المورد" value="${esc(F.q)}"></div>
+  <div class="card" style="padding:0;margin-top:10px"><div class="scroll"><table class="stack lgt"><thead><tr><th>التاريخ</th><th>المرحلة</th><th>النوع</th><th>البيان</th><th>المورد</th><th class="n">القيمة</th><th>مستخلص</th><th>المصدر</th><th></th></tr></thead><tbody>
+    ${shown.map(r => { const dd = r.doc_id && P.docs.find(x => x.id === r.doc_id), edt = r.source !== 'excel' && r.source !== 'archived'; return `<tr class="${r.status !== 'approved' ? 'dim' : ''}"><td data-l="التاريخ">${r.entry_date ? fmtD(r.entry_date) : '–'}</td><td data-l="المرحلة">${esc(phN(r.phase_n))}${r.sub_phase ? `<div class="mut" style="font-size:12px">${esc(r.sub_phase)}</div>` : ''}</td><td data-l="النوع">${esc(lcat(r.category) || '–')}${r.sub_category ? `<div class="mut" style="font-size:12px">${esc(r.sub_category)}</div>` : ''}</td>
+      <td data-l="البيان">${esc(r.description || '')}${r.item_id ? ` <span class="tag">${esc(code(r.item_id))}</span>` : ''}${r.qty ? ` <small class="mut">${nf(r.qty)} ${esc(r.unit || '')}</small>` : ''}${dd ? ' ' + docChip(dd) : ''}</td><td data-l="المورد">${esc(r.supplier || '–')}</td><td class="n" data-l="القيمة"><b>${nf(r.expense, 0)}</b></td><td data-l="مستخلص">${r.owner_invoice_no ?? '–'}</td>
+      <td data-l="المصدر"><span class="mut" style="font-size:12px">${LSRC[r.source] || r.source}${r.custody_user ? ' – ' + esc(nm[r.custody_user] || '') : ''}${r.pay_method && r.source !== 'custody' ? ' · ' + esc(r.pay_method) : ''}</span>${r.status !== 'approved' ? ` <span class="st ${LEST[r.status][0]}">${LEST[r.status][1]}</span>` : ''}</td><td class="qa">${edt ? `<button data-led="${r.id}">تعديل</button><button class="danger" data-ldl="${r.id}">حذف</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="9" class="mut">مفيش قيود بالفلتر ده.</td></tr>'}</tbody></table></div></div>
+  ${rows.length > F.lim ? `<div class="acts"><button id="lgMoreRows">عرض المزيد (${rows.length - F.lim})</button></div>` : ''}`;
+  const set = (k, v) => { F[k] = v; F.lim = 200; renderLedger(); };
+  [['fPh', 'ph'], ['fCat', 'cat'], ['fInv', 'inv'], ['fSrc', 'src'], ['fSt', 'st']].forEach(([id, k]) => $('#' + id).onchange = e => set(k, e.target.value)); $('#fQ').onchange = e => set('q', e.target.value.trim());
+  $('#lgNew').onclick = () => ledgerForm(null, 'acct', sugg, renderLedger); $('#lgMoreRows') && ($('#lgMoreRows').onclick = () => { F.lim += 500; renderLedger(); });
+  $('#main').onclick = async e => { const a = e.target.closest('[data-led]'); if (a) return ledgerForm(R.find(r => String(r.id) === a.dataset.led), 'acct', sugg, renderLedger);
+    const b = e.target.closest('[data-ldl]'); if (b) { if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'متأكد؟'; return; } const { error } = await S.sb.from('ledger_entries').delete().eq('id', b.dataset.ldl); if (error) return toast(error.message); toast('اتحذف'); return renderLedger(); }
+    docClick(e); };
+}
+async function renderCustody() {
+  const P = S.P, fin = can('ledgerEd', P.id), V = (S.cu ||= {}); if (V.pid !== P.id) { S.cu = { pid: P.id, who: null }; return renderCustody(); }
+  $('#main').innerHTML = '<p class="mut">جاري التحميل…</p>';
+  const [le, tx, sugg, pp] = await Promise.all([S.sb.from('ledger_entries').select('*').eq('project_id', P.id).eq('source', 'custody').order('entry_date', { ascending: false }).order('id', { ascending: false }), S.sb.from('custody_txns').select('*').eq('project_id', P.id).order('txn_date', { ascending: false }), ledgerSugg(P.id), S.sb.rpc('project_people', { p_project: P.id })]);
+  if (le.error || tx.error) return $('#main').innerHTML = `<div class="note">${esc((le.error || tx.error).message)}</div>`;
+  const E = le.data || [], T = tx.data || [], people = pp.data || [], nm = id => people.find(p => p.user_id === id)?.name || (id === S.user.id ? 'أنا' : '—'); await ledDocs(E);
+  const bal = h => { const iss = T.filter(t => t.holder === h && t.kind === 'issue').reduce((s, t) => s + +t.amount, 0), ret = T.filter(t => t.holder === h && t.kind === 'return').reduce((s, t) => s + +t.amount, 0), M = E.filter(x => x.custody_user === h), ap = M.filter(x => x.status === 'approved').reduce((s, x) => s + +x.expense, 0), pe = M.filter(x => x.status === 'submitted').reduce((s, x) => s + +x.expense, 0), dr = M.filter(x => ['draft', 'rejected'].includes(x.status)).reduce((s, x) => s + +x.expense, 0); return { iss, ret, ap, pe, dr, left: iss - ret - ap, after: iss - ret - ap - pe - dr }; };
+  const phN = n => n ? n + '. ' + (P.phaseProg.find(p => p.n === n)?.name || '') : '–';
+  const rowE = (x, acts) => { const dd = x.doc_id && P.docs.find(y => y.id === x.doc_id); return `<tr><td data-l="التاريخ">${fmtD(x.entry_date)}</td><td data-l="المرحلة">${esc(phN(x.phase_n))}${x.sub_phase ? `<div class="mut" style="font-size:12px">${esc(x.sub_phase)}</div>` : ''}</td><td data-l="النوع">${esc(lcat(x.category))}${x.sub_category ? `<div class="mut" style="font-size:12px">${esc(x.sub_category)}</div>` : ''}</td><td data-l="البيان">${esc(x.description || '')}${x.supplier ? `<div class="mut" style="font-size:12px">${esc(x.supplier)}</div>` : ''}${dd ? docChip(dd) : '<span class="mut" style="font-size:11px"> · من غير إيصال</span>'}${x.review_note ? `<div style="color:var(--bad);font-size:12px">${esc(x.review_note)}</div>` : ''}</td><td class="n" data-l="القيمة"><b>${nf(x.expense, 0)}</b></td><td data-l="الحالة"><span class="st ${LEST[x.status][0]}">${LEST[x.status][1]}</span></td><td class="qa">${acts(x)}</td></tr>`; };
+  const tbl = (L, acts) => `<div class="card" style="padding:0"><div class="scroll"><table class="stack"><thead><tr><th>التاريخ</th><th>المرحلة</th><th>النوع</th><th>البيان</th><th class="n">القيمة</th><th>الحالة</th><th></th></tr></thead><tbody>${L.map(x => rowE(x, acts)).join('') || '<tr><td colspan="7" class="mut">مفيش.</td></tr>'}</tbody></table></div></div>`;
+  const balCard = (b, h) => `<div class="kpis"><div class="kpi"><b>${money(b.iss - b.ret)}</b><span>العهدة المستلمة<br><small>صرف ${money(b.iss)}${b.ret ? ' − رد ' + money(b.ret) : ''}</small></span></div><div class="kpi k-ok"><b>${money(b.ap)}</b><span>مصروفات معتمدة</span></div><div class="kpi${b.pe ? ' k-warn' : ''}"><b>${money(b.pe)}</b><span>تحت مراجعة الحسابات</span></div><div class="kpi${b.after < 0 ? ' k-bad' : ''}"><b>${money(b.after)}</b><span>${b.after < 0 ? 'مصروف أكتر من العهدة' : 'الباقي في العهدة'}<br><small>بعد كل المصروفات المسجلة</small></span></div></div>`;
+  const mine = () => { const me = S.user.id, b = bal(me), M = E.filter(x => x.custody_user === me), dr = M.filter(x => ['draft', 'rejected'].includes(x.status)), ndr = M.filter(x => x.status === 'draft').length;
+    return `<div class="sthead"><div><h2 style="margin:0">عهدتي</h2><p class="mut" style="margin:2px 0 0;font-size:13px">سجّل كل مصروف بمرحلته ونوعه وصوّر الإيصال، وبعدين ابعت التصفية للحسابات. المصروف بيتحسب على المشروع بعد اعتماد الحسابات.</p></div><div class="acts" style="margin:0"><button class="p" id="cuAdd">+ مصروف</button>${ndr ? `<button class="p" id="cuSend">إرسال التصفية للحسابات (${ndr})</button>` : ''}</div></div>${balCard(b)}
+    ${dr.length ? `<div class="secT">مسودات ومرجّعات – لسه ماتبعتتش</div>${tbl(dr, x => `<button data-ced="${x.id}">تعديل</button><button class="danger" data-cdl="${x.id}">حذف</button>`)}` : ''}
+    <div class="secT">بانتظار الحسابات</div>${tbl(M.filter(x => x.status === 'submitted'), x => `<button data-cback="${x.id}">سحب للتعديل</button>`)}
+    <div class="secT">المعتمد</div>${tbl(M.filter(x => x.status === 'approved').slice(0, 100), () => '')}
+    <div class="secT">حركة العهدة</div><div class="card" style="padding:0">${T.filter(t => t.holder === me).map(t => `<div class="vrow" style="padding:10px 14px"><div style="flex:1">${t.kind === 'issue' ? '⬇ استلام عهدة' : '⬆ رد نقدية'} – ${fmtD(t.txn_date)}${t.note ? ' · ' + esc(t.note) : ''}</div><b>${nf(t.amount, 0)}</b></div>`).join('') || '<p class="mut" style="padding:14px;margin:0">مفيش.</p>'}</div>`; };
+  const admin = () => { const H = [...new Set([...T.map(t => t.holder), ...E.map(x => x.custody_user), ...people.filter(p => ['site', 'tech', 'store'].includes(p.role)).map(p => p.user_id)])], Q = E.filter(x => x.status === 'submitted');
+    return `<div class="sthead"><div><h2 style="margin:0">العُهد والتصفيات</h2><p class="mut" style="margin:2px 0 0;font-size:13px">رصيد عهدة كل مهندس، ومصروفات التصفية اللي مستنية مراجعتك. تقدر تعدّل التصنيف قبل الاعتماد، والمعتمد بيدخل في القيود وتكاليف المراحل على طول.</p></div><div class="acts" style="margin:0"><button class="p" data-tx="issue">+ صرف عهدة</button><button data-tx="return">رد نقدية</button></div></div>
+    <div class="card" style="padding:0"><div class="scroll"><table class="stack"><thead><tr><th>صاحب العهدة</th><th class="n">مستلم</th><th class="n">معتمد</th><th class="n">تحت المراجعة</th><th class="n">الرصيد</th><th></th></tr></thead><tbody>${H.map(h => { const b = bal(h); return `<tr><td data-l="صاحب العهدة"><b>${esc(nm(h))}</b></td><td class="n" data-l="مستلم">${nf(b.iss - b.ret, 0)}</td><td class="n" data-l="معتمد">${nf(b.ap, 0)}</td><td class="n" data-l="تحت المراجعة">${b.pe ? `<b style="color:var(--warn)">${nf(b.pe, 0)}</b>` : '–'}</td><td class="n${b.left < 0 ? ' bad' : ''}" data-l="الرصيد">${nf(b.left, 0)}</td><td class="qa"><button data-tx="issue" data-h="${h}">+ صرف</button></td></tr>`; }).join('') || '<tr><td colspan="6" class="mut">مفيش عُهد لسه.</td></tr>'}</tbody></table></div></div>
+    <div class="secT">بانتظار المراجعة (${Q.length})</div>
+    ${[...new Set(Q.map(x => x.custody_user))].map(h => { const L = Q.filter(x => x.custody_user === h); return `<div class="card" style="padding:0;margin-bottom:12px"><div class="vrow" style="padding:10px 14px;border-bottom:1px solid var(--line)"><div style="flex:1"><b>${esc(nm(h))}</b> <span class="mut">${L.length} مصروف · ${nf(L.reduce((s, x) => s + +x.expense, 0), 0)} ج.م</span></div><button class="p" data-apall="${h}">✔ اعتماد الكل</button></div><div class="scroll"><table class="stack"><tbody>${L.map(x => rowE(x, y => `<button class="p" data-cok="${y.id}">✔</button><button data-ced="${y.id}">تعديل</button><button class="danger" data-cno="${y.id}">رجّع</button>`)).join('')}</tbody></table></div></div>`; }).join('') || '<p class="mut">مفيش تصفيات مستنية مراجعة.</p>'}
+    <div class="secT">آخر حركات العُهد</div><div class="card" style="padding:0">${T.slice(0, 30).map(t => `<div class="vrow" style="padding:10px 14px"><div style="flex:1">${t.kind === 'issue' ? '⬇ صرف عهدة لـ' : '⬆ رد نقدية من'} <b>${esc(nm(t.holder))}</b> – ${fmtD(t.txn_date)}${t.method ? ' · ' + esc(t.method) : ''}${t.note ? ' · ' + esc(t.note) : ''}</div><b>${nf(t.amount, 0)}</b><button class="danger xs" data-txdl="${t.id}">✕</button></div>`).join('') || '<p class="mut" style="padding:14px;margin:0">مفيش.</p>'}</div>`; };
+  $('#main').innerHTML = fin ? admin() : mine();
+  const re = () => renderCustody();
+  const txForm = (kind, h) => { const d = document.createElement('dialog'); d.className = 'adlg'; const H = people.filter(p => ['site', 'tech', 'store', 'finance', 'management'].includes(p.role));
+    d.innerHTML = `<div class="dh"><h3 style="margin:0;font-size:17px">${kind === 'issue' ? 'صرف عهدة' : 'رد نقدية من عهدة'}</h3><button type="button" class="dx">✕</button></div><form class="grid" style="margin-top:12px"><label class="wide">صاحب العهدة<select name="h" required><option value="">— اختار —</option>${H.map(p => `<option value="${p.user_id}"${p.user_id === h ? ' selected' : ''}>${esc(p.name)} (${esc(ROLE[p.role] || p.role)})</option>`).join('')}</select></label><label>المبلغ<input name="a" type="number" step="any" required></label><label>التاريخ<input type="date" name="d" value="${today()}"></label><label>طريقة<select name="m"><option>نقدي</option><option>تحويل بنكي</option><option>شيك</option></select></label><label>ملاحظة<input name="n"></label><div class="acts wide" style="margin:0"><button class="p">حفظ</button></div></form>`;
+    document.body.append(d); d.showModal(); d.onclick = e => { if (e.target === d || e.target.closest('.dx')) { d.close(); d.remove(); } };
+    d.querySelector('form').onsubmit = async e => { e.preventDefault(); const f = e.target; const { error } = await S.sb.from('custody_txns').insert({ project_id: P.id, holder: f.h.value, kind, amount: +f.a.value, txn_date: f.d.value, method: f.m.value, note: f.n.value.trim() || null }); if (error) return toast(error.message); d.close(); d.remove(); toast('اتسجل'); re(); }; };
+  $('#cuAdd') && ($('#cuAdd').onclick = () => ledgerForm(null, 'custody', sugg, re));
+  $('#cuSend') && ($('#cuSend').onclick = async () => { const ids = E.filter(x => x.custody_user === S.user.id && x.status === 'draft').map(x => x.id); const { error } = await S.sb.from('ledger_entries').update({ status: 'submitted' }).in('id', ids); if (error) return toast(error.message); toast(`اتبعت ${ids.length} مصروف للحسابات`); re(); });
+  $('#main').onclick = async e => { const b = e.target.closest('button'); if (!b) return docClick(e); const k = Object.keys(b.dataset).find(x => x !== 'sure' && x !== 'h'), id = b.dataset[k], x = E.find(y => String(y.id) === id);
+    if (k === 'tx') return txForm(b.dataset.tx, b.dataset.h);
+    if (k === 'ced') return ledgerForm(x, 'custody', sugg, re);
+    if (k === 'cdl') { if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'متأكد؟'; return; } const { error } = await S.sb.from('ledger_entries').delete().eq('id', id); return error ? toast(error.message) : re(); }
+    if (k === 'cback') { const { error } = await S.sb.from('ledger_entries').update({ status: 'draft' }).eq('id', id); return error ? toast(error.message) : re(); }
+    if (k === 'cok') { if (!x.phase_n || !x.category) return toast('حدد المرحلة والنوع الأول من "تعديل"'); const { error } = await S.sb.from('ledger_entries').update({ status: 'approved', review_note: null }).eq('id', id); return error ? toast(error.message) : re(); }
+    if (k === 'cno') { const n = await askNote('سبب الرجوع للمهندس', 'مثلاً: الإيصال مش واضح / المرحلة غلط'); if (!n) return; const { error } = await S.sb.from('ledger_entries').update({ status: 'rejected', review_note: n }).eq('id', id); return error ? toast(error.message) : re(); }
+    if (k === 'apall') { const L = E.filter(y => y.custody_user === id && y.status === 'submitted'), bad = L.filter(y => !y.phase_n || !y.category).length; if (bad) return toast(`فيه ${bad} مصروف من غير مرحلة أو نوع – كمّلهم الأول`); if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = `متأكد؟ ${L.length} مصروف`; return; } const { error } = await S.sb.from('ledger_entries').update({ status: 'approved', review_note: null }).in('id', L.map(y => y.id)); return error ? toast(error.message) : (toast('اتعتمدت التصفية'), re()); }
+    if (k === 'txdl') { if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'متأكد؟'; return; } const { error } = await S.sb.from('custody_txns').delete().eq('id', id); return error ? toast(error.message) : re(); } };
+}
+
 async function renderInv() {
   const P = S.P, ed = can('invEdit', P.id), V = S.iv ||= { id: null };
   if (V.pid !== P.id) { V.pid = P.id; V.id = null; }
@@ -1812,10 +1938,15 @@ async function renderInvOne() {
     Object.entries(grp).forEach(([id, ls]) => { if (ls.length !== 1) return; const l = ls[0], c = Math.max(0, (ex[id] || 0) - +l.prev_qty); if (Math.abs(c - +l.cur_qty) > 1e-6) { l.cur_qty = Math.round(c * 1000) / 1000; n++; } });
     toast(n ? `اتحدّث الحالي في ${n} بند من المنفذ المعتمد` : 'مفيش كميات جديدة في التقارير المعتمدة'); renderInvOne(); });
   $('#ivLedger') && ($('#ivLedger').onclick = async () => { keep(); const cat = V.tab, m = { ...inv, ...meta() }; if (!m.period_from && !m.period_to) return toast('حدد فترة المستخلص الأول');
-    let q = S.sb.from('ledger_entries').select('*').eq('project_id', P.id).gt('expense', 0); if (m.period_from) q = q.gt('entry_date', m.period_from); if (m.period_to) q = q.lte('entry_date', m.period_to);
-    const { data: le, error: er } = await q.order('entry_date'); if (er) return toast(er.message); if (!le?.length) return toast('مفيش قيود مصروفات في الفترة دي');
-    const mx = Math.max(0, ...L.filter(l => l.cat === cat).map(l => l.sort)); le.forEach((x, k) => L.push({ cat, kind: 'line', name: x.description || x.supplier || 'مصروف', unit: 'مقطوعية', rate: +x.expense, prev_qty: 0, cur_qty: 1, pct: 1, prev_value: 0, notes: [x.supplier, x.entry_date && fmtD(x.entry_date)].filter(Boolean).join(' · '), sort: mx + 10 * (k + 1) }));
-    toast(`اتضاف ${le.length} قيد – راجعهم واحذف اللي مش تبع المستخلص`); renderInvOne(); });
+    const CM = { supply: ['توريدات', 'توريدوتركيب'], extra: ['نثريات', 'اكراميات_وعمالة', 'موقع', 'دعايا', 'تراخيص'], design: ['تصميمات', 'استشارات'], contract: ['مصنعيات'] }[cat] || [];
+    const { data: tagged } = await S.sb.from('ledger_entries').select('*').eq('project_id', P.id).eq('status', 'approved').eq('owner_invoice_no', inv.no).gt('expense', 0).order('entry_date');
+    let le = (tagged || []).filter(x => !x.category || CM.includes(x.category)), byNo = !!(tagged || []).length;
+    if (!byNo) { let q = S.sb.from('ledger_entries').select('*').eq('project_id', P.id).eq('status', 'approved').is('owner_invoice_no', null).gt('expense', 0); if (m.period_from) q = q.gt('entry_date', m.period_from); if (m.period_to) q = q.lte('entry_date', m.period_to);
+      const { data, error: er } = await q.order('entry_date'); if (er) return toast(er.message); le = (data || []).filter(x => !x.category || CM.includes(x.category)); }
+    const have = new Set(L.map(l => l.notes || '').map(n => (n.match(/#قيد (\d+)/) || [])[1]).filter(Boolean)); le = le.filter(x => !have.has(String(x.id)));
+    if (!le.length) return toast(byNo ? 'مفيش قيود جديدة من النوع ده على المستخلص ده' : 'مفيش قيود معتمدة في الفترة دي');
+    const mx = Math.max(0, ...L.filter(l => l.cat === cat).map(l => l.sort)); le.forEach((x, k) => L.push({ cat, kind: 'line', name: x.description || x.supplier || 'مصروف', unit: x.unit || 'مقطوعية', rate: x.qty ? Math.round(+x.expense / +x.qty * 10000) / 10000 : +x.expense, prev_qty: 0, cur_qty: x.qty ? +x.qty : 1, pct: 1, prev_value: 0, item_id: x.item_id || null, phase_n: x.phase_n || null, notes: [x.supplier, x.entry_date && fmtD(x.entry_date), '#قيد ' + x.id].filter(Boolean).join(' · '), sort: mx + 10 * (k + 1) }));
+    toast(`اتضاف ${le.length} قيد ${byNo ? 'متسجل على المستخلص ده' : 'من الفترة'} – راجعهم`); renderInvOne(); });
   $('#ivSave') && ($('#ivSave').onclick = async () => { keep(); const b = $('#ivSave'); b.disabled = true; const t = invTot(L);
     const head = { ...meta(), amt_design: t.design, amt_contract: t.contract, amt_supply: t.supply, amt_extra: t.extra, updated_at: new Date().toISOString() };
     if (inv.legacy && !L.length) { delete head.amt_design; delete head.amt_contract; delete head.amt_supply; delete head.amt_extra; }
