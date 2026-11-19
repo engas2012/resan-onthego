@@ -27,6 +27,7 @@ const CAN = {
   invEdit: ['tech', 'finance', 'management'],
   quotes: ['tech', 'finance', 'management', 'consultant', 'owner'],
   acct: ['finance', 'management', 'owner'],
+  subs: ['tech', 'finance', 'management'],
   acctEdit: ['finance', 'management'],
   quoteEd: ['tech', 'management'],
   quoteRev: ['consultant', 'management'],
@@ -63,7 +64,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.2.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.3.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -98,8 +99,8 @@ async function afterLogin(user) {
 }
 
 /* ---------------- layout & routing ---------------- */
-const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', 'الجدول الزمني', 'sched'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة التقارير', 'review'], ['log', 'سجل التقارير', 'log'], ['tasks', 'مهام المكتب الفني', 'tasks'], ['boq', 'المقايسة والتكلفة', 'boq'], ['quotes', 'عروض الأسعار', 'quotes'], ['acct', 'ملخص الحسابات', 'acct'], ['inv', 'المستخلصات', 'inv'], ['store', 'المخزن', 'store'], ['docs', 'المستندات', 'docs']];
-const NAVG = [['متابعة المشروع', '📊', ['status', 'schedule']], ['التقارير اليومية', '📝', ['report', 'review', 'log']], ['المكتب الفني والتسعير', '📐', ['tasks', 'boq', 'quotes']], ['الحسابات', '💰', ['acct', 'inv']], ['المخزن والمستندات', '📦', ['store', 'docs']]];
+const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', 'الجدول الزمني', 'sched'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة التقارير', 'review'], ['log', 'سجل التقارير', 'log'], ['tasks', 'مهام المكتب الفني', 'tasks'], ['boq', 'المقايسة والتكلفة', 'boq'], ['quotes', 'عروض الأسعار', 'quotes'], ['subs', 'عقود المقاولين', 'subs'], ['acct', 'ملخص الحسابات', 'acct'], ['inv', 'المستخلصات', 'inv'], ['store', 'المخزن', 'store'], ['docs', 'المستندات', 'docs']];
+const NAVG = [['متابعة المشروع', '📊', ['status', 'schedule']], ['التقارير اليومية', '📝', ['report', 'review', 'log']], ['المكتب الفني والتسعير', '📐', ['tasks', 'boq', 'quotes', 'subs']], ['الحسابات', '💰', ['acct', 'inv']], ['المخزن والمستندات', '📦', ['store', 'docs']]];
 const BADGE = { review: 'pendN', tasks: 'taskN', quotes: 'quoteN' };
 function projNav(pid, view) {
   const vis = VIEWS.filter(v => !v[2] || can(v[2], pid)), lab = Object.fromEntries(vis.map(v => [v[0], v[1]]));
@@ -133,6 +134,7 @@ async function route() {
     if (view === 'docs' && can('docs', pid)) return renderDocs();
     if (view === 'quotes' && can('quotes', pid)) return renderQuotes();
     if (view === 'acct' && can('acct', pid)) return renderAcct();
+    if (view === 'subs' && can('subs', pid)) return renderSubs();
     if (view === 'tasks' && can('tasks', pid)) return renderTasks();
     if (view === 'store' && can('store', pid)) return renderStore();
     if (view === 'inv' && can('inv', pid)) return renderInv();
@@ -1492,6 +1494,197 @@ async function renderAcct() {
     const dl = e.target.closest('[data-pdel]'); if (dl) { if (dl.dataset.sure !== '1') { dl.dataset.sure = '1'; dl.textContent = 'متأكد؟'; return; } const { error } = await S.sb.from('owner_payments').delete().eq('id', dl.dataset.pdel); if (error) return toast(error.message); toast('اتحذفت'); renderAcct(); } };
 }
 
+/* ---------------- subcontractor contracts (technical office): fixed prices, change log, subcontractor invoices & deductions ---------------- */
+const SCST = { draft: ['pend', 'مسودة – الأسعار لسه مش مثبتة'], active: ['appr', 'ساري – الأسعار مثبتة'], closed: ['', 'منتهي'] };
+const SIST = { draft: ['pend', 'مسودة'], submitted: ['run', 'اتقدّم للمراجعة'], approved: ['appr', 'معتمد'], paid: ['appr', 'اتصرف'] };
+const SCCH = { price: 'تعديل فئة', qty: 'تعديل كمية', addition: 'بند إضافي', cancel: 'إلغاء بند', other: 'تعديل آخر' };
+const SDED = ['جزاءات / غرامات تأخير', 'خامات مسلّمة للمقاول', 'سلفة', 'مياه وكهرباء', 'معدات من الشركة', 'أخرى'];
+const sLnCum = l => (+l.prev_qty + +l.cur_qty) * +l.rate * +l.pct, sLnCur = l => sLnCum(l) - +l.prev_value;
+async function loadSubs(pid) {
+  const C = (await S.sb.from('sub_contracts').select('*').eq('project_id', pid).order('created_at')).data || [], ids = C.map(c => c.id);
+  if (!ids.length) return { C, I: [], CH: [], IV: [], LN: [], DD: [] };
+  const [it, ch, iv] = await Promise.all([S.sb.from('sub_contract_items').select('*').in('contract_id', ids).order('sort'), S.sb.from('sub_contract_changes').select('*').in('contract_id', ids).order('change_date').order('created_at'), S.sb.from('sub_invoices').select('*').in('contract_id', ids).order('no')]);
+  const IV = iv.data || [], vid = IV.map(i => i.id); let LN = [], DD = [];
+  if (vid.length) { const [ln, dd] = await Promise.all([S.sb.from('sub_invoice_lines').select('*').in('invoice_id', vid).order('sort'), S.sb.from('sub_deductions').select('*').in('invoice_id', vid).order('created_at')]); LN = ln.data || []; DD = dd.data || []; }
+  return { C, I: it.data || [], CH: ch.data || [], IV, LN, DD };
+}
+const subInvTot = (iv, D) => { const L = D.LN.filter(l => l.invoice_id === iv.id), gross = L.reduce((s, l) => s + sLnCur(l), 0), cum = L.reduce((s, l) => s + sLnCum(l), 0), ret = gross * +iv.retention_pct, adv = +iv.advance_recovery || 0, ded = D.DD.filter(d => d.invoice_id === iv.id).reduce((s, d) => s + +d.amount, 0); return { L, gross, cum, ret, adv, ded, net: gross - ret - adv - ded }; };
+async function renderSubs() {
+  const P = S.P, ed = can('editBoq', P.id), V = (S.sc ||= {}); if (V.pid !== P.id) { S.sc = { pid: P.id }; return renderSubs(); }
+  $('#main').innerHTML = '<p class="mut">جاري التحميل…</p>'; const D = V.D = await loadSubs(P.id);
+  if (V.iid && D.IV.some(i => i.id === V.iid)) return subInvoice(D); V.iid = null;
+  if (V.cid && D.C.some(c => c.id === V.cid)) return subContract(D); V.cid = null;
+  const phName = n => P.phaseProg.find(x => x.n === n)?.name || '';
+  const row = c => { const I = D.I.filter(i => i.contract_id === c.id && !i.cancelled), val = I.reduce((s, i) => s + +i.qty * +i.rate, 0), orig = D.I.filter(i => i.contract_id === c.id && i.origin === 'contract').reduce((s, i) => s + +(i.orig_qty ?? i.qty) * +(i.orig_rate ?? i.rate), 0), IV = D.IV.filter(i => i.contract_id === c.id && i.status !== 'draft').map(i => subInvTot(i, D));
+    const done = IV.reduce((s, t) => s + t.gross, 0), ret = IV.reduce((s, t) => s + t.ret, 0), phs = [...new Set(I.map(i => i.phase_n).filter(Boolean))].sort((a, b) => a - b);
+    return `<a href="#" class="ivcard" data-sc="${c.id}"><div style="flex:1;min-width:0"><b>${esc(c.contractor)}</b> <span class="st ${SCST[c.status][0]}">${SCST[c.status][1]}</span><div>${esc(c.title)}</div><div class="mut" style="font-size:12px">${phs.map(n => n + '. ' + esc(phName(n))).join(' · ') || 'بدون مرحلة'} · ${I.length} بند${D.CH.filter(x => x.contract_id === c.id).length ? ' · ' + D.CH.filter(x => x.contract_id === c.id).length + ' تعديل' : ''} · ${D.IV.filter(i => i.contract_id === c.id).length} مستخلص</div></div>
+      <div style="text-align:left;min-width:150px"><div class="mut" style="font-size:11px">قيمة العقد${Math.abs(val - orig) > 1 && c.status !== 'draft' ? ` (الأصلية ${money(orig)})` : ''}</div><b>${money(val)}</b><div class="mut" style="font-size:11px">منفذ ${money(done)}${val ? ' (' + Math.round(done / val * 100) + '%)' : ''}${ret ? ' · تأمين محجوز ' + money(ret) : ''}</div></div></a>`; };
+  $('#main').innerHTML = `<div class="sthead"><div><h2 style="margin:0">عقود المقاولين</h2><p class="mut" style="margin:2px 0 0;font-size:13px">عقد لكل مقاول بفئاته المثبتة، وكل تعديل أو إضافة بيتسجل برقم أمر التغيير وتاريخه، ومستخلص المقاول بيتعمل من بنود عقده بخصوماته. خصومات المقاول مالهاش علاقة بمستخلص المالك.</p></div>${ed ? '<button class="p" id="scNew">+ عقد مقاول جديد</button>' : ''}</div>
+  ${D.C.length ? `<div class="ivlist">${D.C.map(row).join('')}</div>` : '<div class="note">لسه مفيش عقود مقاولين للمشروع ده.</div>'}`;
+  $('#scNew') && ($('#scNew').onclick = () => subContractForm(null, D));
+  $('#main').onclick = e => { const a = e.target.closest('[data-sc]'); if (!a) return; e.preventDefault(); V.cid = a.dataset.sc; V.tab = 'items'; renderSubs(); };
+}
+function subContractForm(c, D) {
+  const P = S.P, d = document.createElement('dialog'); d.className = 'adlg'; c ||= {};
+  d.innerHTML = `<div class="dh"><h3 style="margin:0;font-size:17px">${c.id ? 'بيانات العقد' : 'عقد مقاول جديد'}</h3><button type="button" class="dx">✕</button></div><form class="grid" style="margin-top:12px">
+    <label>المقاول من القائمة<select name="vendor"><option value="">— مش في القائمة —</option>${(P.vendors || []).map(v => `<option value="${v.id}"${v.id === c.vendor_id ? ' selected' : ''}>${esc(v.name)}</option>`).join('')}</select></label>
+    <label>اسم المقاول<input name="contractor" value="${esc(c.vendor_id ? '' : c.contractor || '')}" placeholder="لو مش في القائمة"></label>
+    <label class="wide">موضوع العقد<input name="title" required value="${esc(c.title || '')}" placeholder="مثلاً: مصنعيات الخرسانة المسلحة للهيكل"></label>
+    <label>تاريخ العقد<input type="date" name="date" value="${c.contract_date || today()}"></label><label>البداية<input type="date" name="start" value="${c.start_date || ''}"></label><label>النهاية<input type="date" name="end" value="${c.end_date || ''}"></label>
+    <label>تأمين أعمال (محجوز من كل مستخلص) %<input type="number" step="any" name="ret" value="${c.id ? Math.round(c.retention_pct * 1000) / 10 : 5}"></label>
+    <label>دفعة مقدمة للمقاول<input type="number" step="any" name="adv" value="${c.advance_amount || 0}"></label><label>استرداد المقدم من كل مستخلص %<input type="number" step="any" name="advp" value="${c.id ? Math.round(c.advance_recovery_pct * 1000) / 10 : 0}"></label>
+    <label class="wide">ملاحظات / شروط<input name="notes" value="${esc(c.notes || '')}"></label>
+    <label class="wide">ملف العقد (اختياري)<input type="file" name="file" accept="${DOC_ACCEPT}"></label>
+    <div class="acts wide" style="margin:0"><button class="p">حفظ</button></div></form>`;
+  document.body.append(d); d.showModal(); const f = d.querySelector('form');
+  d.onclick = e => { if (e.target === d || e.target.closest('.dx')) { d.close(); d.remove(); } };
+  f.onsubmit = async e => { e.preventDefault(); const v = (P.vendors || []).find(x => x.id === f.vendor.value), name = v ? v.name : f.contractor.value.trim(); if (!name) return toast('اختار المقاول أو اكتب اسمه');
+    const rec = { project_id: P.id, vendor_id: v?.id || null, contractor: name, title: f.title.value.trim(), contract_date: f.date.value || null, start_date: f.start.value || null, end_date: f.end.value || null, retention_pct: (+f.ret.value || 0) / 100, advance_amount: +f.adv.value || 0, advance_recovery_pct: (+f.advp.value || 0) / 100, notes: f.notes.value.trim() || null };
+    if (f.file.files[0]) { const m = { kind: 'other', title: 'عقد ' + name + ' – ' + rec.title, doc_date: rec.contract_date }; await uploadDocs([f.file.files[0]], m); if (m.ids?.[0]) rec.doc_id = m.ids[0]; }
+    const { data, error } = c.id ? await S.sb.from('sub_contracts').update(rec).eq('id', c.id).select().single() : await S.sb.from('sub_contracts').insert({ ...rec, status: 'draft' }).select().single();
+    if (error) return toast(error.message); d.close(); d.remove(); S.sc.cid = data.id; S.sc.tab = 'items'; renderSubs(); };
+}
+function subContract(D) {
+  const P = S.P, V = S.sc, ed = can('editBoq', P.id), c = D.C.find(x => x.id === V.cid), I = D.I.filter(i => i.contract_id === c.id), CH = D.CH.filter(x => x.contract_id === c.id), IV = D.IV.filter(i => i.contract_id === c.id);
+  const live = I.filter(i => !i.cancelled), val = live.reduce((s, i) => s + +i.qty * +i.rate, 0), orig = I.filter(i => i.origin === 'contract').reduce((s, i) => s + +(i.orig_qty ?? i.qty) * +(i.orig_rate ?? i.rate), 0);
+  const T = IV.filter(i => i.status !== 'draft').map(i => subInvTot(i, D)), done = T.reduce((s, t) => s + t.gross, 0), ret = T.reduce((s, t) => s + t.ret, 0), advR = T.reduce((s, t) => s + t.adv, 0), ded = T.reduce((s, t) => s + t.ded, 0), net = T.reduce((s, t) => s + t.net, 0);
+  const phName = n => P.phaseProg.find(x => x.n === n)?.name || '', draft = c.status === 'draft', code = i => i.item_id ? P.items.find(x => x.id === i.item_id)?.code || '' : '';
+  const lastQ = {}; IV.forEach(iv => D.LN.filter(l => l.invoice_id === iv.id).forEach(l => { lastQ[l.contract_item_id] = +l.prev_qty + +l.cur_qty; }));
+  const items = `<div class="card" style="padding:0"><div class="scroll"><table class="stack"><thead><tr><th>البند</th><th>المرحلة</th><th>الوحدة</th><th class="n">الكمية</th><th class="n">الفئة</th><th class="n">القيمة</th><th class="n">المنفذ في المستخلصات</th><th></th></tr></thead><tbody>
+    ${I.length ? I.map(i => `<tr class="${i.cancelled ? 'dim' : ''}"><td data-l="البند">${code(i) ? `<span class="tag">${esc(code(i))}</span> ` : ''}${esc(i.name)}${i.origin === 'addition' ? ' <span class="st run">إضافة</span>' : ''}${i.cancelled ? ' <span class="st ret">ملغي</span>' : ''}</td><td data-l="المرحلة">${i.phase_n ? i.phase_n + '. ' + esc(phName(i.phase_n)) : '–'}</td><td data-l="الوحدة">${esc(i.unit || '')}</td>
+      <td class="n" data-l="الكمية">${nf(i.qty)}${i.orig_qty != null && +i.orig_qty !== +i.qty ? `<div class="mut" style="font-size:11px"><s>${nf(i.orig_qty)}</s></div>` : ''}</td><td class="n" data-l="الفئة"><b>${nf(i.rate)}</b>${i.orig_rate != null && +i.orig_rate !== +i.rate ? `<div class="mut" style="font-size:11px"><s>${nf(i.orig_rate)}</s></div>` : ''}</td><td class="n" data-l="القيمة">${nf(+i.qty * +i.rate, 0)}</td><td class="n" data-l="المنفذ">${lastQ[i.id] ? nf(lastQ[i.id]) + (+i.qty ? ` <small class="mut">(${Math.round(lastQ[i.id] / i.qty * 100)}%)</small>` : '') : '–'}</td>
+      <td class="qa">${ed && !i.cancelled ? (draft ? `<button data-ied="${i.id}">تعديل</button><button class="danger" data-idel="${i.id}">حذف</button>` : `<button data-ch="price|${i.id}">تعديل فئة</button><button data-ch="qty|${i.id}">تعديل كمية</button><button class="danger" data-ch="cancel|${i.id}">إلغاء</button>`) : ''}</td></tr>`).join('') : '<tr><td colspan="8" class="mut">لسه مفيش بنود في العقد.</td></tr>'}
+    <tr class="tot"><td>الإجمالي</td><td></td><td></td><td></td><td></td><td class="n" data-l="القيمة">${nf(val, 0)}</td><td class="n" data-l="المنفذ">${nf(done, 0)}</td><td></td></tr></tbody></table></div></div>
+    ${ed ? `<div class="acts"><button class="p" data-spick>+ بنود من المقايسة</button><button data-sman>+ بند يدوي</button>${draft && I.length ? '<button data-sact class="p">✔ اعتماد العقد وتثبيت الأسعار</button>' : ''}</div>${draft ? '<p class="mut" style="font-size:12px">العقد لسه مسودة: تقدر تعدّل البنود بحرية. بعد "اعتماد العقد" الفئات والكميات بتتثبت، وأي تغيير بعدها بيتسجل كتعديل برقم وتاريخ، والبنود الجديدة بتتسجل كإضافة.</p>' : ''}` : ''}`;
+  const changes = `<div class="card" style="padding:0">${CH.length ? `<div class="scroll"><table class="stack"><thead><tr><th>التاريخ</th><th>النوع</th><th>البند</th><th class="n">من</th><th class="n">إلى</th><th>أمر التغيير</th><th>ملاحظات</th></tr></thead><tbody>${CH.slice().reverse().map(x => { const i = I.find(y => y.id === x.contract_item_id); return `<tr><td data-l="التاريخ">${fmtD(x.change_date)}</td><td data-l="النوع"><span class="st ${x.change_type === 'cancel' ? 'ret' : 'run'}">${SCCH[x.change_type]}</span></td><td data-l="البند">${esc(i?.name || '–')}</td><td class="n" data-l="من">${x.old_value != null ? nf(x.old_value) : '–'}</td><td class="n" data-l="إلى">${x.new_value != null ? nf(x.new_value) : '–'}</td><td data-l="أمر التغيير">${esc(x.ref || '–')}</td><td data-l="ملاحظات">${esc(x.note || '')}</td></tr>`; }).join('')}</tbody></table></div>` : '<p class="mut" style="padding:14px;margin:0">مفيش تعديلات على العقد.</p>'}</div>`;
+  const invs = `${ed && !draft ? '<div class="acts" style="margin-top:0"><button class="p" data-snew>+ مستخلص مقاول جديد</button></div>' : draft ? '<div class="note">اعتمد العقد الأول عشان تعمل مستخلصات.</div>' : ''}<div class="ivlist">${IV.slice().reverse().map(iv => { const t = subInvTot(iv, D); return `<a href="#" class="ivcard" data-si="${iv.id}"><div class="ivno">${iv.no}</div><div style="flex:1"><b>مستخلص ${iv.no}</b> <span class="st ${SIST[iv.status][0]}">${SIST[iv.status][1]}</span>${iv.owner_invoice_id ? ' <span class="tag">اتحسب في مستخلص المالك</span>' : ''}<div class="mut" style="font-size:12px">${fmtD(iv.inv_date)} · أعمال ${nf(t.gross, 0)} · خصومات ${nf(t.ret + t.adv + t.ded, 0)}</div></div><div style="text-align:left"><b>${nf(t.net, 0)}</b><div class="mut" style="font-size:11px">صافي المستحق</div></div></a>`; }).join('') || '<p class="mut">مفيش مستخلصات.</p>'}</div>`;
+  $('#main').innerHTML = `<a href="#" id="scBack" class="mut" style="font-size:13px">← كل العقود</a>
+  <div class="sthead"><div><h2 style="margin:2px 0">${esc(c.contractor)} <span class="st ${SCST[c.status][0]}">${SCST[c.status][1]}</span></h2><div>${esc(c.title)}</div><div class="mut" style="font-size:13px">${c.contract_date ? 'بتاريخ ' + fmtD(c.contract_date) : ''}${c.start_date ? ' · من ' + fmtD(c.start_date) : ''}${c.end_date ? ' لـ ' + fmtD(c.end_date) : ''} · تأمين ${Math.round(c.retention_pct * 1000) / 10}%${+c.advance_amount ? ' · مقدم ' + nf(c.advance_amount, 0) + ' يسترد ' + Math.round(c.advance_recovery_pct * 100) + '%' : ''}${c.notes ? ' · ' + esc(c.notes) : ''}</div>${c.doc_id && P.docs.find(x => x.id === c.doc_id) ? docChip(P.docs.find(x => x.id === c.doc_id)) : ''}</div>
+    <div class="acts" style="margin:0">${ed ? `<button data-sced>بيانات العقد</button><select id="scSt" style="width:auto">${Object.entries(SCST).filter(([k]) => k !== 'draft' || draft).map(([k, [, l]]) => `<option value="${k}"${k === c.status ? ' selected' : ''}>${l.split(' –')[0]}</option>`).join('')}</select>` : ''}</div></div>
+  <div class="kpis"><div class="kpi"><b>${money(orig)}</b><span>قيمة العقد الأصلية</span></div><div class="kpi${Math.abs(val - orig) > 1 ? ' k-warn' : ''}"><b>${money(val)}</b><span>القيمة بعد التعديلات<br><small>${val - orig >= 0 ? '+' : ''}${money(val - orig)} · ${CH.length} تعديل</small></span></div><div class="kpi"><b>${money(done)}</b><span>المنفذ في المستخلصات${val ? ` (${Math.round(done / val * 100)}%)` : ''}</span></div><div class="kpi k-ok"><b>${money(net)}</b><span>صافي المستحق للمقاول<br><small>تأمين محجوز ${money(ret)}${advR ? ' · مقدم مسترد ' + money(advR) : ''}${ded ? ' · خصومات ' + money(ded) : ''}</small></span></div></div>
+  <div class="sttabs"><div class="seg">${[['items', `بنود العقد (${I.length})`], ['changes', `التعديلات (${CH.length})`], ['inv', `المستخلصات (${IV.length})`]].map(([k, l]) => `<button type="button" data-stab="${k}" class="${(V.tab || 'items') === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>
+  <div style="margin-top:12px">${V.tab === 'changes' ? changes : V.tab === 'inv' ? invs : items}</div>`;
+  const re = () => renderSubs();
+  $('#scSt') && ($('#scSt').onchange = async e => { const { error } = await S.sb.from('sub_contracts').update({ status: e.target.value }).eq('id', c.id); if (error) return toast(error.message); re(); });
+  $('#main').onclick = async e => { const t = e.target.closest('button,a'); if (!t) return;
+    if (t.id === 'scBack') { e.preventDefault(); V.cid = null; return re(); }
+    if (t.dataset.stab) { V.tab = t.dataset.stab; return subContract(D); }
+    if (t.dataset.si) { e.preventDefault(); V.iid = t.dataset.si; return re(); }
+    if ('sced' in t.dataset) return subContractForm(c, D);
+    if ('spick' in t.dataset) return subPick(c, I, draft, re);
+    if ('sman' in t.dataset) return subItemForm(c, null, draft, re);
+    if (t.dataset.ied) return subItemForm(c, I.find(i => i.id === t.dataset.ied), draft, re);
+    if (t.dataset.idel) { if (t.dataset.sure !== '1') { t.dataset.sure = '1'; t.textContent = 'متأكد؟'; return; } const { error } = await S.sb.from('sub_contract_items').delete().eq('id', t.dataset.idel); return error ? toast(error.message) : re(); }
+    if ('sact' in t.dataset) { if (t.dataset.sure !== '1') { t.dataset.sure = '1'; t.textContent = 'متأكد؟ الفئات هتتثبت'; return; } for (const i of I) await S.sb.from('sub_contract_items').update({ orig_qty: i.qty, orig_rate: i.rate, origin: 'contract' }).eq('id', i.id); const { error } = await S.sb.from('sub_contracts').update({ status: 'active' }).eq('id', c.id); if (error) return toast(error.message); toast('اتعتمد العقد واتثبتت الفئات'); return re(); }
+    if (t.dataset.ch) { const [k, id] = t.dataset.ch.split('|'); return subChange(c, I.find(i => i.id === id), k, re); }
+    if ('snew' in t.dataset) { t.disabled = true; const last = IV[IV.length - 1], no = (last?.no || 0) + 1, LL = last ? D.LN.filter(l => l.invoice_id === last.id) : [];
+      const { data: nv, error } = await S.sb.from('sub_invoices').insert({ contract_id: c.id, no, inv_date: today(), period_from: last?.period_to || c.start_date || null, period_to: today(), retention_pct: c.retention_pct, status: 'draft' }).select().single(); if (error) { t.disabled = false; return toast(error.message); }
+      const rows = I.filter(i => !i.cancelled || LL.some(l => l.contract_item_id === i.id)).map((i, k) => { const pl = LL.find(l => l.contract_item_id === i.id); return { invoice_id: nv.id, contract_item_id: i.id, name: i.name, unit: i.unit, phase_n: i.phase_n, item_id: i.item_id, rate: i.rate, prev_qty: pl ? +pl.prev_qty + +pl.cur_qty : 0, cur_qty: 0, pct: pl ? pl.pct : 1, prev_value: pl ? sLnCum(pl) : 0, sort: k }; });
+      if (rows.length) { const { error: e2 } = await S.sb.from('sub_invoice_lines').insert(rows); if (e2) toast(e2.message); }
+      V.iid = nv.id; V.edit = true; return re(); }
+    docClick(e); };
+}
+function subItemForm(c, it, draft, done) {
+  const P = S.P, d = document.createElement('dialog'); d.className = 'adlg'; it ||= {};
+  d.innerHTML = `<div class="dh"><h3 style="margin:0;font-size:17px">${it.id ? 'تعديل بند' : draft ? 'بند جديد في العقد' : 'بند إضافي على العقد'}</h3><button type="button" class="dx">✕</button></div><form class="grid" style="margin-top:12px">
+    <label class="wide">بند المقايسة (اختياري)<select name="item"><option value="">— بند يدوي —</option>${P.phaseProg.map(ph => `<optgroup label="${ph.n}. ${esc(ph.name)}">${P.items.filter(i => i.phase_n === ph.n).map(i => `<option value="${esc(i.id)}"${i.id === it.item_id ? ' selected' : ''}>${esc(i.code + ' ' + i.name.slice(0, 70))}</option>`).join('')}</optgroup>`).join('')}</select></label>
+    <label class="wide">وصف البند في العقد<input name="name" required value="${esc(it.name || '')}"></label>
+    <label>المرحلة<select name="ph" required><option value="">—</option>${P.phaseProg.map(x => `<option value="${x.n}"${x.n === it.phase_n ? ' selected' : ''}>${x.n}. ${esc(x.name)}</option>`).join('')}</select></label>
+    <label>الوحدة<input name="unit" value="${esc(it.unit || '')}"></label><label>الكمية<input name="qty" type="number" step="any" value="${it.qty ?? ''}"></label><label>الفئة<input name="rate" type="number" step="any" required value="${it.rate ?? ''}"></label>
+    ${!draft ? '<label>رقم أمر التغيير<input name="ref"></label><label>التاريخ<input type="date" name="date" value="' + today() + '"></label><label class="wide">سبب الإضافة<input name="note"></label>' : ''}
+    <div class="acts wide" style="margin:0"><button class="p">حفظ</button></div></form>`;
+  document.body.append(d); d.showModal(); const f = d.querySelector('form');
+  f.item.onchange = () => { const i = P.items.find(x => x.id === f.item.value); if (!i) return; if (!f.name.value) f.name.value = i.name; f.ph.value = i.phase_n; if (!f.unit.value) f.unit.value = i.unit || ''; if (!f.qty.value) f.qty.value = +i.qty || ''; };
+  d.onclick = e => { if (e.target === d || e.target.closest('.dx')) { d.close(); d.remove(); } };
+  f.onsubmit = async e => { e.preventDefault(); const rec = { contract_id: c.id, item_id: f.item.value || null, name: f.name.value.trim(), phase_n: +f.ph.value || null, unit: f.unit.value.trim() || null, qty: f.qty.value === '' ? null : +f.qty.value, rate: +f.rate.value || 0 };
+    if (it.id) { const { error } = await S.sb.from('sub_contract_items').update(rec).eq('id', it.id); if (error) return toast(error.message); }
+    else { const { data, error } = await S.sb.from('sub_contract_items').insert({ ...rec, origin: draft ? 'contract' : 'addition', sort: Date.now() / 1e6 }).select().single(); if (error) return toast(error.message);
+      if (!draft) await S.sb.from('sub_contract_changes').insert({ contract_id: c.id, contract_item_id: data.id, change_type: 'addition', new_value: (rec.qty || 0) * rec.rate, ref: f.ref.value.trim() || null, change_date: f.date.value || today(), note: f.note.value.trim() || null }); }
+    d.close(); d.remove(); done(); };
+}
+function subChange(c, it, kind, done) {
+  const d = document.createElement('dialog'); d.className = 'adlg'; const old = kind === 'price' ? it.rate : kind === 'qty' ? it.qty : null;
+  d.innerHTML = `<div class="dh"><h3 style="margin:0;font-size:17px">${SCCH[kind]} – ${esc(it.name.slice(0, 60))}</h3><button type="button" class="dx">✕</button></div><form class="grid" style="margin-top:12px">
+    ${kind !== 'cancel' ? `<label>${kind === 'price' ? 'الفئة' : 'الكمية'} الحالية<input value="${nf(old)}" disabled></label><label>الجديدة<input name="v" type="number" step="any" required></label>` : '<p class="wide" style="margin:0">البند هيتلغي من العقد ومش هيدخل في المستخلصات الجاية. اللي اتنفذ منه قبل كده بيفضل محسوب.</p>'}
+    <label>رقم أمر التغيير / الملحق<input name="ref"></label><label>التاريخ<input type="date" name="date" value="${today()}"></label><label class="wide">السبب<input name="note" ${kind === 'cancel' ? 'required' : ''}></label>
+    <div class="acts wide" style="margin:0"><button class="p">تسجيل التعديل</button></div></form>`;
+  document.body.append(d); d.showModal(); const f = d.querySelector('form');
+  d.onclick = e => { if (e.target === d || e.target.closest('.dx')) { d.close(); d.remove(); } };
+  f.onsubmit = async e => { e.preventDefault(); const nv = kind === 'cancel' ? null : +f.v.value;
+    const upd = kind === 'price' ? { rate: nv } : kind === 'qty' ? { qty: nv } : { cancelled: true };
+    let { error } = await S.sb.from('sub_contract_items').update(upd).eq('id', it.id);
+    if (!error) ({ error } = await S.sb.from('sub_contract_changes').insert({ contract_id: c.id, contract_item_id: it.id, change_type: kind, old_value: old, new_value: nv, ref: f.ref.value.trim() || null, change_date: f.date.value || today(), note: f.note.value.trim() || null }));
+    if (error) return toast(error.message); d.close(); d.remove(); toast('اتسجل التعديل'); done(); };
+}
+function subPick(c, I, draft, done) {
+  const P = S.P, used = new Set(I.map(i => i.item_id).filter(Boolean)), F = (S.ivPick ||= { ph: '', q: '' }), d = document.createElement('dialog'); d.className = 'adlg wide';
+  const list = () => { const ph = +F.ph || null, q = normAr(F.q); const R = P.items.filter(i => (!ph || i.phase_n === ph) && (!q || normAr(i.code + ' ' + i.name).includes(q)));
+    return `<div class="pklist">${R.map(i => `<label class="pkrow${used.has(i.id) ? ' used' : ''}"><input type="checkbox" value="${esc(i.id)}"${used.has(i.id) ? ' disabled' : ''}><span class="pkc">${esc(i.code)}</span><span class="pkn">${esc(i.name.length > 110 ? i.name.slice(0, 110) + '…' : i.name)}</span><span class="pkq">${+i.qty ? nf(i.qty) + ' ' + esc(i.unit || '') : esc(i.unit || '')}</span><span class="pkr"><input type="number" step="any" placeholder="الفئة" data-r="${esc(i.id)}" style="width:86px;min-height:32px"></span></label>`).join('') || '<p class="mut">مفيش بنود.</p>'}</div>`; };
+  d.innerHTML = `<div class="dh"><div><h3 style="margin:0;font-size:17px">بنود من المقايسة لعقد ${esc(c.contractor)}</h3><div class="mut" style="font-size:13px">علّم على البنود واكتب فئة المقاول (المصنعية أو اللي متفق عليه). الكمية بتيجي من المقايسة وتقدر تعدّلها بعدين.${draft ? '' : ' العقد ساري، فالبنود هتتسجل كإضافات.'}</div></div><button type="button" class="dx">✕</button></div>
+    <div class="filters" style="margin:12px 0 8px"><select id="pkPh"><option value="">كل المراحل</option>${P.phaseProg.map(x => `<option value="${x.n}"${String(x.n) === F.ph ? ' selected' : ''}>${x.n}. ${esc(x.name)}</option>`).join('')}</select><input id="pkQ" type="search" placeholder="بحث" value="${esc(F.q)}"></div>
+    <div id="pkBox">${list()}</div>${draft ? '' : '<div class="grid" style="margin-top:8px"><label>رقم أمر التغيير<input id="pkRef"></label><label>التاريخ<input type="date" id="pkDate" value="' + today() + '"></label></div>'}<div class="acts"><button class="p" id="pkGo">إضافة</button></div>`;
+  document.body.append(d); d.showModal();
+  d.querySelector('#pkPh').onchange = e => { F.ph = e.target.value; d.querySelector('#pkBox').innerHTML = list(); }; d.querySelector('#pkQ').oninput = e => { F.q = e.target.value; d.querySelector('#pkBox').innerHTML = list(); };
+  d.querySelector('#pkBox').addEventListener('input', e => { if (e.target.dataset.r) { const cb = e.target.closest('.pkrow').querySelector('input[type=checkbox]'); if (!cb.disabled) cb.checked = e.target.value !== ''; } });
+  d.onclick = e => { if (e.target === d || e.target.closest('.dx')) { d.close(); d.remove(); } };
+  d.querySelector('#pkGo').onclick = async () => { const rows = [...d.querySelectorAll('#pkBox input[type=checkbox]:checked')].map(cb => { const i = P.items.find(x => x.id === cb.value); return { contract_id: c.id, item_id: i.id, name: i.name, phase_n: i.phase_n, unit: i.unit, qty: +i.qty || null, rate: +d.querySelector(`[data-r="${CSS.escape(i.id)}"]`).value || 0, origin: draft ? 'contract' : 'addition', sort: Date.now() / 1e6 }; });
+    if (!rows.length) return toast('علّم على بند واحد على الأقل'); const { data, error } = await S.sb.from('sub_contract_items').insert(rows).select(); if (error) return toast(error.message);
+    if (!draft) await S.sb.from('sub_contract_changes').insert(data.map(x => ({ contract_id: c.id, contract_item_id: x.id, change_type: 'addition', new_value: (+x.qty || 0) * +x.rate, ref: d.querySelector('#pkRef').value.trim() || null, change_date: d.querySelector('#pkDate').value || today() })));
+    d.close(); d.remove(); toast(`اتضاف ${rows.length} بند${rows.some(r => !r.rate) ? ' – فيه بنود من غير فئة، كمّلها' : ''}`); done(); };
+}
+async function subInvoice(D) {
+  const P = S.P, V = S.sc, iv = D.IV.find(i => i.id === V.iid), c = D.C.find(x => x.id === iv.contract_id), ed = can('editBoq', P.id), fin = can('ledger', P.id);
+  const E = V.edit && ed && iv.status === 'draft', t = subInvTot(iv, D), L = t.L, DDi = D.DD.filter(x => x.invoice_id === iv.id);
+  const advLeft = +c.advance_amount - D.IV.filter(x => x.contract_id === c.id && x.id !== iv.id && x.status !== 'draft').reduce((s, x) => s + +x.advance_recovery, 0), advSug = Math.max(0, Math.min(advLeft, t.gross * +c.advance_recovery_pct));
+  const phName = n => P.phaseProg.find(x => x.n === n)?.name || '';
+  $('#main').innerHTML = `<a href="#" id="siBack" class="mut" style="font-size:13px">← عقد ${esc(c.contractor)}</a>
+  <div class="sthead"><div><h2 style="margin:2px 0">مستخلص ${iv.no} – ${esc(c.contractor)} <span class="st ${SIST[iv.status][0]}">${SIST[iv.status][1]}</span></h2><div class="mut" style="font-size:13px">${esc(c.title)} · ${fmtD(iv.inv_date)}${iv.period_from ? ' · الفترة ' + fmtD(iv.period_from) + ' – ' + fmtD(iv.period_to) : ''}</div></div>
+    <div class="acts" style="margin:0">${ed && iv.status === 'draft' && !E ? '<button class="p" id="siEd">تعديل الكميات</button>' : ''}${E ? '<button class="p" id="siSave">حفظ</button><button id="siPull">⬇ الكميات من التقارير المعتمدة</button><button id="siX">إلغاء</button>' : ''}${!E ? '<button id="siPrint">🖨 طباعة</button>' : ''}${(ed || fin) && !E ? `<select id="siSt" style="width:auto">${Object.entries(SIST).map(([k, [, l]]) => `<option value="${k}"${k === iv.status ? ' selected' : ''}>${l}</option>`).join('')}</select>` : ''}${ed && iv.status === 'draft' && !E ? '<button class="danger" id="siDel">حذف المستخلص</button>' : ''}</div></div>
+  <div class="card" style="padding:0"><div class="scroll"><table class="ivt" id="siT"><thead><tr><th>البند</th><th>الوحدة</th><th class="n">الفئة</th><th class="n">السابق</th><th class="n">الحالي</th><th class="n">الإجمالي</th><th class="n">نسبة الصرف</th><th class="n">القيمة التراكمية</th><th class="n">قيمة الحالي</th><th>ملاحظات</th></tr></thead><tbody>
+    ${L.map(l => `<tr><td>${esc(l.name)}${l.phase_n ? ` <span class="tag ph">م${l.phase_n}</span>` : ''}</td><td>${esc(l.unit || '')}</td><td class="n">${nf(l.rate)}</td><td class="n">${nf(l.prev_qty)}</td><td class="n cur">${E ? `<input data-sl="${l.id}" data-f="cur_qty" type="number" step="any" value="${+l.cur_qty || ''}" style="width:80px">` : +l.cur_qty ? nf(l.cur_qty) : '–'}</td><td class="n">${nf(+l.prev_qty + +l.cur_qty)}</td><td class="n">${E ? `<input data-sl="${l.id}" data-f="pct" type="number" step="any" value="${Math.round(l.pct * 1000) / 10}" style="width:60px">%` : Math.round(l.pct * 100) + '%'}</td><td class="n">${nf(sLnCum(l), 0)}</td><td class="n"><b>${nf(sLnCur(l), 0)}</b></td><td>${E ? `<input data-sl="${l.id}" data-f="notes" value="${esc(l.notes || '')}" style="width:120px">` : esc(l.notes || '')}</td></tr>`).join('')}
+    <tr class="tot"><td colspan="7">الإجمالي</td><td class="n">${nf(t.cum, 0)}</td><td class="n">${nf(t.gross, 0)}</td><td></td></tr></tbody></table></div></div>
+  <div class="ivpay card" style="margin-top:12px"><table><tbody><tr><td>إجمالي الأعمال الحالية</td><td class="n"><b>${nf(t.gross, 0)}</b></td></tr>
+    <tr><td>تأمين أعمال ${ed && iv.status === 'draft' ? `<input id="siRet" type="number" step="any" value="${Math.round(iv.retention_pct * 1000) / 10}" style="width:64px">%` : Math.round(iv.retention_pct * 1000) / 10 + '%'}</td><td class="n">− ${nf(t.ret, 0)}</td></tr>
+    ${+c.advance_amount ? `<tr><td>استرداد من الدفعة المقدمة ${ed && iv.status === 'draft' ? `<input id="siAdv" type="number" step="any" value="${+iv.advance_recovery || ''}" placeholder="${Math.round(advSug)}" style="width:110px">` : ''} <small class="mut">(المتبقي من المقدم ${nf(advLeft, 0)})</small></td><td class="n">− ${nf(t.adv, 0)}</td></tr>` : ''}
+    ${DDi.map(x => `<tr><td>${esc(x.kind)}${x.note ? ' – ' + esc(x.note) : ''} ${(ed || fin) && iv.status === 'draft' ? `<button class="danger xs" data-ddel="${x.id}">✕</button>` : ''}</td><td class="n">− ${nf(x.amount, 0)}</td></tr>`).join('')}
+    <tr class="net"><td>صافي المستحق للمقاول</td><td class="n">${nf(t.net, 0)}</td></tr></tbody></table>
+    ${(ed || fin) && iv.status === 'draft' ? `<form id="ddF" class="grid" style="margin-top:10px"><label>خصم<select name="k">${SDED.map(k => `<option>${k}</option>`).join('')}</select></label><label>المبلغ<input name="a" type="number" step="any" required></label><label>ملاحظة<input name="n"></label><div class="acts" style="margin:0;align-self:end"><button>+ إضافة خصم</button></div></form>` : ''}
+    <p class="mut" style="font-size:12px;margin:8px 0 0">الخصومات دي على المقاول بس، ومش بتأثر على مستخلص المالك.</p></div>`;
+  const re = () => renderSubs();
+  $('#siBack').onclick = e => { e.preventDefault(); V.iid = null; V.edit = false; V.tab = 'inv'; re(); };
+  $('#siEd') && ($('#siEd').onclick = () => { V.edit = true; subInvoice(D); }); $('#siX') && ($('#siX').onclick = () => { V.edit = false; re(); });
+  const collect = () => { document.querySelectorAll('[data-sl]').forEach(x => { const l = L.find(y => y.id === x.dataset.sl), f = x.dataset.f; l[f] = f === 'notes' ? x.value || null : f === 'pct' ? (x.value === '' ? 1 : +x.value / 100) : +x.value || 0; }); };
+  $('#siPull') && ($('#siPull').onclick = async () => { collect(); const ids = L.map(l => l.item_id).filter(Boolean); if (!ids.length) return toast('بنود العقد مش مربوطة ببنود المقايسة');
+    const { data } = await S.sb.from('progress_entries').select('item_id,qty').in('item_id', ids); const ex = {}; (data || []).forEach(x => ex[x.item_id] = (ex[x.item_id] || 0) + +x.qty); let n = 0;
+    L.forEach(l => { if (l.item_id && ex[l.item_id] != null) { const v = Math.max(0, Math.round((ex[l.item_id] - +l.prev_qty) * 1000) / 1000); if (v !== +l.cur_qty) { l.cur_qty = v; n++; } } }); toast(n ? `اتحدث ${n} بند من التقارير` : 'مفيش كميات جديدة'); subInvoice(D); });
+  $('#siSave') && ($('#siSave').onclick = async () => { collect(); let err = null; for (const l of L) { const { error } = await S.sb.from('sub_invoice_lines').update({ cur_qty: l.cur_qty, pct: l.pct, notes: l.notes }).eq('id', l.id); err = err || error; }
+    const upd = { retention_pct: $('#siRet') ? (+$('#siRet').value || 0) / 100 : iv.retention_pct }; if ($('#siAdv')) upd.advance_recovery = $('#siAdv').value === '' ? Math.round(advSug) : +$('#siAdv').value;
+    const { error } = await S.sb.from('sub_invoices').update(upd).eq('id', iv.id); err = err || error; if (err) return toast(err.message); V.edit = false; toast('اتحفظ'); re(); });
+  $('#siRet') && !E && ($('#siRet').onchange = async e => { await S.sb.from('sub_invoices').update({ retention_pct: (+e.target.value || 0) / 100 }).eq('id', iv.id); re(); });
+  $('#siAdv') && !E && ($('#siAdv').onchange = async e => { await S.sb.from('sub_invoices').update({ advance_recovery: +e.target.value || 0 }).eq('id', iv.id); re(); });
+  $('#siSt') && ($('#siSt').onchange = async e => { const { error } = await S.sb.from('sub_invoices').update({ status: e.target.value }).eq('id', iv.id); if (error) return toast(error.message); re(); });
+  $('#siDel') && ($('#siDel').onclick = async e => { const b = e.target; if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'متأكد؟'; return; } const { error } = await S.sb.from('sub_invoices').delete().eq('id', iv.id); if (error) return toast(error.message); V.iid = null; V.tab = 'inv'; re(); });
+  $('#ddF') && ($('#ddF').onsubmit = async e => { e.preventDefault(); const f = e.target; const { error } = await S.sb.from('sub_deductions').insert({ invoice_id: iv.id, kind: f.k.value, amount: +f.a.value, note: f.n.value.trim() || null }); if (error) return toast(error.message); re(); });
+  $('#main').querySelectorAll('[data-ddel]').forEach(b => b.onclick = async () => { await S.sb.from('sub_deductions').delete().eq('id', b.dataset.ddel); re(); });
+  $('#siPrint') && ($('#siPrint').onclick = () => { const w = window.open('', '_blank'); if (!w) return; const tb = $('#siT').outerHTML, pay = $('.ivpay table').outerHTML;
+    w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>مستخلص ${iv.no} – ${esc(c.contractor)}</title><style>body{font-family:system-ui,Tahoma,sans-serif;margin:24px;color:#111}h1{font-size:18px;margin:0}table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px}th,td{border:1px solid #999;padding:4px 6px}th{background:#eee}.n{text-align:left;direction:ltr}.tot td,.net td{font-weight:700;background:#f4f4f4}.tag{font-size:10px;color:#666}input,button{display:none}.sig{display:flex;justify-content:space-around;margin-top:40px}@page{size:A4 landscape;margin:12mm}</style></head><body><h1>${esc(P.proj.name)} – مستخلص مقاول رقم ${iv.no}</h1><div>المقاول: <b>${esc(c.contractor)}</b> · ${esc(c.title)} · التاريخ ${fmtD(iv.inv_date)}</div>${tb}<div style="max-width:420px;margin-right:auto">${pay}</div><div class="sig"><span>المقاول</span><span>المهندس المسئول</span><span>المكتب الفني</span><span>الحسابات</span></div><script>onload=()=>print()<\/script></body></html>`); w.document.close(); });
+}
+/* owner invoice: pull approved subcontractor invoices (gross, no deductions) */
+async function invFromSubs(inv, L, done) {
+  const P = S.P, D = await loadSubs(P.id), A = D.IV.filter(i => ['approved', 'paid'].includes(i.status) && (!i.owner_invoice_id || i.owner_invoice_id === inv.id));
+  const d = document.createElement('dialog'); d.className = 'adlg';
+  d.innerHTML = `<div class="dh"><div><h3 style="margin:0;font-size:17px">من مستخلصات المقاولين</h3><div class="mut" style="font-size:13px">بيتنقل إجمالي الأعمال (الكميات × الفئات) لكل بند بمرحلته، من غير تأمين المقاول ولا خصوماته.</div></div><button type="button" class="dx">✕</button></div>
+    ${A.length ? `<div class="pklist" style="margin-top:10px">${A.map(i => { const c = D.C.find(x => x.id === i.contract_id), t = subInvTot(i, D); return `<label class="pkrow" style="grid-template-columns:24px minmax(0,1fr) 120px"><input type="checkbox" value="${i.id}"${i.owner_invoice_id ? ' checked disabled' : ''}><span><b>${esc(c.contractor)}</b> – مستخلص ${i.no}<br><small class="mut">${esc(c.title)} · ${fmtD(i.inv_date)}${i.owner_invoice_id ? ' · اتنقل قبل كده' : ''}</small></span><span class="pkr">${nf(t.gross, 0)}</span></label>`; }).join('')}</div><div class="acts"><button class="p" id="fsGo">نقل للمستخلص</button></div>` : '<p class="mut">مفيش مستخلصات مقاولين معتمدة لسه ماتنقلتش.</p>'}`;
+  document.body.append(d); d.showModal(); d.onclick = e => { if (e.target === d || e.target.closest('.dx')) { d.close(); d.remove(); } };
+  const go = d.querySelector('#fsGo'); if (!go) return;
+  go.onclick = async () => { const ids = [...d.querySelectorAll('input:checked:not(:disabled)')].map(x => x.value); if (!ids.length) return toast('اختار مستخلص');
+    let mx = Math.max(0, ...L.filter(l => l.cat === 'contract').map(l => +l.sort || 0)), n = 0;
+    ids.forEach(id => D.LN.filter(l => l.invoice_id === id && +l.cur_qty).forEach(s => { const o = L.find(l => l.cat === 'contract' && l.kind === 'line' && l.line_key === s.contract_item_id);
+      if (o) { o.cur_qty = +o.cur_qty + +s.cur_qty; o.rate = +s.rate; } else L.push({ cat: 'contract', kind: 'line', name: s.name, unit: s.unit, rate: +s.rate, prev_qty: +s.prev_qty, cur_qty: +s.cur_qty, pct: +s.pct, prev_value: +s.prev_value, item_id: s.item_id, phase_n: s.phase_n, line_key: s.contract_item_id, notes: null, sort: mx += 10, _new: true }); n++; }));
+    V_subPulled = ids; d.close(); d.remove(); toast(`اتنقل ${n} بند – احفظ المستخلص`); done(); };
+}
+let V_subPulled = [];
+
 async function renderInv() {
   const P = S.P, ed = can('invEdit', P.id), V = S.iv ||= { id: null };
   if (V.pid !== P.id) { V.pid = P.id; V.id = null; }
@@ -1579,7 +1772,7 @@ async function renderInvOne() {
         <td>${E ? inp(l, 'notes', 130, 'text') : esc(l.notes || '')}</td>${E ? `<td><button type="button" class="danger xs" data-ldel="${l._i}">✕</button></td>` : ''}</tr>`;
     return `<div class="scroll"><table class="ivt"><thead><tr><th>البند</th><th>الوحدة</th><th class="n">الفئة</th>${cum ? '<th class="n">السابق</th>' : ''}<th class="n">الحالي</th>${cum ? '<th class="n">إجمالي الكميات</th>' : ''}<th class="n">${cum ? 'نسبة الإنجاز' : 'نسبة الصرف'}</th><th class="n">قيمة الصرف</th><th>ملاحظات</th>${E ? '<th></th>' : ''}</tr></thead><tbody>${R.map(row).join('') || `<tr><td colspan="10" class="mut">مفيش بنود.</td></tr>`}</tbody></table></div>
       <div class="ivfoot">${cum ? `<span>الإجمالي التراكمي <b>${nf(c === 'contract' ? T.cumContract : T.cumDesign, 0)}</b></span><span>السابق <b>${nf(c === 'contract' ? T.prevContract : T.prevDesign, 0)}</b></span>` : ''}<span class="cur">الحالي <b id="ivCurT">${nf(T[c], 0)}</b></span></div>
-      ${E ? `<div class="acts"><button type="button" class="p" data-pick="${c}">+ بنود من المقايسة</button><button type="button" data-add="line|${c}">+ بند يدوي</button><button type="button" data-add="head1|${c}">+ عنوان رئيسي</button><button type="button" data-add="head2|${c}">+ عنوان فرعي</button>${c === 'contract' ? '<button type="button" id="ivPull">⬇ الكميات الحالية من التقارير المعتمدة</button>' : ''}${c === 'supply' || c === 'extra' ? '<button type="button" id="ivLedger">⬇ من قيود الحسابات</button>' : ''}</div>` : ''}`; };
+      ${E ? `<div class="acts"><button type="button" class="p" data-pick="${c}">+ بنود من المقايسة</button><button type="button" data-add="line|${c}">+ بند يدوي</button><button type="button" data-add="head1|${c}">+ عنوان رئيسي</button><button type="button" data-add="head2|${c}">+ عنوان فرعي</button>${c === 'contract' ? '<button type="button" id="ivPull">⬇ الكميات الحالية من التقارير المعتمدة</button><button type="button" id="ivSubs">⬇ من مستخلصات المقاولين</button>' : ''}${c === 'supply' || c === 'extra' ? '<button type="button" id="ivLedger">⬇ من قيود الحسابات</button>' : ''}</div>` : ''}`; };
   const summary = `<div class="ivpay card"><table><tbody>${Object.entries(ICAT).map(([k, l]) => `<tr><td>${l}</td><td class="n">${nf(amt(k), 0)}</td></tr>`).join('')}<tr class="tot"><td>إجمالي الأعمال عن ${esc(inv.title || '')}</td><td class="n">${nf(works, 0)}</td></tr>
     <tr><td>نسبة الصرف من الأعمال ${E ? `<input id="ivPay" type="number" step="any" value="${Math.round(inv.pay_pct * 100)}" style="width:70px">%` : `<b>${Math.round(inv.pay_pct * 100)}%</b>`} <span class="mut" style="font-size:12px">(الباقي مخصوم من الدفعة المقدمة)</span></td><td class="n">${nf(pay, 0)}</td></tr>
     <tr><td>نسبة الشركة ${E ? `<input id="ivFee" type="number" step="any" value="${Math.round(inv.fee_pct * 1000) / 10}" style="width:70px">%` : `<b>${Math.round(inv.fee_pct * 1000) / 10}%</b>`} من الأعمال – تُصرف 100%</td><td class="n">${nf(fee, 0)}</td></tr>
@@ -1600,11 +1793,12 @@ async function renderInvOne() {
   document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { if (E) keep(); V.metaPend = { ...(V.metaPend || {}), ...meta() }; V.tab = b.dataset.tab; renderInvOne(); });
   $('#ivBack').onclick = e => { e.preventDefault(); if (E && !confirm('في تعديلات مش محفوظة. تخرج من غير حفظ؟')) return; V.id = null; V.L = null; V.edit = false; V.metaPend = null; renderInv(); };
   $('#ivEd') && ($('#ivEd').onclick = () => { V.edit = true; renderInvOne(); });
-  $('#ivCancel') && ($('#ivCancel').onclick = () => { V.edit = false; V.L = null; V.metaPend = null; renderInvOne(); });
+  $('#ivCancel') && ($('#ivCancel').onclick = () => { V_subPulled = []; V.edit = false; V.L = null; V.metaPend = null; renderInvOne(); });
   if (E && V.metaPend) { const m = V.metaPend; if ('title' in m && $('#ivTitle')) $('#ivTitle').value = m.title; if (m.inv_date !== undefined && $('#ivDate')) { $('#ivDate').value = m.inv_date || ''; $('#ivFrom').value = m.period_from || ''; $('#ivTo').value = m.period_to || ''; } if ('pay_pct' in m && $('#ivPay')) $('#ivPay').value = Math.round(m.pay_pct * 100); if ('fee_pct' in m && $('#ivFee')) $('#ivFee').value = Math.round(m.fee_pct * 1000) / 10; }
   $('#main').onclick = async e => {
     const ad = e.target.closest('[data-add]'); if (ad) { keep(); const [kind, cat] = ad.dataset.add.split('|'); const mx = Math.max(0, ...L.filter(l => l.cat === cat).map(l => l.sort)); L.push({ cat, kind, name: kind === 'line' ? '' : (kind === 'head1' ? 'عنوان رئيسي' : 'عنوان فرعي'), unit: ICUM(cat) ? 'م3' : 'مقطوعية', rate: 0, prev_qty: 0, cur_qty: ICUM(cat) ? 0 : 1, pct: 1, prev_value: 0, sort: mx + 10, _new: true }); return renderInvOne(); }
     const pk = e.target.closest('[data-pick]'); if (pk) { keep(); return invPick(pk.dataset.pick, L, re); }
+    if (e.target.closest('#ivSubs')) { keep(); return invFromSubs(inv, L, re); }
     const dl = e.target.closest('[data-ldel]'); if (dl) { keep(); const l = L[+dl.dataset.ldel]; if (l.id) V.del.push(l.id); L.splice(+dl.dataset.ldel, 1); return renderInvOne(); }
   };
   $('#main').oninput = e => { if (e.target.matches('[data-l][data-f]') && ['rate', 'prev_qty', 'cur_qty', 'pct'].includes(e.target.dataset.f)) { /* live total on blur */ } };
@@ -1631,6 +1825,7 @@ async function renderInvOne() {
     const up = L.filter(l => l.id).map(l => ({ id: l.id, ...clean(l) })), ins = L.filter(l => !l.id).map(clean);
     for (let k = 0; k < up.length && !er; k += 300) ({ error: er } = await S.sb.from('owner_invoice_lines').upsert(up.slice(k, k + 300)));
     for (let k = 0; k < ins.length && !er; k += 300) ({ error: er } = await S.sb.from('owner_invoice_lines').insert(ins.slice(k, k + 300)));
+    if (!er && V_subPulled.length) { ({ error: er } = await S.sb.from('sub_invoices').update({ owner_invoice_id: inv.id }).in('id', V_subPulled)); if (!er) V_subPulled = []; }
     if (er) { b.disabled = false; return toast('مقدرتش أحفظ: ' + er.message); } toast('اتحفظ المستخلص'); V.edit = false; V.L = null; V.metaPend = null; renderInvOne(); });
   $('#ivSt') && ($('#ivSt').onchange = async e => { const { error: er } = await S.sb.from('owner_invoices').update({ status: e.target.value, updated_at: new Date().toISOString() }).eq('id', inv.id); if (er) return toast(er.message); toast('اتغيرت الحالة'); renderInvOne(); });
   $('#ivPrint') && ($('#ivPrint').onclick = async () => { const { data: all } = await S.sb.from('owner_invoices').select('*').eq('project_id', P.id).lte('no', inv.no).order('no'); printInv(inv, L, all || [inv]); });
