@@ -66,7 +66,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.10.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.11.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -2942,8 +2942,8 @@ const isWork = t => new Date(t).getUTCDay() !== 5;   // الجمعة إجازة
 const addWork = (t, n) => { if (!Number.isFinite(t)) return t; n = Math.round(+n || 0); const st = n < 0 ? -DAY : DAY; while (!isWork(t)) t += st; while (n) { t += st; if (isWork(t)) n -= Math.sign(n); } return t; };
 const workDays = (a, b) => { if (!Number.isFinite(a) || !Number.isFinite(b) || b < a) return 0; const days = Math.round((b - a) / DAY) + 1, wk = Math.floor(days / 7); let n = wk * 6; for (let t = a + wk * 7 * DAY; t <= b; t += DAY) if (isWork(t)) n++; return n; };
 const fmtD = s => s ? s.slice(8, 10) + '/' + s.slice(5, 7) + '/' + s.slice(2, 4) : '–';
-const SCH = { rowH: 34, zoom: { 'يوم': 22, 'أسبوع': 7, 'شهر': 2.4 } };
-if (!S.sc) S.sc = { zoom: 'أسبوع', closed: new Set(), late: false, q: '', b: '' };
+const SCH = { rowH: 40, zoom: { 'المشروع كله': 0, 'شهر': 2.4, 'أسبوع': 7, 'يوم': 22 } };
+const scdInit = () => (S.scd ||= { zoom: 'المشروع كله', closed: new Set(), late: false, q: '', b: '', view: innerWidth < 700 ? 'list' : 'gantt' });
 
 async function loadSchedule() {
   const P = S.P, ed = can('editBoq', P.id);
@@ -2971,6 +2971,7 @@ function schCompute() {
     const plan = y => y.s == null ? 0 : now < y.s ? 0 : now >= (y.f ?? y.s) ? 1 : (now - y.s + DAY) / ((y.f - y.s) + DAY);
     const W = L.reduce((s, y) => s + w(y), 0); x.plan = W ? L.reduce((s, y) => s + w(y) * plan(y), 0) / W : 0;
     const K = L.filter(y => y.pr.pct != null), WK = K.reduce((s, y) => s + w(y), 0);
+    const phx = !x.kids.length && x.pr.pct == null && x.phase_n != null ? (S.P.phaseProg || []).find(p => p.n === x.phase_n) : null; if (phx) { x.pr = { ...x.pr, pct: Math.min(+phx.pct || 0, 1) }; x.fromPh = true; }
     x.act = x.kids.length ? (WK ? K.reduce((s, y) => s + w(y) * +y.pr.pct, 0) / WK : null) : (x.pr.pct != null ? +x.pr.pct : null);
     x.st = x.act != null && x.act >= 0.999 ? 'done' : x.s == null || now < x.s ? 'wait' : x.act == null ? 'nodata' : (x.f != null && now > x.f) || x.act < x.plan - 0.05 ? 'late' : 'run';
   });
@@ -2980,39 +2981,52 @@ const SST = { done: ['appr', 'خلص'], run: ['run', 'شغال'], late: ['ret', 
 async function renderSchedule() {
   const P = S.P, ed = can('editBoq', P.id);
   $('#main').innerHTML = '<p class="mut">جاري تحميل الجدول الزمني…</p>';
-  await loadSchedule(); const { A } = P.sch, F = S.sc;
+  await loadSchedule(); const { A } = P.sch, F = scdInit();
   const top = A.filter(x => !x.parent_id), leafs = A.filter(x => !x.kids.length);
   const W = leafs.reduce((s, y) => s + Math.max(y.dur, 1), 0), plan = W ? leafs.reduce((s, y) => s + Math.max(y.dur, 1) * y.plan, 0) / W : 0;
   const K = leafs.filter(y => y.act != null), WK = K.reduce((s, y) => s + Math.max(y.dur, 1), 0), act = WK ? K.reduce((s, y) => s + Math.max(y.dur, 1) * y.act, 0) / WK : null, planK = WK ? K.reduce((s, y) => s + Math.max(y.dur, 1) * y.plan, 0) / WK : 0;
   const fin = Math.max(0, ...A.map(x => x.f || 0)), bfin = Math.max(0, ...A.map(x => x.bf || 0)), slip = fin && bfin ? workDays(Math.min(fin, bfin), Math.max(fin, bfin)) * Math.sign(fin - bfin) : 0;
   const lateN = leafs.filter(x => x.st === 'late').length, linked = leafs.filter(x => x.pr.items > 0 || x.manual_pct != null).length;
-  $('#main').innerHTML = `<h2>الجدول الزمني</h2>
-  ${A.length ? `<div class="kp" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"><div class="k"><b>${Math.round(plan * 100)}%</b><span>المخطط حتى النهارده</span></div><div class="k"><b style="color:var(--acc)">${act == null ? '–' : Math.round(act * 100) + '%'}</b><span>الفعلي (من الأنشطة المربوطة)</span></div><div class="k"><b>${act == null || !planK ? '–' : nf(act / planK, 2)}</b><span>مؤشر الأداء الزمني SPI</span></div><div class="k"><b style="${lateN ? 'color:var(--bad)' : ''}">${lateN}</b><span>نشاط متأخر</span></div><div class="k"><b>${fin ? fmtD(DS(fin)) : '–'}</b><span>نهاية المشروع${bfin ? ` · ${slip > 0 ? 'متأخر ' + slip + ' يوم عن' : slip < 0 ? 'متقدم ' + -slip + ' يوم عن' : 'مطابق لـ'} خط الأساس` : ''}</span></div></div>
-  <p class="mut" style="margin-top:8px">${linked} من ${leafs.length} نشاط مربوطين ببنود المقايسة أو ليهم نسبة يدوية. نسبة النشاط بتتحسب لوحدها من كميات التقارير المعتمدة. أيام العمل من السبت للخميس.</p>` : `<div class="note">لسه مفيش جدول زمني للمشروع ده.${ed ? ' ارفع ملف MS Project، أو ابدأ تضيف أنشطة.' : ' المكتب الفني هيرفعه قريب.'}</div>`}
-  <div class="acts">${ed ? `<button class="p" id="scAdd">+ نشاط</button><label class="btn">استيراد MS Project (XML)<input type="file" id="scImp" accept=".xml" hidden></label>${A.length ? '<button id="scCalc">إعادة حساب التواريخ</button><button id="scBase">حفظ خط الأساس</button>' : ''}` : ''}${A.length ? '<button id="scX">تحميل Excel</button>' : ''}</div>
-  ${ed ? '<p class="mut" style="margin-top:-4px">من برنامج MS Project احفظ الجدول بصيغة XML (من Save As اختار XML Format). لو رفعت نسخة أحدث بعدين، الأنشطة بتتحدّث وربطها بالبنود بيفضل زي ما هو.</p>' : ''}<div id="scImpBox"></div>
-  ${A.length ? `<div class="filters" style="margin-top:12px">${(P.proj.buildings || []).length > 1 ? `<select id="scB"><option value="">كل المباني</option>${P.proj.buildings.map(b => `<option${b === F.b ? ' selected' : ''}>${esc(b)}</option>`).join('')}</select>` : ''}<input id="scQ" type="search" placeholder="بحث في الأنشطة" value="${esc(F.q)}"><label class="chk"><input type="checkbox" id="scL"${F.late ? ' checked' : ''}> المتأخر بس</label><div class="seg">${Object.keys(SCH.zoom).map(z => `<button type="button" data-z="${z}" class="${z === F.zoom ? 'on' : ''}">${z}</button>`).join('')}</div></div><div id="gantt"></div>` : ''}`;
+  const cnt = k => leafs.filter(x => x.st === k).length, gap = act == null ? null : act - planK, verdict = gap == null ? ['', 'مفيش بيانات فعلية'] : gap >= -.02 ? ['ok', gap > .02 ? 'متقدمين عن الخطة' : 'ماشيين حسب الخطة'] : gap >= -.1 ? ['warn', `متأخرين ${Math.round(-gap * 100)}% عن الخطة`] : ['bad', `متأخرين ${Math.round(-gap * 100)}% عن الخطة`];
+  const srcN = leafs.filter(x => x.fromPh).length;
+  $('#main').innerHTML = `<div class="schead"><h2 style="margin:0">الجدول الزمني</h2><div class="acts" style="margin:0">${A.length ? '<button id="scX">⬇ Excel</button>' : ''}${ed ? '<button class="p" id="scAdd">+ نشاط</button>' : ''}</div></div>
+  ${A.length ? `<div class="sckp">
+    <div class="sck big"><div class="sclab">نسبة الإنجاز</div><div class="scbars"><div><span>الفعلي</span><div class="bar"><u style="width:${(act || 0) * 100}%"></u></div><b>${act == null ? '–' : Math.round(act * 100) + '%'}</b></div><div><span>المخطط</span><div class="bar pl"><u style="width:${planK * 100}%"></u></div><b>${Math.round(planK * 100)}%</b></div></div><div class="scv ${verdict[0]}">${verdict[1]}</div></div>
+    <div class="sck"><div class="sclab">نهاية المشروع المتوقعة</div><b class="scbig">${fin ? fmtD(DS(fin)) : '–'}</b>${slip ? `<div class="scv ${slip > 0 ? 'bad' : 'ok'}">${slip > 0 ? 'متأخرة' : 'أبدر'} ${Math.abs(slip)} يوم عمل عن خط الأساس</div><small class="mut">خط الأساس: ${fmtD(DS(bfin))}</small>` : bfin ? '<div class="scv ok">زي خط الأساس</div>' : '<small class="mut">مفيش خط أساس محفوظ</small>'}</div>
+    <div class="sck"><div class="sclab">الأنشطة (${leafs.length})</div><div class="scst">${[['done', 'خلصت'], ['run', 'شغالة'], ['late', 'متأخرة'], ['wait', 'لسه']].map(([k, l]) => `<button type="button" data-stf="${k}" class="${k}${F.stf === k ? ' on' : ''}"><b>${cnt(k)}</b>${l}</button>`).join('')}</div></div></div>
+  ${srcN ? `<p class="mut" style="font-size:12px;margin:6px 0 0">${srcN} نشاط نسبتهم الفعلية جاية من نسبة إنجاز المرحلة المربوطين بيها (من الموقف التنفيذي). اربطهم ببنود المقايسة لو عاوز دقة أكتر.</p>` : ''}` : `<div class="note">لسه مفيش جدول زمني للمشروع ده.${ed ? ' ارفع ملف MS Project، أو ابدأ تضيف أنشطة.' : ' المكتب الفني هيرفعه قريب.'}</div>`}
+  ${ed ? `<details class="sctools"${A.length ? '' : ' open'}><summary>⚙ أدوات الجدول</summary><div class="acts"><label class="btn">استيراد MS Project (XML)<input type="file" id="scImp" accept=".xml" hidden></label>${A.length ? '<button id="scCalc">إعادة حساب التواريخ</button><button id="scBase">حفظ خط الأساس</button>' : ''}</div><p class="mut" style="font-size:12px">من MS Project: Save As ← XML Format. لو رفعت نسخة أحدث، الأنشطة بتتحدّث وربطها بالبنود بيفضل زي ما هو. أيام العمل من السبت للخميس.</p></details>` : ''}<div id="scImpBox"></div>
+  ${A.length ? `<div class="filters" style="margin-top:12px"><div class="seg"><button type="button" data-vw="gantt" class="${F.view === 'gantt' ? 'on' : ''}">📊 مخطط زمني</button><button type="button" data-vw="list" class="${F.view === 'list' ? 'on' : ''}">☰ قائمة</button></div>${(P.proj.buildings || []).length > 1 ? `<select id="scB"><option value="">كل المباني</option>${P.proj.buildings.map(b => `<option${b === F.b ? ' selected' : ''}>${esc(b)}</option>`).join('')}</select>` : ''}<input id="scQ" type="search" placeholder="بحث في الأنشطة" value="${esc(F.q)}">${F.view === 'gantt' ? `<div class="seg">${Object.keys(SCH.zoom).map(z => `<button type="button" data-z="${z}" class="${z === F.zoom ? 'on' : ''}">${z}</button>`).join('')}</div>` : ''}${F.stf ? `<button id="scXf">✕ ${SST[F.stf][1]} بس</button>` : ''}</div><div id="gantt"></div>` : ''}`;
   if (A.length) drawGantt();
   const on = (id, ev, fn) => { const e = $(id); if (e) e[ev] = fn; };
-  on('#scQ', 'onchange', e => { F.q = e.target.value.trim(); drawGantt(); }); on('#scL', 'onchange', e => { F.late = e.target.checked; drawGantt(); }); on('#scB', 'onchange', e => { F.b = e.target.value; drawGantt(); });
+  on('#scQ', 'onchange', e => { F.q = e.target.value.trim(); drawGantt(); }); on('#scXf', 'onclick', () => { F.stf = ''; renderSchedule(); });
+  document.querySelectorAll('[data-stf]').forEach(b => b.onclick = () => { F.stf = F.stf === b.dataset.stf ? '' : b.dataset.stf; renderSchedule(); });
+  document.querySelectorAll('[data-vw]').forEach(b => b.onclick = () => { F.view = b.dataset.vw; renderSchedule(); }); on('#scB', 'onchange', e => { F.b = e.target.value; drawGantt(); });
   document.querySelectorAll('[data-z]').forEach(b => b.onclick = () => { F.zoom = b.dataset.z; document.querySelectorAll('[data-z]').forEach(x => x.classList.toggle('on', x === b)); drawGantt(); });
   on('#scAdd', 'onclick', () => editActivity(null)); on('#scX', 'onclick', exportSchedule); on('#scCalc', 'onclick', recalcSchedule); on('#scBase', 'onclick', saveBaseline);
   on('#scImp', 'onchange', e => { const f = e.target.files[0]; e.target.value = ''; if (f) importMsp(f); });
 }
 
 function drawGantt() {
-  const P = S.P, { A } = P.sch, F = S.sc, px = SCH.zoom[F.zoom], now = TD(today());
-  const match = x => (!F.q || x.name.includes(F.q) || (x.wbs || '').startsWith(F.q)) && (!F.b || x.building === F.b || x.kids.length) && (!F.late || x.st === 'late');
+  const P = S.P, { A } = P.sch, F = scdInit(), now = TD(today());
+  const match = x => (!F.q || x.name.includes(F.q) || (x.wbs || '').startsWith(F.q)) && (!F.b || x.building === F.b || x.kids.length) && (!F.stf || x.st === F.stf);
   const keep = new Set(); const mark = x => { let ok = match(x); x.kids.forEach(k => { if (mark(k)) ok = true; }); if (ok && (F.q || F.late || F.b ? (match(x) || x.kids.some(k => keep.has(k.id))) : true)) keep.add(x.id); return keep.has(x.id); };
   A.filter(x => !x.parent_id).forEach(mark);
   const rows = []; const walk = x => { if (!keep.has(x.id)) return; rows.push(x); if (!F.closed.has(x.id) || F.q || F.late) x.kids.forEach(walk); };
   A.filter(x => !x.parent_id).forEach(walk);
   const ds = A.flatMap(x => [x.s, x.f, x.bs, x.bf]).filter(Boolean); if (!ds.length) return $('#gantt').innerHTML = '<p class="mut">الأنشطة مفيهاش تواريخ.</p>';
+  if (F.view === 'list') { const one = x => { const d = x.bf && x.f ? workDays(Math.min(x.f, x.bf), Math.max(x.f, x.bf)) * Math.sign(x.f - x.bf) : 0, [c, l] = SST[x.st];
+      return `<div class="scard ${x.st}${x.kids.length ? ' sum' : ''}" style="margin-inline-start:${(x.outline_level - 1) * 14}px" data-open="${x.id}"><div class="sct"><b>${x.wbs ? `<small class="mut">${esc(x.wbs)}</small> ` : ''}${esc(x.name)}</b><span class="st ${c}">${l}</span></div>
+      <div class="scd">📅 ${fmtD(x.start)} ← ${fmtD(x.finish)}${x.dur ? ` <span class="mut">(${x.dur} يوم عمل)</span>` : ''}${d ? ` <span class="${d > 0 ? 'bad' : 'ok'}">${d > 0 ? '+' : ''}${d} يوم عن خط الأساس</span>` : ''}</div>
+      <div class="scbars sm"><div><span>الفعلي</span><div class="bar"><u style="width:${(x.act || 0) * 100}%"></u></div><b>${x.act == null ? '–' : Math.round(x.act * 100) + '%'}</b></div><div><span>المخطط</span><div class="bar pl"><u style="width:${x.plan * 100}%"></u></div><b>${Math.round(x.plan * 100)}%</b></div></div>${x.fromPh ? '<small class="mut">النسبة من المرحلة المربوطة</small>' : ''}</div>`; };
+    $('#gantt').innerHTML = `<div class="sclist">${rows.map(one).join('') || '<p class="mut">مفيش أنشطة بالفلتر ده.</p>'}</div>`;
+    $('#gantt').onclick = e => { const o = e.target.closest('[data-open]'); if (o) editActivity(P.sch.byId[o.dataset.open]); }; return; }
   let t0 = Math.min(...ds, now), t1 = Math.max(...ds, now); t0 = Date.UTC(new Date(t0).getUTCFullYear(), new Date(t0).getUTCMonth(), 1); t1 = Date.UTC(new Date(t1).getUTCFullYear(), new Date(t1).getUTCMonth() + 1, 1);
+  const iw = innerWidth < 700 ? 190 : 440, gw = ($('#gantt')?.clientWidth || 900) - iw - 4, px = F.zoom === 'المشروع كله' ? Math.max(gw / ((t1 - t0) / DAY), .25) : SCH.zoom[F.zoom] || 2.4;
   const TW = Math.round((t1 - t0) / DAY * px), X = t => Math.round((t - t0) / DAY * px);
   const months = []; for (let t = t0; t < t1;) { const d = new Date(t), n = Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1); months.push([t, n]); t = n; }
   const MN = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
-  const head = months.map(([a, b]) => `<i style="right:${X(a)}px;width:${X(b) - X(a)}px">${X(b) - X(a) > 46 ? MN[new Date(a).getUTCMonth()] + ' ' + String(new Date(a).getUTCFullYear()).slice(2) : ''}</i>`).join('');
+  const head = months.map(([a, b]) => { const w = X(b) - X(a), d = new Date(a), m = d.getUTCMonth(); return `<i style="right:${X(a)}px;width:${w}px"${m === 0 ? ' class="yr"' : ''}>${w > 46 ? MN[m] + ' ' + String(d.getUTCFullYear()).slice(2) : m === 0 ? (w > 30 ? d.getUTCFullYear() : '’' + String(d.getUTCFullYear()).slice(2)) : w > 18 ? m + 1 : ''}</i>`; }).join('');
   const grid = months.map(([a]) => `<b style="right:${X(a)}px"></b>`).join('');
   const bar = x => { if (x.s == null) return '';
     const r = X(x.s), w = Math.max(X((x.f ?? x.s) + DAY) - r, 3), bl = x.bs != null ? `<em class="bl" style="right:${X(x.bs)}px;width:${Math.max(X((x.bf ?? x.bs) + DAY) - X(x.bs), 3)}px"></em>` : '';
@@ -3021,10 +3035,10 @@ function drawGantt() {
     return `${bl}<span class="br ${x.st}" style="right:${r}px;width:${w}px" title="${esc(x.name)}: ${fmtD(x.start)} → ${fmtD(x.finish)} · مخطط ${Math.round(x.plan * 100)}% · فعلي ${x.act == null ? '–' : Math.round(x.act * 100) + '%'}"><u style="width:${(x.act || 0) * 100}%"></u></span>`; };
   $('#gantt').innerHTML = `<div class="gwrap"><div class="gt" style="--tw:${TW}px">
   <div class="gr gh"><div class="gi"><span class="gn">النشاط</span><span class="gd">البداية</span><span class="gd">النهاية</span><span class="gp">الفعلي</span></div><div class="gl">${head}</div></div>
-  ${rows.map(x => `<div class="gr${x.kids.length ? ' sum' : ''}" data-id="${x.id}"><div class="gi"><span class="gn" style="padding-inline-start:${(x.outline_level - 1) * 14 + 6}px">${x.kids.length ? `<button type="button" class="tg" data-tg="${x.id}">${F.closed.has(x.id) && !F.q && !F.late ? '◂' : '▾'}</button>` : ''}<a href="#" data-open="${x.id}" title="${esc(x.name)}">${x.wbs ? `<small>${esc(x.wbs)}</small> ` : ''}${esc(x.name)}</a></span><span class="gd">${fmtD(x.start)}</span><span class="gd">${fmtD(x.finish)}</span><span class="gp">${x.act == null ? '<span class="mut">–</span>' : Math.round(x.act * 100) + '%'}${!x.kids.length ? ` <span class="st ${SST[x.st][0]}">${SST[x.st][1]}</span>` : ''}</span></div><div class="gl">${bar(x)}</div></div>`).join('')}
+  ${rows.map(x => `<div class="gr${x.kids.length ? ' sum' : ''}" data-id="${x.id}"><div class="gi"><span class="gn" style="padding-inline-start:${(x.outline_level - 1) * 14 + 6}px">${x.kids.length ? `<button type="button" class="tg" data-tg="${x.id}">${F.closed.has(x.id) && !F.q && !F.late ? '◂' : '▾'}</button>` : ''}<a href="#" data-open="${x.id}" title="${esc(x.name)}">${x.wbs ? `<small>${esc(x.wbs)}</small> ` : ''}${esc(x.name)}</a></span><span class="gd">${fmtD(x.start)}</span><span class="gd">${fmtD(x.finish)}</span><span class="gp">${x.act == null ? '<span class="mut">–</span>' : `<b>${Math.round(x.act * 100)}%</b>`}${!x.kids.length ? ` <span class="st ${SST[x.st][0]}">${SST[x.st][1]}</span>` : ''}</span></div><div class="gl">${bar(x)}</div></div>`).join('')}
   <div class="gbg" style="height:${(rows.length + 1) * SCH.rowH}px">${grid}${now >= t0 && now <= t1 ? `<s style="right:${X(now)}px" title="النهارده"></s>` : ''}</div></div></div>
   <div class="leg"><span><i style="background:var(--acc)"></i>الفعلي</span><span><i style="background:var(--conc)"></i>المخطط</span><span><i style="background:var(--bad)"></i>متأخر</span><span><i style="background:var(--mut);height:3px"></i>خط الأساس</span><span><i style="background:var(--acc);width:2px"></i>النهارده</span></div>`;
-  const wrap = $('#gantt .gwrap'); if (!S.sc.scrolled) { wrap.scrollLeft = -(X(now) - wrap.clientWidth / 2); }
+  const wrap = $('#gantt .gwrap'); if (!F.scrolled) { wrap.scrollLeft = -(X(now) - wrap.clientWidth / 2); }
   $('#gantt').onclick = e => { const tg = e.target.closest('[data-tg]'); if (tg) { F.closed.has(tg.dataset.tg) ? F.closed.delete(tg.dataset.tg) : F.closed.add(tg.dataset.tg); return drawGantt(); }
     const o = e.target.closest('[data-open]'); if (o) { e.preventDefault(); editActivity(P.sch.byId[o.dataset.open]); } };
 }
