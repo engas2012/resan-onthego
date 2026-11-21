@@ -66,7 +66,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.11.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.12.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -724,6 +724,10 @@ async function renderOwner() {
   if (can('acct', pid)) { const [iv, py] = await Promise.all([S.sb.from('owner_invoices').select('*').eq('project_id', pid).neq('status', 'draft'), S.sb.from('owner_payments').select('*').eq('project_id', pid)]); const I = iv.data || [], Y = py.data || [], got = y => y.status === 'received', sum = (A, f) => A.reduce((t, x) => t + (+f(x) || 0), 0);
     if (I.length || Y.length) { const R = I.map(i => { const q = invPay(i), LP = Y.filter(y => y.kind === 'invoice' && y.invoice_id === i.id), paid = sum(LP.filter(got), y => y.amount), as = !LP.length && i.status === 'paid'; return { gross: q.works + q.fee, rem: as ? 0 : Math.max(q.net - paid, 0), ded: q.works * (1 - +i.pay_pct) }; }), adv = sum(Y.filter(y => y.kind === 'advance' && got(y)), y => y.amount), recv = sum(Y.filter(got), y => y.amount), req = sum(Y.filter(y => y.status === 'requested'), y => y.amount), advBal = adv - sum(R, r => r.ded), due = sum(R, r => r.rem);
       fin = `<section class="osec"><h3>💰 الموقف المالي</h3><div class="otiles"><div><b>${money(sum(R, r => r.gross))}</b><span>قيمة المستخلصات (${I.length})</span></div><div><b>${money(recv)}</b><span>اللي اتدفع لحد دلوقتي</span></div><div class="${due > 1 ? 'warn' : ''}"><b>${money(due)}</b><span>${due > 1 ? 'مستحق من المستخلصات' : 'مفيش مستحقات متأخرة ✓'}</span></div><div><b>${money(advBal)}</b><span>رصيد الدفعات المقدمة${req ? `<br><small>مطلوب ${money(req)}</small>` : ''}</span></div></div><p class="mut">كل المبالغ بالجنيه المصري. <a href="#p/${pid}/acct">التفاصيل في الحسابات ←</a></p></section>`; } }
+  let sch = ''; { const [sa, sd] = await Promise.all([S.sb.from('schedule_activities').select('finish,bl_finish').eq('project_id', pid), S.sb.from('schedule_delays').select('days,cause,status,affects_finish').eq('project_id', pid)]);
+    const A = sa.data || [], fin = Math.max(0, ...A.map(x => TD(x.finish) || 0)), bf = Math.max(0, ...A.map(x => TD(x.bl_finish) || 0));
+    if (fin && bf) { const slip = workDays(Math.min(fin, bf), Math.max(fin, bf)) * Math.sign(fin - bf), D = (sd.data || []).filter(d => dExc(d) && d.affects_finish), ex = D.reduce((t, d) => t + +d.days, 0), cs = Math.max(slip - ex, 0), cz = [...new Set(D.map(d => DCAUSE[d.cause]))].join('، ');
+      sch = `<section class="osec"><h3>⏱ المدة الزمنية</h3><div class="otiles"><div><b>${fmtD(DS(fin))}</b><span>النهاية المتوقعة</span></div><div><b>${fmtD(DS(ex ? addWork(bf, ex) : bf))}</b><span>${ex ? 'خط الأساس بعد التمديد' : 'خط الأساس'}</span></div>${ex ? `<div class="exc"><b>${Math.min(ex, Math.max(slip, 0))} يوم</b><span>تأخير بسبب ${esc(cz)}</span></div>` : ''}<div class="${cs > 0 ? 'warn' : ''}"><b>${cs > 0 ? cs + ' يوم' : 'مفيش ✓'}</b><span>تأخير على المقاول</span></div></div>${ex ? '<p class="mut">التأخير اللي سببه ظروف الموقع مستحق عنه تمديد زمني ومش محسوب على المقاول.</p>' : ''}</section>`; } }
   const Q = P.quotes || [], qw = Q.filter(q => q.status === 'submitted').length, qa = Q.filter(q => q.status === 'approved').length, qi = new Set(Q.map(q => q.item_id)).size;
   const ic = x => x.pct >= .995 ? '<i class="oi done">✓</i>' : x.pct > 0 ? '<i class="oi cur">●</i>' : '<i class="oi">○</i>';
   const pic = floorPic();
@@ -733,6 +737,7 @@ async function renderOwner() {
     ${stt ? `<div class="opill ${stt[0]}">${stt[1]} · المخطط ${Math.round(pl * 100)}%</div>` : ''}
     <ul class="ofacts"><li><b>${done.length}</b> من ${L.length} مراحل خلصت</li>${cur.length ? `<li>شغالين دلوقتي في: <b>${cur.map(x => esc(x.name)).join('، ')}</b></li>` : ''}${next ? `<li>المرحلة الجاية: <b>${esc(next.name)}</b></li>` : ''}</ul></div>${ring(ov)}</header>
   <section class="osec"><h3>🏗 مراحل المشروع</h3><div class="ophs">${L.map(x => `<div class="oph${x.pct > 0 && x.pct < .995 ? ' on' : ''}">${ic(x)}<span>${esc(x.name)}</span><div class="bar${x.pct >= 1 ? ' full' : ''}"><u style="width:${Math.min(x.pct, 1) * 100}%"></u></div><b>${Math.round(x.pct * 100)}%</b>${x.planned_pct != null ? `<small>المخطط ${Math.round(x.planned_pct)}%</small>` : '<small></small>'}</div>`).join('')}</div><p class="mut" style="font-size:12px">نسبة المشروع = مجموع نسبة كل مرحلة × وزنها من قيمة المشروع.</p></section>
+  ${sch}
   ${pic ? `<section class="osec"><h3>🏢 شكل المبنى دلوقتي</h3><div class="sec opic">${pic}<div class="leg"><span><i style="background:var(--acc)"></i>الأعمدة والحوائط</span><span><i style="background:#1d7a4f"></i>الأسقف</span></div></div></section>` : ''}
   ${fin}
   ${Q.length && can('quotes', pid) ? `<section class="osec"><h3>📑 عروض الأسعار</h3><div class="otiles"><div><b>${qi}</b><span>بند عليه عروض أسعار</span></div><div><b>${Q.length}</b><span>عرض مقدم من الشركات</span></div><div class="${qw ? 'warn' : ''}"><b>${qw}</b><span>عند الاستشاري للمراجعة</span></div><div><b>${qa}</b><span>اعتمدها الاستشاري</span></div></div><p class="mut"><a href="#p/${pid}/quotes">شوف العروض مقسمة على المراحل والبنود ←</a></p></section>` : ''}
@@ -2947,9 +2952,9 @@ const scdInit = () => (S.scd ||= { zoom: 'المشروع كله', closed: new Se
 
 async function loadSchedule() {
   const P = S.P, ed = can('editBoq', P.id);
-  const [a, l, pr, li] = await Promise.all([
+  const [a, l, dl, pr, li] = await Promise.all([
     S.sb.from('schedule_activities').select('*').eq('project_id', P.id).order('sort'),
-    S.sb.from('schedule_links').select('*').eq('project_id', P.id),
+    S.sb.from('schedule_links').select('*').eq('project_id', P.id), S.sb.from('schedule_delays').select('*').eq('project_id', P.id).order('created_at'),
     S.sb.rpc('schedule_progress', { p_project: P.id }),
     ed ? S.sb.from('schedule_activity_items').select('activity_id,item_id') : Promise.resolve({ data: [] }),
   ]);
@@ -2958,7 +2963,7 @@ async function loadSchedule() {
   const A = (a.data || []).map(x => ({ ...x, s: TD(x.start), f: TD(x.finish), bs: TD(x.bl_start), bf: TD(x.bl_finish), pr: prog[x.id] || {}, kids: [] }));
   const byId = Object.fromEntries(A.map(x => [x.id, x]));
   A.forEach(x => { if (x.parent_id && byId[x.parent_id]) byId[x.parent_id].kids.push(x); });
-  P.sch = { A, byId, links: l.data || [], items: {} };
+  P.sch = { A, byId, links: l.data || [], items: {}, D: dl.data || [] };
   (li.data || []).forEach(r => (P.sch.items[r.activity_id] ||= []).push(r.item_id));
   schCompute();
 }
@@ -2974,9 +2979,15 @@ function schCompute() {
     const phx = !x.kids.length && x.pr.pct == null && x.phase_n != null ? (S.P.phaseProg || []).find(p => p.n === x.phase_n) : null; if (phx) { x.pr = { ...x.pr, pct: Math.min(+phx.pct || 0, 1) }; x.fromPh = true; }
     x.act = x.kids.length ? (WK ? K.reduce((s, y) => s + w(y) * +y.pr.pct, 0) / WK : null) : (x.pr.pct != null ? +x.pr.pct : null);
     x.st = x.act != null && x.act >= 0.999 ? 'done' : x.s == null || now < x.s ? 'wait' : x.act == null ? 'nodata' : (x.f != null && now > x.f) || x.act < x.plan - 0.05 ? 'late' : 'run';
+    x.slip = x.bf != null && x.f != null ? workDays(Math.min(x.f, x.bf), Math.max(x.f, x.bf)) * Math.sign(x.f - x.bf) : 0;
+    x.exc = (S.P.sch.D || []).filter(d => d.activity_id === x.id && dExc(d)).reduce((t, d) => t + +d.days, 0);
+    if (x.st === 'late' && x.exc > 0 && x.exc >= x.slip) x.st = 'exc';
   });
 }
-const SST = { done: ['appr', 'خلص'], run: ['run', 'شغال'], late: ['ret', 'متأخر'], wait: ['imp', 'لسه'], nodata: ['imp', 'بدون ربط'] };
+const SST = { done: ['appr', 'خلص'], run: ['run', 'شغال'], late: ['ret', 'متأخر'], exc: ['exc', 'معذور'], wait: ['imp', 'لسه'], nodata: ['imp', 'بدون ربط'] };
+const DCAUSE = { dewatering: 'نزح ومياه جوفية', site: 'ظروف الموقع', owner: 'من المالك (قرارات / دفعات / تسليم)', permits: 'تراخيص وتصاريح', consultant: 'اعتمادات الاستشاري', design: 'تعديلات تصميم', force: 'قوة قاهرة', contractor: 'على الشركة (مش معذور)' };
+const DST = { claimed: ['pend', 'مطالبة – مستنية الاستشاري'], approved: ['appr', 'معتمد من الاستشاري'], rejected: ['ret', 'مرفوض'] };
+const dExc = d => d.status !== 'rejected' && d.cause !== 'contractor';
 
 async function renderSchedule() {
   const P = S.P, ed = can('editBoq', P.id);
@@ -2988,25 +2999,51 @@ async function renderSchedule() {
   const fin = Math.max(0, ...A.map(x => x.f || 0)), bfin = Math.max(0, ...A.map(x => x.bf || 0)), slip = fin && bfin ? workDays(Math.min(fin, bfin), Math.max(fin, bfin)) * Math.sign(fin - bfin) : 0;
   const lateN = leafs.filter(x => x.st === 'late').length, linked = leafs.filter(x => x.pr.items > 0 || x.manual_pct != null).length;
   const cnt = k => leafs.filter(x => x.st === k).length, gap = act == null ? null : act - planK, verdict = gap == null ? ['', 'مفيش بيانات فعلية'] : gap >= -.02 ? ['ok', gap > .02 ? 'متقدمين عن الخطة' : 'ماشيين حسب الخطة'] : gap >= -.1 ? ['warn', `متأخرين ${Math.round(-gap * 100)}% عن الخطة`] : ['bad', `متأخرين ${Math.round(-gap * 100)}% عن الخطة`];
-  const srcN = leafs.filter(x => x.fromPh).length;
+  const srcN = leafs.filter(x => x.fromPh).length, D = P.sch.D || [], excP = D.filter(d => dExc(d) && d.affects_finish).reduce((t, d) => t + +d.days, 0), excA = D.filter(d => dExc(d) && d.affects_finish && d.status === 'approved').reduce((t, d) => t + +d.days, 0), cSlip = Math.max(slip - excP, 0), rv = can('quoteRev', P.id);
   $('#main').innerHTML = `<div class="schead"><h2 style="margin:0">الجدول الزمني</h2><div class="acts" style="margin:0">${A.length ? '<button id="scX">⬇ Excel</button>' : ''}${ed ? '<button class="p" id="scAdd">+ نشاط</button>' : ''}</div></div>
   ${A.length ? `<div class="sckp">
     <div class="sck big"><div class="sclab">نسبة الإنجاز</div><div class="scbars"><div><span>الفعلي</span><div class="bar"><u style="width:${(act || 0) * 100}%"></u></div><b>${act == null ? '–' : Math.round(act * 100) + '%'}</b></div><div><span>المخطط</span><div class="bar pl"><u style="width:${planK * 100}%"></u></div><b>${Math.round(planK * 100)}%</b></div></div><div class="scv ${verdict[0]}">${verdict[1]}</div></div>
-    <div class="sck"><div class="sclab">نهاية المشروع المتوقعة</div><b class="scbig">${fin ? fmtD(DS(fin)) : '–'}</b>${slip ? `<div class="scv ${slip > 0 ? 'bad' : 'ok'}">${slip > 0 ? 'متأخرة' : 'أبدر'} ${Math.abs(slip)} يوم عمل عن خط الأساس</div><small class="mut">خط الأساس: ${fmtD(DS(bfin))}</small>` : bfin ? '<div class="scv ok">زي خط الأساس</div>' : '<small class="mut">مفيش خط أساس محفوظ</small>'}</div>
-    <div class="sck"><div class="sclab">الأنشطة (${leafs.length})</div><div class="scst">${[['done', 'خلصت'], ['run', 'شغالة'], ['late', 'متأخرة'], ['wait', 'لسه']].map(([k, l]) => `<button type="button" data-stf="${k}" class="${k}${F.stf === k ? ' on' : ''}"><b>${cnt(k)}</b>${l}</button>`).join('')}</div></div></div>
+    <div class="sck"><div class="sclab">نهاية المشروع المتوقعة</div><b class="scbig">${fin ? fmtD(DS(fin)) : '–'}</b>${slip ? `<div class="scv ${slip > 0 ? (cSlip > 0 ? 'bad' : 'exc') : 'ok'}">${slip > 0 ? 'متأخرة' : 'أبدر'} ${Math.abs(slip)} يوم عمل عن خط الأساس</div>${slip > 0 && excP ? `<div class="scsplit"><span class="exc">${Math.min(excP, slip)} يوم ظروف خارجة عن الشركة${excA < excP ? ` <small>(${excA} معتمد)</small>` : ''}</span><span class="${cSlip > 0 ? 'bad' : 'ok'}">${cSlip > 0 ? cSlip + ' يوم على الشركة' : 'مفيش تأخير على الشركة ✓'}</span></div><small class="mut">خط الأساس ${fmtD(DS(bfin))} · بعد التمديد ${fmtD(DS(addWork(bfin, excP)))}</small>` : `<small class="mut">خط الأساس: ${fmtD(DS(bfin))}${slip > 0 && ed ? ' · لو التأخير بسبب ظروف الموقع سجّله تحت' : ''}</small>`}` : bfin ? '<div class="scv ok">زي خط الأساس</div>' : '<small class="mut">مفيش خط أساس محفوظ</small>'}</div>
+    <div class="sck"><div class="sclab">الأنشطة (${leafs.length})</div><div class="scst">${[['done', 'خلصت'], ['run', 'شغالة'], ['late', 'متأخرة'], ...(cnt('exc') ? [['exc', 'معذورة']] : []), ['wait', 'لسه']].map(([k, l]) => `<button type="button" data-stf="${k}" class="${k}${F.stf === k ? ' on' : ''}"><b>${cnt(k)}</b>${l}</button>`).join('')}</div></div></div>
   ${srcN ? `<p class="mut" style="font-size:12px;margin:6px 0 0">${srcN} نشاط نسبتهم الفعلية جاية من نسبة إنجاز المرحلة المربوطين بيها (من الموقف التنفيذي). اربطهم ببنود المقايسة لو عاوز دقة أكتر.</p>` : ''}` : `<div class="note">لسه مفيش جدول زمني للمشروع ده.${ed ? ' ارفع ملف MS Project، أو ابدأ تضيف أنشطة.' : ' المكتب الفني هيرفعه قريب.'}</div>`}
   ${ed ? `<details class="sctools"${A.length ? '' : ' open'}><summary>⚙ أدوات الجدول</summary><div class="acts"><label class="btn">استيراد MS Project (XML)<input type="file" id="scImp" accept=".xml" hidden></label>${A.length ? '<button id="scCalc">إعادة حساب التواريخ</button><button id="scBase">حفظ خط الأساس</button>' : ''}</div><p class="mut" style="font-size:12px">من MS Project: Save As ← XML Format. لو رفعت نسخة أحدث، الأنشطة بتتحدّث وربطها بالبنود بيفضل زي ما هو. أيام العمل من السبت للخميس.</p></details>` : ''}<div id="scImpBox"></div>
-  ${A.length ? `<div class="filters" style="margin-top:12px"><div class="seg"><button type="button" data-vw="gantt" class="${F.view === 'gantt' ? 'on' : ''}">📊 مخطط زمني</button><button type="button" data-vw="list" class="${F.view === 'list' ? 'on' : ''}">☰ قائمة</button></div>${(P.proj.buildings || []).length > 1 ? `<select id="scB"><option value="">كل المباني</option>${P.proj.buildings.map(b => `<option${b === F.b ? ' selected' : ''}>${esc(b)}</option>`).join('')}</select>` : ''}<input id="scQ" type="search" placeholder="بحث في الأنشطة" value="${esc(F.q)}">${F.view === 'gantt' ? `<div class="seg">${Object.keys(SCH.zoom).map(z => `<button type="button" data-z="${z}" class="${z === F.zoom ? 'on' : ''}">${z}</button>`).join('')}</div>` : ''}${F.stf ? `<button id="scXf">✕ ${SST[F.stf][1]} بس</button>` : ''}</div><div id="gantt"></div>` : ''}`;
+  ${A.length ? `<div class="filters" style="margin-top:12px"><div class="seg"><button type="button" data-vw="gantt" class="${F.view === 'gantt' ? 'on' : ''}">📊 مخطط زمني</button><button type="button" data-vw="list" class="${F.view === 'list' ? 'on' : ''}">☰ قائمة</button></div>${(P.proj.buildings || []).length > 1 ? `<select id="scB"><option value="">كل المباني</option>${P.proj.buildings.map(b => `<option${b === F.b ? ' selected' : ''}>${esc(b)}</option>`).join('')}</select>` : ''}<input id="scQ" type="search" placeholder="بحث في الأنشطة" value="${esc(F.q)}">${F.view === 'gantt' ? `<div class="seg">${Object.keys(SCH.zoom).map(z => `<button type="button" data-z="${z}" class="${z === F.zoom ? 'on' : ''}">${z}</button>`).join('')}</div>` : ''}${F.stf ? `<button id="scXf">✕ ${SST[F.stf][1]} بس</button>` : ''}</div><div id="gantt"></div>
+  <div class="secT" style="display:flex;justify-content:space-between;align-items:center;gap:8px">⏱ أسباب التأخير والتمديد الزمني ${ed ? '<button class="p xs" id="dAdd">+ تأخير بسبب خارج عن الشركة</button>' : ''}</div>
+  <p class="mut" style="font-size:12px;margin-top:-4px">التأخير اللي سببه ظروف الموقع (النزح والمياه)، أو المالك، أو التصاريح، أو الاستشاري، بيتسجل هنا بأيامه ومستنداته. أيامه بتتخصم من التأخير المحسوب على الشركة، وبتتعرض على الاستشاري يعتمدها كتمديد.</p>
+  <div class="card" id="dBox" style="padding:0"><div class="scroll"><table class="stack"><thead><tr><th>النشاط</th><th>السبب</th><th class="n">أيام</th><th>الفترة</th><th>الحالة</th><th></th></tr></thead><tbody>${D.map(d => { const x = P.sch.byId[d.activity_id], [c, l] = DST[d.status], doc = d.doc_id && (P.docs || []).find(y => y.id === d.doc_id); return `<tr><td data-l="النشاط">${x ? esc(x.name) : '<span class="mut">المشروع كله</span>'}</td><td data-l="السبب"><b class="${d.cause === 'contractor' ? 'bad' : ''}">${DCAUSE[d.cause]}</b>${d.description ? `<div class="mut" style="font-size:12px">${esc(d.description)}</div>` : ''}${doc ? docChip(doc) : ''}</td><td class="n" data-l="أيام"><b>${d.days}</b>${d.affects_finish ? '' : '<div class="mut" style="font-size:11px">مش مأثر على النهاية</div>'}</td><td data-l="الفترة">${d.from_date ? fmtD(d.from_date) + (d.to_date ? ' ← ' + fmtD(d.to_date) : '') : '–'}</td><td data-l="الحالة"><span class="st ${c}">${l}</span>${d.review_note ? `<div class="mut" style="font-size:12px">${esc(d.review_note)}</div>` : ''}</td><td class="qa">${rv && d.status === 'claimed' ? `<button class="p xs" data-dok="${d.id}">✔ اعتماد</button><button class="danger xs" data-dno="${d.id}">رفض</button>` : ''}${ed && d.status !== 'approved' ? `<button class="xs" data-ded="${d.id}">تعديل</button><button class="danger xs" data-ddl="${d.id}">حذف</button>` : ''}</td></tr>`; }).join('') || `<tr><td colspan="6" class="mut">لسه مفيش تأخيرات متسجلة.${slip > 0 ? ' المشروع متأخر ' + slip + ' يوم عن خط الأساس – لو جزء منهم بسبب النزح والمياه أو ظروف الموقع سجّله هنا.' : ''}</td></tr>`}</tbody></table></div></div>` : ''}`;
   if (A.length) drawGantt();
   const on = (id, ev, fn) => { const e = $(id); if (e) e[ev] = fn; };
   on('#scQ', 'onchange', e => { F.q = e.target.value.trim(); drawGantt(); }); on('#scXf', 'onclick', () => { F.stf = ''; renderSchedule(); });
   document.querySelectorAll('[data-stf]').forEach(b => b.onclick = () => { F.stf = F.stf === b.dataset.stf ? '' : b.dataset.stf; renderSchedule(); });
-  document.querySelectorAll('[data-vw]').forEach(b => b.onclick = () => { F.view = b.dataset.vw; renderSchedule(); }); on('#scB', 'onchange', e => { F.b = e.target.value; drawGantt(); });
+  document.querySelectorAll('[data-vw]').forEach(b => b.onclick = () => { F.view = b.dataset.vw; renderSchedule(); });
+  on('#dAdd', 'onclick', () => delayForm(null));
+  $('#dBox') && ($('#dBox').onclick = async e => { const b = e.target.closest('[data-dok],[data-dno],[data-ded],[data-ddl]'); if (!b) return; const D = P.sch.D, id = b.dataset.dok || b.dataset.dno || b.dataset.ded || b.dataset.ddl, d = D.find(x => x.id === id);
+    if (b.dataset.ded) return delayForm(d);
+    if (b.dataset.ddl) { if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'متأكد؟'; return; } const { error } = await S.sb.from('schedule_delays').delete().eq('id', id); return error ? toast(error.message) : renderSchedule(); }
+    const ok = !!b.dataset.dok, n = ok ? null : await askNote('سبب الرفض', 'مثلاً: المستندات مش كافية'); if (!ok && !n) return;
+    const { error } = await S.sb.from('schedule_delays').update({ status: ok ? 'approved' : 'rejected', review_note: n }).eq('id', id); if (error) return toast(error.message); toast(ok ? 'اتعمد التمديد' : 'اترفض'); renderSchedule(); }); on('#scB', 'onchange', e => { F.b = e.target.value; drawGantt(); });
   document.querySelectorAll('[data-z]').forEach(b => b.onclick = () => { F.zoom = b.dataset.z; document.querySelectorAll('[data-z]').forEach(x => x.classList.toggle('on', x === b)); drawGantt(); });
   on('#scAdd', 'onclick', () => editActivity(null)); on('#scX', 'onclick', exportSchedule); on('#scCalc', 'onclick', recalcSchedule); on('#scBase', 'onclick', saveBaseline);
   on('#scImp', 'onchange', e => { const f = e.target.files[0]; e.target.value = ''; if (f) importMsp(f); });
 }
 
+function delayForm(x) { x ||= {}; const P = S.P, A = P.sch.A, d = document.createElement('dialog'); d.className = 'adlg';
+  d.innerHTML = `<div class="dh"><h3 style="margin:0;font-size:17px">${x.id ? 'تعديل تأخير' : 'تأخير بسبب خارج عن الشركة'}</h3><button type="button" class="dx">✕</button></div><form class="grid" style="margin-top:12px">
+    <label class="wide">النشاط المتأثر<select name="act"><option value="">— المشروع كله —</option>${A.map(a => `<option value="${a.id}"${a.id === x.activity_id ? ' selected' : ''}>${esc((a.wbs ? a.wbs + ' ' : '') + a.name)}${a.slip > 0 ? ` (متأخر ${a.slip} يوم عن خط الأساس)` : ''}</option>`).join('')}</select></label>
+    <label class="wide">السبب<select name="cause">${Object.entries(DCAUSE).map(([k, l]) => `<option value="${k}"${k === (x.cause || 'dewatering') ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+    <label>من<input type="date" name="from" value="${x.from_date || ''}"></label><label>لحد<input type="date" name="to" value="${x.to_date || ''}"></label>
+    <label>عدد أيام العمل المتأثرة<input type="number" name="days" min="0" step="1" required value="${x.days ?? ''}"></label>
+    <label class="chk" style="align-self:end"><input type="checkbox" name="fin"${x.affects_finish === false ? '' : ' checked'}> بيأثر على نهاية المشروع</label>
+    <label class="wide">الوصف والمستند<input name="desc" value="${esc(x.description || '')}" placeholder="مثلاً: ارتفاع منسوب المياه الجوفية – تشغيل طلمبات النزح 24 ساعة ووقف الحفر"></label>
+    <label class="wide">مرفق (محضر / خطاب / صور)${x.doc_id ? ' – <span class="mut">فيه مرفق</span>' : ''}<input type="file" name="file" accept="${DOC_ACCEPT}"></label>
+    <p class="mut wide" style="font-size:12px;margin:0">لو حددت "من" و"لحد" عدد الأيام بيتحسب لوحده (أيام عمل من السبت للخميس). بعد الحفظ بيتبعت للاستشاري يعتمده.</p>
+    <div class="acts wide" style="margin:0"><button class="p">حفظ</button></div></form>`;
+  document.body.append(d); d.showModal(); const f = d.querySelector('form'), calc = () => { if (f.from.value && f.to.value && f.to.value >= f.from.value) f.days.value = workDays(TD(f.from.value), TD(f.to.value)); }; f.from.onchange = f.to.onchange = calc;
+  d.onclick = e => { if (e.target === d || e.target.closest('.dx')) { d.close(); d.remove(); } };
+  f.onsubmit = async e => { e.preventDefault(); const rec = { project_id: P.id, activity_id: f.act.value || null, cause: f.cause.value, from_date: f.from.value || null, to_date: f.to.value || null, days: +f.days.value || 0, affects_finish: f.fin.checked, description: f.desc.value.trim() || null };
+    const file = f.file.files[0]; if (file) { const m = { kind: 'other', title: 'تأخير – ' + DCAUSE[rec.cause], doc_date: rec.from_date || today() }; await uploadDocs([file], m); if (m.ids?.[0]) rec.doc_id = m.ids[0]; }
+    if (x.id && x.status === 'rejected') rec.status = 'claimed';
+    const { error } = x.id ? await S.sb.from('schedule_delays').update(rec).eq('id', x.id) : await S.sb.from('schedule_delays').insert(rec); if (error) return toast(error.message); d.close(); d.remove(); toast('اتسجل'); renderSchedule(); }; }
 function drawGantt() {
   const P = S.P, { A } = P.sch, F = scdInit(), now = TD(today());
   const match = x => (!F.q || x.name.includes(F.q) || (x.wbs || '').startsWith(F.q)) && (!F.b || x.building === F.b || x.kids.length) && (!F.stf || x.st === F.stf);
@@ -3017,7 +3054,7 @@ function drawGantt() {
   const ds = A.flatMap(x => [x.s, x.f, x.bs, x.bf]).filter(Boolean); if (!ds.length) return $('#gantt').innerHTML = '<p class="mut">الأنشطة مفيهاش تواريخ.</p>';
   if (F.view === 'list') { const one = x => { const d = x.bf && x.f ? workDays(Math.min(x.f, x.bf), Math.max(x.f, x.bf)) * Math.sign(x.f - x.bf) : 0, [c, l] = SST[x.st];
       return `<div class="scard ${x.st}${x.kids.length ? ' sum' : ''}" style="margin-inline-start:${(x.outline_level - 1) * 14}px" data-open="${x.id}"><div class="sct"><b>${x.wbs ? `<small class="mut">${esc(x.wbs)}</small> ` : ''}${esc(x.name)}</b><span class="st ${c}">${l}</span></div>
-      <div class="scd">📅 ${fmtD(x.start)} ← ${fmtD(x.finish)}${x.dur ? ` <span class="mut">(${x.dur} يوم عمل)</span>` : ''}${d ? ` <span class="${d > 0 ? 'bad' : 'ok'}">${d > 0 ? '+' : ''}${d} يوم عن خط الأساس</span>` : ''}</div>
+      <div class="scd">📅 ${fmtD(x.start)} ← ${fmtD(x.finish)}${x.dur ? ` <span class="mut">(${x.dur} يوم عمل)</span>` : ''}${d ? ` <span class="${d > 0 ? (x.exc >= d ? 'excu' : 'bad') : 'ok'}">${d > 0 ? '+' : ''}${d} يوم عن خط الأساس</span>` : ''}${x.exc ? ` <span class="excu">· ${x.exc} يوم معذور (${(P.sch.D || []).filter(z => z.activity_id === x.id && dExc(z)).map(z => DCAUSE[z.cause]).filter((v, i, a) => a.indexOf(v) === i).join('، ')})</span>` : ''}</div>
       <div class="scbars sm"><div><span>الفعلي</span><div class="bar"><u style="width:${(x.act || 0) * 100}%"></u></div><b>${x.act == null ? '–' : Math.round(x.act * 100) + '%'}</b></div><div><span>المخطط</span><div class="bar pl"><u style="width:${x.plan * 100}%"></u></div><b>${Math.round(x.plan * 100)}%</b></div></div>${x.fromPh ? '<small class="mut">النسبة من المرحلة المربوطة</small>' : ''}</div>`; };
     $('#gantt').innerHTML = `<div class="sclist">${rows.map(one).join('') || '<p class="mut">مفيش أنشطة بالفلتر ده.</p>'}</div>`;
     $('#gantt').onclick = e => { const o = e.target.closest('[data-open]'); if (o) editActivity(P.sch.byId[o.dataset.open]); }; return; }
@@ -3037,7 +3074,7 @@ function drawGantt() {
   <div class="gr gh"><div class="gi"><span class="gn">النشاط</span><span class="gd">البداية</span><span class="gd">النهاية</span><span class="gp">الفعلي</span></div><div class="gl">${head}</div></div>
   ${rows.map(x => `<div class="gr${x.kids.length ? ' sum' : ''}" data-id="${x.id}"><div class="gi"><span class="gn" style="padding-inline-start:${(x.outline_level - 1) * 14 + 6}px">${x.kids.length ? `<button type="button" class="tg" data-tg="${x.id}">${F.closed.has(x.id) && !F.q && !F.late ? '◂' : '▾'}</button>` : ''}<a href="#" data-open="${x.id}" title="${esc(x.name)}">${x.wbs ? `<small>${esc(x.wbs)}</small> ` : ''}${esc(x.name)}</a></span><span class="gd">${fmtD(x.start)}</span><span class="gd">${fmtD(x.finish)}</span><span class="gp">${x.act == null ? '<span class="mut">–</span>' : `<b>${Math.round(x.act * 100)}%</b>`}${!x.kids.length ? ` <span class="st ${SST[x.st][0]}">${SST[x.st][1]}</span>` : ''}</span></div><div class="gl">${bar(x)}</div></div>`).join('')}
   <div class="gbg" style="height:${(rows.length + 1) * SCH.rowH}px">${grid}${now >= t0 && now <= t1 ? `<s style="right:${X(now)}px" title="النهارده"></s>` : ''}</div></div></div>
-  <div class="leg"><span><i style="background:var(--acc)"></i>الفعلي</span><span><i style="background:var(--conc)"></i>المخطط</span><span><i style="background:var(--bad)"></i>متأخر</span><span><i style="background:var(--mut);height:3px"></i>خط الأساس</span><span><i style="background:var(--acc);width:2px"></i>النهارده</span></div>`;
+  <div class="leg"><span><i style="background:var(--acc)"></i>الفعلي</span><span><i style="background:var(--conc)"></i>المخطط</span><span><i style="background:var(--bad)"></i>متأخر</span><span><i style="background:#1f5fae"></i>معذور (ظروف خارجة عن الشركة)</span><span><i style="background:var(--mut);height:3px"></i>خط الأساس</span><span><i style="background:var(--acc);width:2px"></i>النهارده</span></div>`;
   const wrap = $('#gantt .gwrap'); if (!F.scrolled) { wrap.scrollLeft = -(X(now) - wrap.clientWidth / 2); }
   $('#gantt').onclick = e => { const tg = e.target.closest('[data-tg]'); if (tg) { F.closed.has(tg.dataset.tg) ? F.closed.delete(tg.dataset.tg) : F.closed.add(tg.dataset.tg); return drawGantt(); }
     const o = e.target.closest('[data-open]'); if (o) { e.preventDefault(); editActivity(P.sch.byId[o.dataset.open]); } };

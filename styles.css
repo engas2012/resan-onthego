@@ -504,3 +504,6 @@ details.sctools{margin-top:12px;border:1px dashed var(--line);border-radius:10px
 .sct{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.scd{font-size:13px}.scd .bad{color:var(--bad);font-weight:700}.scd .ok{color:#1d7a4f;font-weight:700}
 .gl i.yr{border-right:2px solid var(--mut);font-weight:700;color:var(--ink,#1b1c1e)}.gp b{font-size:13px}
 @media(max-width:800px){.sckp{grid-template-columns:1fr}}
+.st.exc{background:#e3eefc;color:#1f5fae}.scv.exc{color:#1f5fae}.scsplit{display:flex;flex-direction:column;gap:2px;font-size:13px;font-weight:700}.scsplit .exc,.excu{color:#1f5fae}.scsplit .bad{color:var(--bad)}.scsplit .ok{color:#1d7a4f}
+.scard.exc{border-inline-start-color:#1f5fae}.scst .exc b{color:#1f5fae}.gl .br.exc{outline:2px solid #1f5fae;outline-offset:-2px}
+.otiles .exc{background:#e3eefc}.otiles .exc b{color:#1f5fae}
