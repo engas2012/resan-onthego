@@ -66,7 +66,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.13.2</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.14.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -1518,7 +1518,7 @@ const IST = { draft: ['pend', 'مسودة'], submitted: ['run', 'اتقدّم ل
 const lnVal = l => l.kind !== 'line' ? 0 : ICUM(l.cat) ? (+l.prev_qty + +l.cur_qty) * +l.rate * +l.pct : +l.cur_qty * +l.rate * +l.pct;
 const lnCur = l => l.kind !== 'line' ? 0 : ICUM(l.cat) ? lnVal(l) - +l.prev_value : lnVal(l);
 const invTot = L => { const t = { design: 0, contract: 0, supply: 0, extra: 0, cumDesign: 0, cumContract: 0, prevContract: 0, prevDesign: 0 }; L.forEach(l => { t[l.cat] += lnCur(l); if (l.cat === 'contract') { t.cumContract += lnVal(l); t.prevContract += +l.prev_value; } if (l.cat === 'design') { t.cumDesign += lnVal(l); t.prevDesign += +l.prev_value; } }); return t; };
-const invSum = i => +i.amt_design + +i.amt_contract + +i.amt_supply + +i.amt_extra;
+const invSum = i => +i.amt_design + +i.amt_contract + +i.amt_supply + +i.amt_extra + (+i.owner_adj || 0);
 const invPay = i => { const w = invSum(i); return { works: w, worksPay: w * +i.pay_pct, fee: w * +i.fee_pct, net: w * +i.pay_pct + w * +i.fee_pct }; };
 /* ---------------- accounts: invoices, payments received per invoice, advance payments, actual cost ---------------- */
 const PAYK = { advance: 'دفعة مقدمة', invoice: 'دفعة مستخلص', other: 'دفعة أخرى' }, PAYM = ['تحويل بنكي', 'شيك', 'نقدي', 'إيداع'];
@@ -2270,15 +2270,16 @@ async function renderInv() {
   $('#main').innerHTML = '<p class="mut">جاري التحميل…</p>';
   const { data, error } = await S.sb.from('owner_invoices').select('*').eq('project_id', P.id).order('no');
   if (error) return $('#main').innerHTML = `<div class="note">${esc(error.message)}</div>`;
-  const I = data || [], last = I[I.length - 1], tot = I.reduce((a, i) => { Object.keys(ICAT).forEach(k => a[k] += +i['amt_' + k]); return a; }, { design: 0, contract: 0, supply: 0, extra: 0 }), all = Object.values(tot).reduce((a, b) => a + b, 0);
+  const I = data || [], last = I[I.length - 1], tot = I.reduce((a, i) => { Object.keys(ICAT).forEach(k => a[k] += +i['amt_' + k]); return a; }, { design: 0, contract: 0, supply: 0, extra: 0 }), all = I.reduce((s, i) => s + invSum(i), 0), adjT = I.reduce((s, i) => s + (+i.owner_adj || 0), 0);
   const paidNet = I.filter(i => i.status !== 'draft').reduce((s, i) => s + invPay(i).net, 0);
   $('#main').innerHTML = `<div class="sthead"><div><h2 style="margin:0">مستخلصات المالك</h2><p class="mut" style="margin:2px 0 0;font-size:13px">بنظام التكلفة + أتعاب الشركة. كل مستخلص بيكمّل كميات اللي قبله تلقائياً.</p></div>${ed ? '<button id="ivNew" class="p">+ مستخلص جديد</button>' : ''}</div>
   <div class="kpis"><div class="kpi"><b>${I.length}</b><span>مستخلص</span></div><div class="kpi"><b>${nf(all / 1e6, 2)}<small> م</small></b><span>إجمالي الأعمال</span></div><div class="kpi k-ok"><b>${nf(paidNet / 1e6, 2)}<small> م</small></b><span>إجمالي المستحق صرفه</span></div><div class="kpi"><b>${last ? nf(invPay(last).net, 0) : '–'}</b><span>صافي آخر مستخلص${last ? ' (' + last.no + ')' : ''}</span></div></div>
   ${I.length ? `<div class="card" style="padding:0"><div class="scroll"><table class="ivsum"><thead><tr><th>البند</th>${I.map(i => `<th class="n"><a href="#" data-iv="${i.id}">مستخلص ${i.no}</a></th>`).join('')}<th class="n">الإجمالي</th></tr></thead><tbody>
     ${Object.entries(ICAT).map(([k, l]) => `<tr><td>${l}</td>${I.map(i => `<td class="n">${nf(i['amt_' + k], 0)}</td>`).join('')}<td class="n"><b>${nf(tot[k], 0)}</b></td></tr>`).join('')}
-    <tr class="tot"><td>إجمالي الأعمال</td>${I.map(i => `<td class="n">${nf(invSum(i), 0)}</td>`).join('')}<td class="n">${nf(all, 0)}</td></tr>
+    ${adjT || I.some(i => +i.owner_adj) ? `<tr><td title="الفرق بين المقدّم واللي المالك اعتمده في كشفه">تعديل المالك</td>${I.map(i => `<td class="n"${i.owner_adj_note ? ` title="${esc(i.owner_adj_note)}"` : ''} style="color:${+i.owner_adj < 0 ? 'var(--bad)' : 'inherit'}">${Math.abs(+i.owner_adj) >= 1 ? nf(i.owner_adj, 0) : '–'}</td>`).join('')}<td class="n"><b>${nf(adjT, 0)}</b></td></tr>` : ''}
+    <tr class="tot"><td>إجمالي الأعمال المعتمد</td>${I.map(i => `<td class="n">${nf(invSum(i), 0)}</td>`).join('')}<td class="n">${nf(all, 0)}</td></tr>
     <tr><td class="mut">المستحق صرفه</td>${I.map(i => `<td class="n mut">${nf(invPay(i).net, 0)}</td>`).join('')}<td class="n mut">${nf(paidNet, 0)}</td></tr></tbody></table></div></div>` : '<div class="note">لسه مفيش مستخلصات للمشروع ده.</div>'}
-  <div class="ivlist">${[...I].reverse().map(i => { const p = invPay(i); return `<a href="#" class="ivcard" data-iv="${i.id}"><div class="ivno">${i.no}</div><div style="flex:1;min-width:0"><b>${esc(i.title || 'مستخلص جاري ' + i.no)}</b> <span class="st ${IST[i.status][0]}">${IST[i.status][1]}</span><div class="mut" style="font-size:12px">${i.inv_date ? fmtD(i.inv_date) : 'بدون تاريخ'}${i.legacy ? ' · مستخلص سابق (إجماليات بس)' : ''}</div></div><div style="text-align:left"><div class="mut" style="font-size:11px">الأعمال ${nf(p.works, 0)}</div><b>${nf(p.net, 0)}</b><div class="mut" style="font-size:11px">مستحق صرفه</div></div></a>`; }).join('')}</div>`;
+  <div class="ivlist">${[...I].reverse().map(i => { const p = invPay(i); return `<a href="#" class="ivcard" data-iv="${i.id}"><div class="ivno">${i.no}</div><div style="flex:1;min-width:0"><b>${esc(i.title || 'مستخلص جاري ' + i.no)}</b> <span class="st ${IST[i.status][0]}">${IST[i.status][1]}</span><div class="mut" style="font-size:12px">${i.inv_date ? fmtD(i.inv_date) : 'بدون تاريخ'}${i.legacy ? ' · مستخلص سابق (إجماليات بس)' : ''}${Math.abs(+i.owner_adj) >= 1 ? ` · <span style="color:${+i.owner_adj < 0 ? 'var(--bad)' : 'var(--ok)'}">تعديل المالك ${nf(i.owner_adj, 0)}</span>` : ''}</div></div><div style="text-align:left"><div class="mut" style="font-size:11px">الأعمال ${nf(p.works, 0)}</div><b>${nf(p.net, 0)}</b><div class="mut" style="font-size:11px">مستحق صرفه</div></div></a>`; }).join('')}</div>`;
   $('#main').onclick = e => { const a = e.target.closest('[data-iv]'); if (!a) return; e.preventDefault(); V.id = a.dataset.iv; V.tab = 'summary'; V.edit = false; renderInv(); };
   $('#ivNew') && ($('#ivNew').onclick = async () => {
     const no = (last?.no || 0) + 1; $('#ivNew').disabled = true;
@@ -2338,7 +2339,7 @@ async function renderInvOne() {
   const lock = inv.status !== 'draft', canEd = ed && !lock;
   if (!V.L || V.loaded !== V.id) { V.L = (LL || []).map(l => ({ ...l })); V.loaded = V.id; V.del = []; }
   const L = V.L, T = invTot(L), useLines = L.length > 0 || !inv.legacy;
-  const amt = k => useLines ? T[k] : +inv['amt_' + k], works = Object.keys(ICAT).reduce((s, k) => s + amt(k), 0), pay = works * +inv.pay_pct, fee = works * +inv.fee_pct;
+  const amt = k => useLines ? T[k] : +inv['amt_' + k], adj = +inv.owner_adj || 0, works = Object.keys(ICAT).reduce((s, k) => s + amt(k), 0) + adj, pay = works * +inv.pay_pct, fee = works * +inv.fee_pct;
   const E = V.edit && canEd, inp = (l, f, w = 90, ty = 'number') => E ? `<input data-l="${l._i}" data-f="${f}" type="${ty}" step="any" value="${esc(l[f] ?? '')}" style="width:${w}px">` : '';
   L.forEach((l, k) => l._i = k);
   const catTable = c => { const R = L.filter(l => l.cat === c), cum = ICUM(c);
@@ -2351,7 +2352,7 @@ async function renderInvOne() {
     return `<div class="scroll"><table class="ivt"><thead><tr><th>البند</th><th>الوحدة</th><th class="n">الفئة</th>${cum ? '<th class="n">السابق</th>' : ''}<th class="n">الحالي</th>${cum ? '<th class="n">إجمالي الكميات</th>' : ''}<th class="n">${cum ? 'نسبة الإنجاز' : 'نسبة الصرف'}</th><th class="n">قيمة الصرف</th><th>ملاحظات</th>${E ? '<th></th>' : ''}</tr></thead><tbody>${R.map(row).join('') || `<tr><td colspan="10" class="mut">مفيش بنود.</td></tr>`}</tbody></table></div>
       <div class="ivfoot">${cum ? `<span>الإجمالي التراكمي <b>${nf(c === 'contract' ? T.cumContract : T.cumDesign, 0)}</b></span><span>السابق <b>${nf(c === 'contract' ? T.prevContract : T.prevDesign, 0)}</b></span>` : ''}<span class="cur">الحالي <b id="ivCurT">${nf(T[c], 0)}</b></span></div>
       ${E ? `<div class="acts"><button type="button" class="p" data-pick="${c}">+ بنود من المقايسة</button><button type="button" data-add="line|${c}">+ بند يدوي</button><button type="button" data-add="head1|${c}">+ عنوان رئيسي</button><button type="button" data-add="head2|${c}">+ عنوان فرعي</button>${c === 'contract' ? '<button type="button" id="ivPull">⬇ الكميات الحالية من التقارير المعتمدة</button><button type="button" id="ivSubs">⬇ من مستخلصات المقاولين</button>' : ''}${c === 'supply' || c === 'extra' ? '<button type="button" id="ivLedger">⬇ من قيود الحسابات</button>' : ''}</div>` : ''}`; };
-  const summary = `<div class="ivpay card"><table><tbody>${Object.entries(ICAT).map(([k, l]) => `<tr><td>${l}</td><td class="n">${nf(amt(k), 0)}</td></tr>`).join('')}<tr class="tot"><td>إجمالي الأعمال عن ${esc(inv.title || '')}</td><td class="n">${nf(works, 0)}</td></tr>
+  const summary = `<div class="ivpay card"><table><tbody>${Object.entries(ICAT).map(([k, l]) => `<tr><td>${l}</td><td class="n">${nf(amt(k), 0)}</td></tr>`).join('')}${Math.abs(adj) >= 1 ? `<tr><td>تعديل المالك${inv.owner_adj_note ? `<div class="mut" style="font-size:11px">${esc(inv.owner_adj_note)}</div>` : ''}</td><td class="n" style="color:${adj < 0 ? 'var(--bad)' : 'inherit'}">${nf(adj, 0)}</td></tr>` : ''}<tr class="tot"><td>إجمالي الأعمال عن ${esc(inv.title || '')}</td><td class="n">${nf(works, 0)}</td></tr>
     <tr><td>نسبة الصرف من الأعمال ${E ? `<input id="ivPay" type="number" step="any" value="${Math.round(inv.pay_pct * 100)}" style="width:70px">%` : `<b>${Math.round(inv.pay_pct * 100)}%</b>`} <span class="mut" style="font-size:12px">(الباقي مخصوم من الدفعة المقدمة)</span></td><td class="n">${nf(pay, 0)}</td></tr>
     <tr><td>نسبة الشركة ${E ? `<input id="ivFee" type="number" step="any" value="${Math.round(inv.fee_pct * 1000) / 10}" style="width:70px">%` : `<b>${Math.round(inv.fee_pct * 1000) / 10}%</b>`} من الأعمال – تُصرف 100%</td><td class="n">${nf(fee, 0)}</td></tr>
     <tr class="net"><td>المستحق صرفه</td><td class="n">${nf(pay + fee, 0)}</td></tr></tbody></table>
