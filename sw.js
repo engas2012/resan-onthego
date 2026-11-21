@@ -1,5 +1,5 @@
 // RESAN On the go — service worker: installable app, offline shell, push notifications.
-const CACHE = 'resan-v24', SHELL = ['./', './index.html', './app.js', './styles.css', './config.js', './study.js', './logo-dark.png', './logo-light.png', './icon-192.png', './manifest.webmanifest'];
+const CACHE = 'resan-v25', SHELL = ['./', './index.html', './app.js', './styles.css', './config.js', './study.js', './logo-dark.png', './logo-light.png', './icon-192.png', './manifest.webmanifest'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).catch(() => {})); self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 // network-first for our own files (always fresh when online), cache fallback when offline; never touch API calls
