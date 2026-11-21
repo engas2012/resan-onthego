@@ -66,7 +66,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.13.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.13.1</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -796,13 +796,19 @@ async function loadSchLite() { const P = S.P; if (P.schLite?.pid === P.id) retur
   const links = {}; (l.data || []).forEach(x => (links[x.activity_id] ||= new Set()).add(x.item_id)); P.schLite = { pid: P.id, A: a.data || [], links, parents: new Set((a.data || []).map(x => x.parent_id).filter(Boolean)) }; }
 function addActRow(v = {}) { const P = S.P, it = v.item && P.items.find(i => i.id === v.item), d = document.createElement('div'); d.className = 'row arow2'; d.dataset.k = 'act';
   const mode = v.mode || (it && !(+it.qty > 0) ? 'pct' : 'qty'), val = mode === 'pct' ? v.pct ?? '' : v.qty ?? '';
-  d.innerHTML = `<label class="wide">البند من المقايسة<input data-n="pick" list="itemDL" placeholder="اكتب كود البند أو جزء من اسمه واختار…" value="${it ? esc(itLabel(it)) : v.item ? '' : esc(v.work || '')}"></label>
-    <label>بسجّل<select data-n="mode"><option value="qty"${mode === 'qty' ? ' selected' : ''}>كمية اتنفذت النهارده</option><option value="pct"${mode === 'pct' ? ' selected' : ''}>البند وصل لنسبة %</option></select></label>
+  const ph0 = it ? it.phase_n : S.lastPh ?? (P.phaseProg.find(x => x.pct > 0 && x.pct < .995) || P.phaseProg[0])?.n;
+  d.innerHTML = `<label>المرحلة<select data-n="ph"><option value="">كل المراحل</option>${P.phaseProg.map(x => `<option value="${x.n}"${x.n === ph0 ? ' selected' : ''}>${x.n}. ${esc(x.name)}</option>`).join('')}</select></label>
+    <label class="wide acwrap">البند<input data-n="pick" autocomplete="off" placeholder="اكتب كلمة من اسم البند أو الكود…" value="${it ? esc(itLabel(it)) : v.item ? '' : esc(v.work || '')}"><div class="acl" hidden></div></label>
+    <label>بسجّل<select data-n="mode"><option value="qty"${mode === 'qty' ? ' selected' : ''}>كمية النهارده</option><option value="pct"${mode === 'pct' ? ' selected' : ''}>وصل لنسبة %</option></select></label>
     <label><span data-u>${mode === 'pct' ? 'النسبة %' : 'الكمية' + (it ? ' (' + esc(it.unit) + ')' : '')}</span><input data-n="val" type="number" step="any" inputmode="decimal" value="${val}"></label>
     <label class="wide">وصف الشغل (اختياري)<input data-n="work" value="${it ? esc(v.desc || '') : ''}" placeholder="مثلاً: صب أعمدة الدور الرابع محور A–C"></label><button type="button" class="x">حذف</button><div class="hint"></div>`;
-  $('#aRows').append(d); actHint(d); }
-function actHint(d) { const P = S.P, pk = d.querySelector('[data-n=pick]'), it = itByLabel(pk.value), h = d.querySelector('.hint'), md = d.querySelector('[data-n=mode]'), val = +d.querySelector('[data-n=val]').value || 0;
-  d.dataset.item = it ? it.id : ''; d.querySelector('[data-u]').textContent = md.value === 'pct' ? 'النسبة اللي وصلها %' : 'الكمية' + (it ? ' (' + it.unit + ')' : '');
+  if (it) d.dataset.item = it.id; $('#aRows').append(d); actHint(d); }
+function acShow(d) { const P = S.P, inp = d.querySelector('[data-n=pick]'), box = d.querySelector('.acl'), ph = d.querySelector('[data-n=ph]').value, T = normAr(inp.value).split(/\s+/).filter(w => w.length > 1).map(w => w.length > 4 ? w.replace(/^(وال|بال|لل|ال)/, '') : w);
+  const L = P.items.filter(i => (!ph || i.phase_n === +ph) && (!T.length || T.every(t => normAr(i.code + ' ' + i.name + ' ' + (i.group_name || '') + ' ' + (i.building || '')).includes(t)))).slice(0, 60);
+  box.innerHTML = L.length ? L.map(i => { const p = itPct(i); return `<div class="aco" data-pick="${esc(i.id)}"><div><span class="tcode">${esc(i.code)}</span> ${esc(i.name)}</div><small>${esc(i.group_name || '')}${(P.proj.buildings || []).length > 1 && i.building ? ' · ' + esc(i.building) : ''} · ${+i.qty > 0 ? nf(i.ex || 0) + ' من ' + nf(i.qty) + ' ' + esc(i.unit) : esc(i.unit || '') + ' – بالنسبة'} · <b class="${p >= 1 ? 'ok' : ''}">${Math.round(p * 100)}%</b></small></div>`; }).join('') : `<div class="aco none">مفيش بنود ${ph ? 'في المرحلة دي ' : ''}فيها الكلمة دي${ph ? ' – جرّب "كل المراحل"' : ''}</div>`;
+  box.hidden = false; }
+function actHint(d) { const P = S.P, pk = d.querySelector('[data-n=pick]'), it = P.items.find(i => i.id === d.dataset.item), h = d.querySelector('.hint'), md = d.querySelector('[data-n=mode]'), val = +d.querySelector('[data-n=val]').value || 0;
+  d.querySelector('[data-u]').textContent = md.value === 'pct' ? 'النسبة اللي وصلها %' : 'الكمية' + (it ? ' (' + it.unit + ')' : '');
   if (!it) { h.innerHTML = pk.value.trim() ? '<span class="warn">⚠ ده مش بند في المقايسة – هيتسجل كملاحظة ومش هيتحسب على أي نسبة. اختار البند من القايمة.</span>' : ''; return; }
   const ph = P.phaseProg.find(x => x.n === it.phase_n), a = actOf(it), p0 = itPct(it), p1 = md.value === 'pct' ? Math.min(val / 100, 1) : +it.qty > 0 ? Math.min(((+it.ex || 0) + val) / +it.qty, 1) : p0;
   h.innerHTML = `<b>${+it.qty > 0 ? `المنفذ ${nf(it.ex || 0)} من ${nf(it.qty)} ${esc(it.unit)}` : 'بند من غير كمية – بيتسجل بالنسبة'} · ${Math.round(p0 * 100)}%${val ? ` ← <span class="ok">${Math.round(p1 * 100)}% بعد التقرير</span>` : ''}</b><br><span class="mut">المرحلة: ${ph ? ph.n + '. ' + esc(ph.name) : '–'}${a ? ' · الجدول الزمني: ' + esc(a.name) : ''}${md.value === 'pct' && +it.qty > 0 && val ? ` · = ${nf(Math.max(val / 100 * it.qty - (+it.ex || 0), 0))} ${esc(it.unit)}` : ''}</span>`; }
@@ -814,10 +820,10 @@ const collect = k => [...document.querySelectorAll(ROW[k].box + ' .row')].map(d 
 function renderReport(r) {
   const P = S.P; r = r || P.reports.find(x => x.report_date === today());
   $('#main').innerHTML = `<h2>${r ? 'تقرير ' + r.report_date : 'تقرير يومي جديد'}</h2><p class="mut">يكتبه مهندس الموقع ويوصل للمكتب الفني. كل شغل بيتسجل على بند من المقايسة، وبعد الاعتماد نسبة البند والمرحلة والجدول الزمني بيتحدّثوا لوحدهم.</p><div class="note" id="fState" hidden></div>
-  <datalist id="itemDL">${P.items.map(i => `<option value="${esc(itLabel(i))}">`).join('')}</datalist><datalist id="engDL"></datalist>
+  <datalist id="engDL"></datalist>
   <form id="rf"><div class="card grid"><label>التاريخ<input type="date" id="fDate" value="${r ? r.report_date : today()}" required></label><label>مهندس التنفيذ<input id="fEng" list="engDL" required placeholder="اسم المهندس"></label><label>موعد الوصول<input type="time" id="fArr"></label><label>حالة الطقس<select id="fSky"><option value="">—</option><option value="sunny">مشمس</option><option value="cloudy">غائم</option><option value="windy">رياح</option><option value="rain">ممطر</option></select></label><label>درجة الحرارة<input type="number" id="fTemp" inputmode="numeric" placeholder="°م"></label></div>
   <h3>الطاقم الفني للمقاول بالموقع</h3><div class="card staffgrid">${STAFF_POS.map(([k, l]) => `<label>${l}<input type="number" min="0" inputmode="numeric" data-sp="${k}"></label>`).join('')}</div>
-  <h3>الأعمال اللي اتنفذت النهارده</h3><p class="mut" style="margin-top:-6px">اختار البند من المقايسة، واكتب الكمية اللي اتنفذت النهارده أو النسبة اللي البند وصلها.</p><div class="rows" id="aRows"></div><button type="button" data-add="act">+ إضافة بند</button>
+  <h3>الأعمال اللي اتنفذت النهارده</h3><p class="mut" style="margin-top:-6px">اختار المرحلة، واكتب كلمة من اسم البند واختاره من القايمة، وبعدين اكتب الكمية اللي اتنفذت النهارده أو النسبة اللي البند وصلها.</p><div class="rows" id="aRows"></div><button type="button" data-add="act">+ إضافة بند</button>
   <div class="card grid" style="margin-top:14px"><label>المعوقات<textarea id="fObs"></textarea></label><label>الإجراء المتخذ<textarea id="fAct"></textarea></label><label>ملاحظات<textarea id="fNotes"></textarea></label><label>التوصيات (الاستشاري)<textarea id="fRec"></textarea></label></div>
   <h3>صبات الخرسانة</h3><p class="mut" style="margin-top:-6px">لو ربطت الصبة ببند، المكعب بيتحسب عليه. ماتكتبهوش تاني في الكميات.</p><div class="rows" id="pRows"></div><button type="button" data-add="pour">+ إضافة صبة</button>
   <h3>العمالة</h3><div class="rows" id="lRows"></div><button type="button" data-add="labor">+ إضافة عمالة</button>
@@ -829,7 +835,12 @@ function renderReport(r) {
   loadSchLite().then(() => document.querySelectorAll('#aRows .row').forEach(actHint));
   S.sb.rpc('project_people', { p_project: P.id }).then(({ data }) => { const el = $('#engDL'); if (el) el.innerHTML = [...new Set((data || []).filter(p => ['site', 'tech', 'management'].includes(p.role)).map(p => p.name))].map(n => `<option value="${esc(n)}">`).join(''); });
   $('#main').onclick = e => { const a = e.target.closest('[data-add]'); if (a) a.dataset.add === 'act' ? addActRow() : addRow(a.dataset.add); const x = e.target.closest('.row .x'); if (x) x.closest('.row').remove(); };
-  $('#aRows').addEventListener('input', e => { const row = e.target.closest('.row'); if (row) actHint(row); });
+  const aR = $('#aRows');
+  aR.addEventListener('input', e => { const row = e.target.closest('.row'); if (!row) return; if (e.target.dataset.n === 'pick') { const it = S.P.items.find(i => i.id === row.dataset.item); if (!it || e.target.value !== itLabel(it)) row.dataset.item = ''; acShow(row); } actHint(row); });
+  aR.addEventListener('focusin', e => { if (e.target.dataset.n === 'pick') acShow(e.target.closest('.row')); });
+  aR.addEventListener('change', e => { const row = e.target.closest('.row'); if (row && e.target.dataset.n === 'ph') { S.lastPh = +e.target.value || null; const it = S.P.items.find(i => i.id === row.dataset.item); if (it && e.target.value && it.phase_n !== +e.target.value) { row.dataset.item = ''; row.querySelector('[data-n=pick]').value = ''; } actHint(row); row.querySelector('[data-n=pick]').focus(); } });
+  aR.addEventListener('mousedown', e => { const o = e.target.closest('[data-pick]'); if (!o) return; e.preventDefault(); const row = o.closest('.row'), it = S.P.items.find(i => i.id === o.dataset.pick); row.dataset.item = it.id; row.querySelector('[data-n=pick]').value = itLabel(it); row.querySelector('[data-n=ph]').value = it.phase_n; S.lastPh = it.phase_n; const md = row.querySelector('[data-n=mode]'); md.value = +it.qty > 0 ? 'qty' : 'pct'; row.querySelector('.acl').hidden = true; actHint(row); row.querySelector('[data-n=val]').focus(); });
+  aR.addEventListener('focusout', e => { if (e.target.dataset.n === 'pick') setTimeout(() => { const b = e.target.closest('.row')?.querySelector('.acl'); if (b) b.hidden = true; }, 150); });
   $('#fDate').onchange = () => fill(P.reports.find(x => x.report_date === $('#fDate').value), true);
   $('#fNew').onclick = () => { $('#fDate').value = today(); fill(null); };
   $('#rf').onsubmit = submitReport;
