@@ -517,3 +517,9 @@ details.qph>summary::after{content:'◂';margin-inline-start:auto;color:var(--mu
 .acwrap{position:relative}.acl{position:absolute;top:100%;inset-inline:0;z-index:30;max-height:340px;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);margin-top:4px}
 .aco{padding:8px 10px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px;line-height:1.5;font-weight:400}.aco:hover{background:#fff4ec}.aco small{color:var(--mut);display:block}.aco small .ok{color:#1d7a4f}.aco.none{color:var(--mut);cursor:default}
 @media(max-width:700px){.arow2{grid-template-columns:1fr 1fr!important}.arow2 .acwrap{grid-column:1/-1}.acl{max-height:260px}}
+
+/* سعر استرشادي من السوق */
+table.bq tr.guide td{background:#fff6dc}
+@media (prefers-color-scheme:dark){table.bq tr.guide td{background:#3a3220}}
+.tag.guidetag{color:#a86b00!important;border-color:#e8b84a;background:#fff3cf}
+.rsrc .gnew{color:#a86b00;font-weight:600}.rsrc .gold{color:var(--bad);font-weight:600}
