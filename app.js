@@ -31,6 +31,8 @@ const CAN = {
   ledgerEd: ['finance', 'management'],
   custody: ['site', 'tech', 'store', 'finance', 'management'],
   acctEdit: ['finance', 'management'],
+  ded: ['tech', 'finance', 'management'],
+  dedDel: ['finance', 'management'],
   quoteEd: ['tech', 'management'],
   quoteRev: ['consultant', 'management'],
 };
@@ -66,7 +68,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.18.2</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.19.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -101,9 +103,9 @@ async function afterLogin(user) {
 }
 
 /* ---------------- layout & routing ---------------- */
-const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', 'الجدول الزمني', 'sched'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة التقارير', 'review'], ['log', 'سجل التقارير', 'log'], ['tasks', 'مهام المكتب الفني', 'tasks'], ['boq', 'المقايسة والتكلفة', 'boq'], ['quotes', 'عروض الأسعار', 'quotes'], ['subs', 'عقود المقاولين', 'subs'], ['acct', 'ملخص الحسابات', 'acct'], ['phfin', 'حساب المراحل', 'ledger'], ['ledger', 'القيود والمصروفات', 'ledgerEd'], ['custody', 'العهدة', 'custody'], ['inv', 'المستخلصات', 'inv'], ['store', 'المخزن', 'store'], ['docs', 'المستندات', 'docs']];
+const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', 'الجدول الزمني', 'sched'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة التقارير', 'review'], ['log', 'سجل التقارير', 'log'], ['tasks', 'مهام المكتب الفني', 'tasks'], ['boq', 'المقايسة والتكلفة', 'boq'], ['quotes', 'عروض الأسعار', 'quotes'], ['subs', 'عقود المقاولين', 'subs'], ['acct', 'ملخص الحسابات', 'acct'], ['phfin', 'حساب المراحل', 'ledger'], ['ledger', 'القيود والمصروفات', 'ledgerEd'], ['custody', 'العهدة', 'custody'], ['inv', 'المستخلصات', 'inv'], ['ded', 'الخصومات المعلقة', 'ded'], ['store', 'المخزن', 'store'], ['docs', 'المستندات', 'docs']];
 const NAVG = [['متابعة المشروع', '📊', ['status', 'schedule']], ['التقارير اليومية', '📝', ['report', 'review', 'log']], ['المكتب الفني والتسعير', '📐', ['tasks', 'boq', 'quotes', 'subs']], ['المخزن والمستندات', '📦', ['store', 'docs']]];
-const FINV = ['acct', 'phfin', 'ledger', 'inv'], FINC = { acct: 'acct', phfin: 'ledger', ledger: 'ledgerEd', inv: 'inv' };
+const FINV = ['acct', 'phfin', 'ledger', 'inv', 'ded'], FINC = { acct: 'acct', phfin: 'ledger', ledger: 'ledgerEd', inv: 'inv', ded: 'ded' };
 const finOn = () => finPids().length > 0 || S.projects.some(p => can('custody', p.id));
 const FINCO = () => [['fin', 'ملخص المشروعات', finPids().length > 0], ['fin/bank', 'البنك والخزينة', S.finAny], ['fin/ga', 'المصروفات الإدارية', S.finAny], ['fin/custody', 'العهد', S.projects.some(p => can('custody', p.id))], ['fin/people', 'حسابات الأفراد', S.admin]].filter(x => x[2]);
 const FINT = { fin: 'كل المشروعات', 'fin/bank': 'البنك والخزينة', 'fin/ga': 'المصروفات الإدارية والعمومية', 'fin/custody': 'العهد والتصفيات', 'fin/people': 'حسابات الأفراد' };
@@ -153,6 +155,7 @@ async function route() {
     if (view === 'tasks' && can('tasks', pid)) return renderTasks();
     if (view === 'store' && can('store', pid)) return renderStore();
     if (view === 'inv' && can('inv', pid)) return renderInv();
+    if (view === 'ded' && can('ded', pid)) return renderDed();
     return role(pid) === 'owner' || (S.ownerView && S.ownerView === pid) ? renderOwner() : (S.ownerView = false, renderStatus());
   }
   $('#app').innerHTML = shell(null, h); bindOut();
@@ -1620,6 +1623,50 @@ async function renderPhFin() {
     const pe = e.target.closest('[data-ped]'); if (pe) return payForm(null, PY.find(y => y.id === pe.dataset.ped), null, renderPhFin);
     const sp = e.target.closest('[data-split]'); if (sp) splitForm(I.find(i => i.id === sp.dataset.split)); };
 }
+const DEDC = { retention: 'استقطاع لحين الاستكمال', design: 'تصميمات', quality: 'جودة / أعمال', dispute: 'محل خلاف', other: 'أخرى' };
+const DEDS = { open: ['مفتوح', 'warn'], ready: ['جاهز للمطالبة', 'ok'], claimed: ['اتطالب بيه', 'pend'], collected: ['اتحصّل', 'ok'], waived: ['اتنازلنا عنه', 'mut'] };
+async function renderDed() {
+  const P = S.P, delOk = can('dedDel', P.id), V = (S.dd ||= { st: 'live' });
+  $('#main').innerHTML = '<p class="mut">جاري التحميل…</p>';
+  const [dq, iq] = await Promise.all([S.sb.from('owner_deductions').select('*').eq('project_id', P.id).order('created_at'), S.sb.from('owner_invoices').select('id,no,inv_date,status').eq('project_id', P.id).order('no')]);
+  if (dq.error) return $('#main').innerHTML = `<div class="note">${esc(dq.error.message)}</div>`;
+  const D = dq.data || [], I = iq.data || [], ino = id => I.find(i => i.id === id)?.no, live = x => !['collected', 'waived'].includes(x.status);
+  const rem = x => Math.max(+x.amount - +x.recovered, 0), gross = x => rem(x) * (1 + +x.fee_pct), sum = (A, f) => A.reduce((t, x) => t + f(x), 0);
+  const L = D.filter(live), rdy = L.filter(x => x.status === 'ready'), list = D.filter(x => V.st === 'all' || (V.st === 'live' ? live(x) : x.status === V.st));
+  $('#main').innerHTML = `<div class="sthead"><div><h2 style="margin:0">الخصومات المعلقة على المالك</h2><p class="mut" style="margin:2px 0 0;font-size:13px">أي مبلغ المالك خصمه أو استقطعه من مستخلص لحين استكمال أعمال أو تسوية. بتفضل ظاهرة هنا للحسابات والمكتب الفني لحد ما تتحصل.</p></div><div class="acts" style="margin:0"><button class="p" id="ddAdd">+ خصم جديد</button></div></div>
+  <div class="kpis"><div class="kpi${L.length ? ' k-warn' : ''}"><b>${money(sum(L, gross))}</b><span>مستحق تحصيله (شامل الأتعاب)<br><small>أعمال ${money(sum(L, rem))} · ${L.length} بند</small></span></div>
+  <div class="kpi${rdy.length ? ' k-ok' : ''}"><b>${money(sum(rdy, gross))}</b><span>جاهز للمطالبة في المستخلص الجاي<br><small>${rdy.length} بند</small></span></div>
+  <div class="kpi"><b>${money(sum(D, x => +x.recovered))}</b><span>اتحصّل لحد دلوقتي<br><small>أعمال</small></span></div></div>
+  <div class="acts" style="margin:6px 0">${[['live', 'المفتوحة'], ['ready', 'جاهزة للمطالبة'], ['collected', 'اتحصّلت'], ['all', 'الكل']].map(([k, l]) => `<button class="${V.st === k ? 'p' : ''}" data-st="${k}">${l}</button>`).join('')}</div>
+  ${list.length ? `<div class="card" style="padding:0"><div class="scroll"><table class="actb stack"><thead><tr><th>المستخلص</th><th>السبب</th><th>المطلوب علشان يتحصل</th><th class="n">المخصوم</th><th class="n">اتحصّل</th><th class="n">الباقي + أتعاب</th><th>الحالة</th><th></th></tr></thead><tbody>
+  ${list.map(x => `<tr><td data-l="المستخلص">${x.invoice_id ? 'مستخلص ' + ino(x.invoice_id) : '–'}</td><td data-l="السبب"><b>${esc(x.reason)}</b><div class="mut" style="font-size:11px">${DEDC[x.category]}${x.phase_n ? ' · مرحلة ' + x.phase_n : ''}</div></td>
+  <td data-l="المطلوب">${esc(x.condition || '–')}${x.tech_note ? `<div class="mut" style="font-size:11px">📐 ${esc(x.tech_note)}</div>` : ''}${x.acct_note ? `<div class="mut" style="font-size:11px">💰 ${esc(x.acct_note)}</div>` : ''}</td>
+  <td class="n" data-l="المخصوم">${nf(x.amount, 0)}</td><td class="n" data-l="اتحصّل">${+x.recovered ? nf(x.recovered, 0) + (x.recovered_invoice_id ? `<div class="mut" style="font-size:11px">في مستخلص ${ino(x.recovered_invoice_id)}</div>` : '') : '–'}</td>
+  <td class="n" data-l="الباقي"><b>${nf(gross(x), 0)}</b></td><td data-l="الحالة"><span class="tag ${DEDS[x.status][1]}">${DEDS[x.status][0]}</span></td><td class="qa"><button class="xs" data-ded="${x.id}">تعديل</button></td></tr>`).join('')}
+  </tbody></table></div></div>` : '<div class="note">مفيش خصومات في الفلتر ده.</div>'}`;
+  const form = (x = {}) => { const d = document.createElement('dialog'); d.className = 'adlg';
+    d.innerHTML = `<div class="dh"><h3 style="margin:0;font-size:17px">${x.id ? 'تعديل خصم' : '+ خصم جديد'}</h3><button type="button" class="dx">✕</button></div><form class="grid" style="margin-top:12px">
+    <label>المستخلص اللي اتخصم منه<select name="inv"><option value="">–</option>${I.map(i => `<option value="${i.id}"${i.id === x.invoice_id ? ' selected' : ''}>مستخلص ${i.no}${i.inv_date ? ' – ' + fmtD(i.inv_date) : ''}</option>`).join('')}</select></label>
+    <label>النوع<select name="cat">${Object.entries(DEDC).map(([k, l]) => `<option value="${k}"${k === (x.category || 'retention') ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+    <label style="grid-column:1/-1">السبب<input name="reason" required value="${esc(x.reason || '')}"></label>
+    <label>المبلغ المخصوم (قيمة أعمال قبل الأتعاب)<input name="amount" type="number" step="any" required value="${x.amount ?? ''}"></label>
+    <label>نسبة الأتعاب %<input name="fee" type="number" step="any" value="${Math.round((x.fee_pct ?? 0.15) * 100)}"></label>
+    <label style="grid-column:1/-1">المطلوب علشان يتحصل (الأعمال اللي لازم تكمل)<input name="cond" value="${esc(x.condition || '')}"></label>
+    <label>المرحلة<input name="ph" type="number" value="${x.phase_n ?? ''}"></label>
+    <label>الحالة<select name="st">${Object.entries(DEDS).map(([k, l]) => `<option value="${k}"${k === (x.status || 'open') ? ' selected' : ''}>${l[0]}</option>`).join('')}</select></label>
+    <label>اتحصّل منه (أعمال)<input name="rec" type="number" step="any" value="${x.recovered ?? 0}"></label>
+    <label>اتحصّل في مستخلص<select name="rinv"><option value="">–</option>${I.map(i => `<option value="${i.id}"${i.id === x.recovered_invoice_id ? ' selected' : ''}>مستخلص ${i.no}</option>`).join('')}</select></label>
+    <label style="grid-column:1/-1">ملاحظة المكتب الفني<input name="tn" value="${esc(x.tech_note || '')}"></label>
+    <label style="grid-column:1/-1">ملاحظة الحسابات<input name="an" value="${esc(x.acct_note || '')}"></label>
+    <div class="acts" style="grid-column:1/-1"><button class="p">حفظ</button>${x.id && delOk ? '<button type="button" class="danger" id="ddDel">حذف</button>' : ''}</div></form>`;
+    document.body.append(d); d.showModal(); const f = d.querySelector('form');
+    d.onclick = async e => { if (e.target === d || e.target.closest('.dx')) { d.close(); d.remove(); } if (e.target.id === 'ddDel' && confirm('تحذف الخصم ده؟')) { const { error } = await S.sb.from('owner_deductions').delete().eq('id', x.id); if (error) return toast(error.message); d.close(); d.remove(); renderDed(); } };
+    f.onsubmit = async e => { e.preventDefault(); const v = { project_id: P.id, invoice_id: f.inv.value || null, category: f.cat.value, reason: f.reason.value.trim(), amount: +f.amount.value, fee_pct: (+f.fee.value || 0) / 100, condition: f.cond.value.trim() || null, phase_n: f.ph.value ? +f.ph.value : null, status: f.st.value, recovered: +f.rec.value || 0, recovered_invoice_id: f.rinv.value || null, tech_note: f.tn.value.trim() || null, acct_note: f.an.value.trim() || null };
+      if (v.recovered >= v.amount && v.status !== 'waived') v.status = 'collected';
+      const { error } = x.id ? await S.sb.from('owner_deductions').update(v).eq('id', x.id) : await S.sb.from('owner_deductions').insert(v); if (error) return toast(error.message); d.close(); d.remove(); toast('اتحفظ'); renderDed(); }; };
+  $('#ddAdd').onclick = () => form();
+  $('#main').onclick = e => { const b = e.target.closest('[data-st]'); if (b) { V.st = b.dataset.st; return renderDed(); } const t = e.target.closest('[data-ded]'); if (t) form(D.find(x => x.id === t.dataset.ded)); };
+}
 async function renderFinAll() {
   const PS = finPids(), sum = (A, f) => A.reduce((s, x) => s + (+f(x) || 0), 0), got = x => x.status === 'received';
   const rows = await Promise.all(PS.map(async pid => { const p = S.projects.find(x => x.id === pid), A = can('acct', pid), cost = can('ledger', pid), rv = can('ledgerEd', pid);
@@ -1658,6 +1705,7 @@ async function renderAcct() {
   const pr = x => `${x.direct ? '<span class="tag" title="المالك دفعها مباشر لطرف تالت – بتتحسب في تسوية المالك بس مش وارد خزينة">مدفوع مباشر</span> ' : ''}${PAYK[x.kind]}${x.kind === 'invoice' ? ' – مستخلص ' + (I.find(i => i.id === x.invoice_id)?.no ?? '؟') : ''}${x.phase_ns?.length ? ' – ' + x.phase_ns.map(n => n + '. ' + phName(n)).join('، ') : ''}`;
   const acts = x => ed ? `<button data-ped="${x.id}">تعديل</button><button class="danger" data-pdel="${x.id}">حذف</button>` : '';
   const LIST = PY.filter(x => V.list === 'all' || x.kind === V.list).slice().reverse();
+  if (can('ded', P.id)) S.sb.from('owner_deductions').select('amount,recovered,fee_pct,status').eq('project_id', P.id).then(({ data }) => { const L = (data || []).filter(x => !['collected', 'waived'].includes(x.status)), t = L.reduce((s, x) => s + Math.max(+x.amount - +x.recovered, 0) * (1 + +x.fee_pct), 0), el = $('#dedNote'); if (el && L.length) el.innerHTML = `<div class="note">⏳ فيه <b>${money(t)}</b> خصومات معلّقة على المالك (${L.length} بند) لسه هتتحصل بعد استكمال الأعمال. <a href="#p/${P.id}/ded">الخصومات المعلقة ←</a></div>`; });
   const costRows = (() => { const m = {}; LG.forEach(x => { const k = x.phase_n || 0; (m[k] ||= { n: k, e: 0, r: 0 }); m[k].e += +x.expense; m[k].r += +x.revenue; }); return Object.values(m).sort((a, b) => (a.n || 99) - (b.n || 99)); })();
   $('#main').innerHTML = `<div class="sthead"><div><h2 style="margin:0">الحسابات</h2><p class="mut" style="margin:2px 0 0;font-size:13px">المستخلصات والدفعات المستلمة من المالك على كل مستخلص، والدفعات المقدمة واللي اتخصم منها${cost ? '، والمصروف الفعلي من شيت الحسابات' : ''}.</p></div>${ed ? '<div class="acts" style="margin:0"><button class="p" data-padd="invoice">+ وارد دفعة مستخلص</button><button data-padd="advance">+ وارد دفعة مقدمة</button><button data-padd="other">+ وارد آخر</button></div>' : ''}</div>
   <div class="kpis">
@@ -1667,7 +1715,7 @@ async function renderAcct() {
     <div class="kpi${pBal < 0 ? ' k-bad' : ''}"><b>${money(Math.max(pBal, 0))}</b><span>رصيد المقدم عند المالك<br><small>المحصّل أكبر من المستخلصات${advReq ? ' · مطلوب ' + money(advReq) : ''}</small></span></div>
     ${cost ? `<div class="kpi${recv - exp < 0 ? ' k-warn' : ''}"><b>${money(exp)}</b><span>المصروف الفعلي (شيت الحسابات)<br><small>${recv - exp >= 0 ? 'المحصّل أكبر بـ ' + money(recv - exp) : 'المصروف أكبر من المحصّل بـ ' + money(exp - recv)}</small></span></div>` : ''}
   </div>
-  ${false ? `<div class="note">المخصوم من الدفعات المقدمة (${money(advUsed)}) أكبر من المقدم المستلم (${money(advGot)}). يا إما فيه دفعات مقدمة لسه ماتسجلتش، يا إما المستخلصات الجاية محتاجة تتصرف بنسبة أعلى.</div>` : ''}
+  <div id="dedNote"></div>${false ? `<div class="note">المخصوم من الدفعات المقدمة (${money(advUsed)}) أكبر من المقدم المستلم (${money(advGot)}). يا إما فيه دفعات مقدمة لسه ماتسجلتش، يا إما المستخلصات الجاية محتاجة تتصرف بنسبة أعلى.</div>` : ''}
   <div class="secT">المستخلصات والدفعات</div>
   ${I.length ? `<div class="card" style="padding:0"><div class="scroll"><table class="actb stack"><thead><tr><th>المستخلص</th><th>الحالة</th><th class="n">الأعمال</th><th class="n">الأتعاب</th><th class="n">يتخصم من المقدم</th><th class="n">صافي المستحق</th><th class="n">المنصرف</th><th class="n" title="بنسبة الصرف المسجلة على المستخلص – الموقف الفعلي في الكروت فوق">المتبقي بالنسبة</th><th></th></tr></thead><tbody>
     ${R.map(r => `<tr class="${r.i.status === 'draft' ? 'dim' : ''}"><td data-l="المستخلص"><a href="#p/${P.id}/inv" data-iv="${r.i.id}"><b>${r.i.no}</b> ${esc(r.i.title || '')}</a><div class="mut" style="font-size:11px">${r.i.inv_date ? fmtD(r.i.inv_date) : 'بدون تاريخ'}${r.last ? ' · آخر دفعة ' + fmtD(r.last) : ''}</div></td><td data-l="الحالة"><span class="st ${IST[r.i.status][0]}">${IST[r.i.status][1]}</span></td>
