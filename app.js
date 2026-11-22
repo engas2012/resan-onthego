@@ -68,7 +68,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.20.1</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.21.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -1962,7 +1962,7 @@ const lcat = c => (c || '').replace(/_/g, ' ').replace('توريدوتركيب',
 const LPAY = ['نقدي', 'تحويل بنكي', 'شيك', 'عهدة'], LEST = { draft: ['', 'مسودة'], submitted: ['pend', 'بانتظار الحسابات'], approved: ['appr', 'معتمد'], rejected: ['ret', 'مرجّع'] };
 const LSRC = { excel: 'شيت الحسابات', odoo: 'أودو', manual: 'قيد يدوي', custody: 'عهدة', archived: 'أرشيف' };
 async function ledDocs(rows) { const P = S.P, ids = [...new Set(rows.map(r => r.doc_id).filter(Boolean))].filter(id => !P.docs.some(d => d.id === id)); if (ids.length) { const { data } = await S.sb.from('documents').select('*').in('id', ids); P.docs = [...P.docs, ...(data || [])]; } }
-const GACAT = ['مرتبات', 'إيجارات', 'مكافآت', 'نثريات', 'انتقالات', 'سكن', 'مرافق_واتصالات', 'مصاريف_بنكية', 'ضيافة', 'مستلزمات_مكتبية', 'أخرى'];
+const GACAT = ['مرتبات', 'إيجارات', 'مكافآت', 'نثريات', 'انتقالات', 'سكن', 'مرافق_واتصالات', 'مصاريف_بنكية', 'ضيافة', 'مستلزمات_مكتبية', 'دفعات_موردين', 'أخرى'];
 async function loadAccs(force) { if (!S.finAny) return []; if (!S.accs || force) S.accs = (await S.sb.from('cash_accounts').select('*').order('sort').order('created_at')).data || []; return S.accs; }
 const accName = id => (S.accs || []).find(a => a.id === id)?.name || '';
 const accSel = (name, sel, blank = '—') => `<select name="${name}"><option value="">${blank}</option>${(S.accs || []).filter(a => a.active || a.id === sel).map(a => `<option value="${a.id}"${a.id === sel ? ' selected' : ''}>${a.kind === 'cash' ? '💵' : '🏦'} ${esc(a.name)}</option>`).join('')}</select>`;
@@ -2123,7 +2123,7 @@ async function cashMoves() {
 async function pickProj(list, title) { return new Promise(res => { const d = document.createElement('dialog'); d.className = 'adlg'; d.innerHTML = `<div class="dh"><h3 style="margin:0;font-size:17px">${title}</h3><button type="button" class="dx">✕</button></div><div class="acts">${list.map(p => `<button class="p" data-pp="${p.id}">${esc(p.name)}</button>`).join('')}</div>`; document.body.append(d); d.showModal(); d.onclick = e => { const b = e.target.closest('[data-pp]'); if (b || e.target === d || e.target.closest('.dx')) { d.close(); d.remove(); res(b ? b.dataset.pp : null); } }; }); }
 function accForm(x, done) { x ||= {}; const d = document.createElement('dialog'); d.className = 'adlg';
   d.innerHTML = `<div class="dh"><h3 style="margin:0;font-size:17px">${x.id ? 'تعديل حساب' : '+ حساب بنك / خزينة'}</h3><button type="button" class="dx">✕</button></div><form class="grid" style="margin-top:12px"><label class="wide">اسم الحساب<input name="name" required value="${esc(x.name || '')}" placeholder="مثلاً: بنك مصر – جاري"></label>
-    <label>النوع<select name="kind"><option value="bank">بنك</option><option value="cash"${x.kind === 'cash' ? ' selected' : ''}>خزينة نقدية</option></select></label><label>البنك<input name="bank" value="${esc(x.bank_name || '')}"></label><label>رقم الحساب<input name="no" value="${esc(x.acc_no || '')}"></label>
+    <label>النوع<select name="kind"><option value="bank">بنك</option><option value="cash"${x.kind === 'cash' ? ' selected' : ''}>خزينة نقدية</option><option value="custody"${x.kind === 'custody' ? ' selected' : ''}>عهدة مهندس</option></select></label><label>البنك<input name="bank" value="${esc(x.bank_name || '')}"></label><label>رقم الحساب<input name="no" value="${esc(x.acc_no || '')}"></label>
     <label>رصيد الافتتاح<input name="ob" type="number" step="any" value="${x.opening_balance ?? 0}"></label><label>بتاريخ<input type="date" name="od" value="${x.opening_date || today()}"></label><label class="chk"><input type="checkbox" name="act"${x.active !== false ? ' checked' : ''}> شغال</label>
     <p class="mut wide" style="font-size:12px;margin:0">الرصيد بيتحسب من رصيد الافتتاح + كل الحركات من التاريخ ده وبعده. الحركات اللي قبله مش بتأثر.</p><div class="acts wide" style="margin:0"><button class="p">حفظ</button></div></form>`;
   document.body.append(d); d.showModal(); d.onclick = e => { if (e.target === d || e.target.closest('.dx')) { d.close(); d.remove(); } };
@@ -2138,13 +2138,81 @@ function cashForm(kind, x, done) { x ||= {}; const d = document.createElement('d
     if (tr && (!f.from.value || !f.to.value || f.from.value === f.to.value)) return toast('اختار حسابين مختلفين'); if (!tr && !f.acc.value) return toast('اختار الحساب');
     const t = tr ? 'cash_transfers' : 'cash_income', rec = tr ? { ...base, from_account: f.from.value, to_account: f.to.value } : { ...base, account_id: f.acc.value, source: f.src.value.trim() || null };
     const { error } = x.id ? await S.sb.from(t).update(rec).eq('id', x.id) : await S.sb.from(t).insert(rec); if (error) return toast(error.message); d.close(); d.remove(); toast('اتسجل'); done(); }; }
+const ACCT_PRJ = { 'مجاويش': 'sahlgate', 'شيراتون': 'sheraton' };
+const ACCT_PH = { 'التصميم_والتراخيص': 1, 'اعمال_تجهيز_الموقع': 2, 'اسفل_منسوب_الارض': 3, 'الهيكل_الخرساني': 4, 'التشطيبات_الداخلية': 5 };
+function acctDate(v) {
+  const p2 = n => String(n).padStart(2, '0'), today = new Date().toISOString().slice(0, 10);
+  let y, m, d;
+  if (v instanceof Date && !isNaN(v)) { const t = new Date(v.getTime() + 12 * 3600e3); y = t.getUTCFullYear(); m = t.getUTCMonth() + 1; d = t.getUTCDate(); }
+  else if (typeof v === 'number' && v > 20000 && v < 80000) { const t = new Date(Math.round((v - 25569) * 864e5)); y = t.getUTCFullYear(); m = t.getUTCMonth() + 1; d = t.getUTCDate(); }
+  else if (typeof v === 'string') { const s = v.trim().replace(/\/+/g, '/').replace(/[-.]/g, '/'); const k = s.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/); if (!k) return null; d = +k[1]; m = +k[2]; y = k[3] ? +k[3] : 2026; if (y < 100) y += 2000; }
+  else return null;
+  if (m > 12 && d <= 12) [d, m] = [m, d];
+  let iso = `${y}-${p2(m)}-${p2(d)}`;
+  if (iso > today && d <= 12) { const s2 = `${y}-${p2(d)}-${p2(m)}`; if (s2 <= today) iso = s2; }
+  return m >= 1 && m <= 12 && d >= 1 && d <= 31 ? iso : null;
+}
+function acctGaCat(t) {
+  const R = [[/ماكوم|ماكم|عبد ?الرحمن يوسف|حديد تسليح|طن حديد|خرسان/, 'دفعات_موردين'], [/مرتب|رواتب|اجور ادار/, 'مرتبات'], [/حافز|حوافز|مكافأ|مكافا|بونص/, 'مكافآت'], [/ايجار|إيجار/, 'إيجارات'], [/سكن|شقة|شقه/, 'سكن'], [/بنزين|سولار|عربي|سيار|بيجو|كاوتش|مواصلات|انتقال|سفر|تذكر|اوبر|أوبر/, 'انتقالات'], [/كهرباء|مياه|انترنت|نت |موبايل|كارت شحن|فاتورة تليفون|اتصالات/, 'مرافق_واتصالات'], [/مصاريف بنكي|عمولة|رسوم بنك/, 'مصاريف_بنكية'], [/ضيافة|عزوم|غداء|غدا|فطار|عشاء|قهو|شاي|شاى|مياه شرب|بوفيه/, 'ضيافة'], [/مكتب|كمبيوتر|لاب ?توب|طابع|ورق|احبار|مكتبة|تكييف/, 'مستلزمات_مكتبية']];
+  const x = R.find(([re]) => re.test(t)); return x ? x[1] : 'أخرى';
+}
+function parseAcctSheet(A) {
+  const num = v => typeof v === 'number' && isFinite(v) ? v : 0, str = v => v == null ? '' : String(v).trim(), H = A[1] || [], D = A.slice(3);
+  const cols = []; for (let j = 18; j + 1 < Math.max(...A.slice(0, 50).map(r => r.length), 20); j += 2) if (D.some(r => num(r[j]) || num(r[j + 1]))) cols.push(j);
+  const colL = j => { let s = '', n = j + 1; while (n) { s = String.fromCharCode(65 + (n - 1) % 26) + s; n = Math.floor((n - 1) / 26); } return s; };
+  const accs = cols.map((j, i) => { let name = str(H[j]).replace(/\s+/g, ' ');
+    if (!name) { const c = {}; D.forEach(r => { if (num(r[j])) { const k = str(r[4]).match(/عهد[ةه]\s*(?:م\s*[\/.]?\s*)?\/?\s*([^\s\d]+(?:\s+(?!لزوم|موقع|مصاريف)[^\s\d]+)?)/); if (k) c[k[1]] = (c[k[1]] || 0) + 1; } }); const g = Object.entries(c).sort((a, b) => b[1] - a[1])[0]; name = g ? `عهدة م/${g[0]} (عمود ${colL(j)})` : `حساب (عمود ${colL(j)})`; }
+    return { i, key: 'sheet:' + colL(j), col: j, name, kind: /بنك/.test(name) ? 'bank' : /خزين/.test(name) ? 'cash' : 'custody' }; });
+  const rows = [], skip = [];
+  D.forEach((r, ri) => {
+    const pj = str(r[6]), rev = num(r[15]), exp = num(r[16]), dr = accs.filter(a => num(r[a.col]) > 0), cr = accs.filter(a => num(r[a.col + 1]) > 0);
+    const base = { d: acctDate(r[1]), desc: str(r[4]) || null, sup: str(r[5]) || null, ref: str(r[3]) || null };
+    if (exp > 0) { const pid = ACCT_PRJ[pj] || null, txt = [base.desc, base.sup].join(' ');
+      rows.push(pid ? { ...base, t: 'exp', pid, amt: exp, acc: cr[0]?.key || dr[0]?.key || null, mp: str(r[7]) || null, sp: str(r[8]) || null, cat: str(r[9]) || null, sub: str(r[10]) || null, ph: ACCT_PH[str(r[7])] || null }
+        : { ...base, t: 'exp', pid: null, amt: exp, acc: cr[0]?.key || dr[0]?.key || null, cat: acctGaCat(txt), sub: pj === 'المصنع' ? 'المصنع' : str(r[10]) || str(r[9]) || (pj && pj !== '=' && pj !== 'ريسان' ? pj : null) }); }
+    else if (rev > 0) { const pid = ACCT_PRJ[pj] || null; rows.push({ ...base, t: 'rev', pid, amt: rev, acc: dr[0]?.key || null, srcn: pid ? 'تحصيل مالك – ' + pj : 'وارد للشركة' + (pj && pj !== '=' && pj !== 'ريسان' ? ' – ' + pj : '') }); }
+    else if (dr.length && cr.length) rows.push({ ...base, t: 'tr', amt: num(r[dr[0].col]), acc: cr[0].key, acc2: dr[0].key });
+    else if (dr.length) rows.push({ ...base, t: 'in', amt: num(r[dr[0].col]), acc: dr[0].key });
+    else if (cr.length) rows.push({ ...base, t: 'out', amt: num(r[cr[0].col + 1]), acc: cr[0].key });
+    else if (num(r[12]) || num(r[13])) skip.push(ri + 4);
+  });
+  return { accs: accs.map(({ col, ...a }) => a), rows: rows.filter(x => x.amt > 0), skip };
+}
+async function importAcctSheet(re) {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.xlsx,.xls,.xlsm';
+  inp.onchange = async () => { const f = inp.files[0]; if (!f) return; toast('جاري قراءة الشيت…');
+    let wb; try { wb = XLSX.read(await f.arrayBuffer(), { cellDates: true }); } catch (e) { return toast('مش قادر أقرا الملف: ' + e.message); }
+    const sn = wb.SheetNames.find(n => n.trim() === 'الغردقة') || wb.SheetNames.find(n => /غردق/.test(n));
+    if (!sn) return toast('مفيش تاب اسمه «الغردقة» في الملف');
+    const R = parseAcctSheet(XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: null }));
+    const sm = (f2) => R.rows.filter(f2).reduce((t, x) => t + x.amt, 0), pn = id => S.projects.find(p => p.id === id)?.name || id;
+    const prj = [...new Set(R.rows.filter(x => x.pid).map(x => x.pid))];
+    const d = document.createElement('dialog'); d.className = 'adlg';
+    d.innerHTML = `<div class="dh"><h3 style="margin:0;font-size:17px">استيراد شيت الحسابات – ${esc(f.name)}</h3><button type="button" class="dx">✕</button></div>
+    <p class="mut" style="font-size:13px">تاب «${esc(sn)}» · ${R.rows.length} قيد. الاستيراد بيمسح أي استيراد قبله من الشيت (وتجميع الغردقة الشهري القديم) وينزّل الكل من جديد. اللي متسجل يدوي في السيستم مش هيتلمس.</p>
+    <table class="actb"><tbody>${prj.map(p => `<tr><td>${esc(pn(p))}</td><td class="n">مصروفات ${nf(sm(x => x.t === 'exp' && x.pid === p), 0)}</td><td class="n">وارد ${nf(sm(x => x.t === 'rev' && x.pid === p), 0)}</td></tr>`).join('')}
+    <tr><td>مصروفات إدارية</td><td class="n">${nf(sm(x => x.t === 'exp' && !x.pid && x.cat !== 'دفعات_موردين'), 0)}</td><td></td></tr>
+    <tr><td>دفعات موردين تحت التوزيع</td><td class="n">${nf(sm(x => x.t === 'exp' && !x.pid && x.cat === 'دفعات_موردين'), 0)}</td><td></td></tr>
+    <tr><td>وارد للشركة (تمويل)</td><td></td><td class="n">${nf(sm(x => x.t === 'rev' && !x.pid), 0)}</td></tr>
+    <tr><td>تحويلات بين البنك والعهد</td><td class="n">${R.rows.filter(x => x.t === 'tr').length} حركة</td><td class="n">${nf(sm(x => x.t === 'tr'), 0)}</td></tr></tbody></table>
+    <p style="font-size:13px;margin:10px 0 4px"><b>الحسابات (${R.accs.length}):</b> ${R.accs.map(a => esc(a.name)).join(' · ')}</p>
+    <p class="mut" style="font-size:12px">${R.rows.filter(x => !x.d).length} قيد من غير تاريخ في الشيت. الحسابات الجديدة تقدر تغيّر اسمها بعد الاستيراد وهيفضل محفوظ.</p>
+    <div class="acts"><button class="p" id="impGo">استيراد</button></div>`;
+    document.body.append(d); d.showModal(); const close = () => { d.close(); d.remove(); };
+    d.onclick = async e => { if (e.target === d || e.target.closest('.dx')) close(); if (e.target.id === 'impGo') { e.target.disabled = true; e.target.textContent = 'جاري الاستيراد…';
+      const { data, error } = await S.sb.rpc('import_acct_sheet', { p_batch: 'شيت الحسابات ' + new Date().toISOString().slice(0, 10) + ' – ' + f.name, p_accs: R.accs, p_rows: R.rows });
+      if (error) { e.target.disabled = false; e.target.textContent = 'استيراد'; return toast(error.message); }
+      close(); toast(`اتسجل: ${data.exp} مصروف · ${data.rev} وارد · ${data.tr} تحويل`); re(); } };
+  };
+  inp.click();
+}
 async function renderBank() {
   $('#main').innerHTML = '<p class="mut">جاري التحميل…</p>'; const V = (S.bk ||= { acc: null, lim: 200 });
-  const C = await cashMoves(), A = C.A, tot = A.filter(x => x.a.active).reduce((s, x) => s + x.bal, 0), cur = A.find(x => x.a.id === V.acc) || A[0]; if (cur) V.acc = cur.a.id;
+  const C = await cashMoves(), A = C.A, tot = A.filter(x => x.a.active && x.a.kind !== 'custody').reduce((s, x) => s + x.bal, 0), cuA = A.filter(x => x.a.active && x.a.kind === 'custody').reduce((s, x) => s + x.bal, 0), cur = A.find(x => x.a.id === V.acc) || A[0]; if (cur) V.acc = cur.a.id;
   const re = () => renderBank(), LP = S.projects.filter(p => can('ledgerEd', p.id));
-  $('#main').innerHTML = `<div class="sthead"><div><h2 style="margin:0">البنك والخزينة</h2><p class="mut" style="margin:2px 0 0;font-size:13px">كل التمويل بيدخل هنا، ومنه بيتصرف على المشروعات (بمراحلها وبنودها) أو مصروفات إدارية، أو بيتحول عهد للمهندسين.</p></div><div class="acts" style="margin:0"><button class="p" data-bk="op">+ وارد من مالك</button><button data-bk="ci">+ وارد آخر</button><button class="p" data-bk="pj">+ مصروف على مشروع</button><button data-bk="ga">+ مصروف إداري</button><button data-bk="tr">⇄ تحويل</button><button data-bk="ct">+ صرف عهدة</button><button data-bk="acc">⚙ حساب جديد</button></div></div>
-  <div class="kpis"><div class="kpi${tot < 0 ? ' k-bad' : ' k-ok'}"><b>${money(tot)}</b><span>رصيد البنوك والخزينة</span></div><div class="kpi"><b>${money(C.custBal)}</b><span>أرصدة العهد مع المهندسين</span></div><div class="kpi"><b>${money(tot + C.custBal)}</b><span>إجمالي النقدية<br><small>حسابات + عهد</small></span></div></div>
-  <div class="acgrid">${A.map(x => `<button type="button" class="accard${x === cur ? ' on' : ''}${x.a.active ? '' : ' dim'}" data-acc="${x.a.id}"><i>${x.a.kind === 'cash' ? '💵' : '🏦'}</i><b>${esc(x.a.name)}</b><span class="${x.bal < 0 ? 'bad' : ''}">${nf(x.bal, 0)} ج.م</span><small>افتتاح ${nf(x.a.opening_balance, 0)} في ${fmtD(x.a.opening_date)}</small></button>`).join('')}</div>
+  $('#main').innerHTML = `<div class="sthead"><div><h2 style="margin:0">البنك والخزينة</h2><p class="mut" style="margin:2px 0 0;font-size:13px">كل التمويل بيدخل هنا، ومنه بيتصرف على المشروعات (بمراحلها وبنودها) أو مصروفات إدارية، أو بيتحول عهد للمهندسين.</p></div><div class="acts" style="margin:0"><button class="p" data-bk="op">+ وارد من مالك</button><button data-bk="ci">+ وارد آخر</button><button class="p" data-bk="pj">+ مصروف على مشروع</button><button data-bk="ga">+ مصروف إداري</button><button data-bk="imp">📥 استيراد شيت الحسابات</button><button data-bk="tr">⇄ تحويل</button><button data-bk="ct">+ صرف عهدة</button><button data-bk="acc">⚙ حساب جديد</button></div></div>
+  <div class="kpis"><div class="kpi${tot < 0 ? ' k-bad' : ' k-ok'}"><b>${money(tot)}</b><span>رصيد البنوك والخزينة</span></div><div class="kpi"><b>${money(C.custBal + cuA)}</b><span>أرصدة العهد مع المهندسين</span></div><div class="kpi"><b>${money(tot + C.custBal + cuA)}</b><span>إجمالي النقدية<br><small>حسابات + عهد</small></span></div></div>
+  <div class="acgrid">${A.map(x => `<button type="button" class="accard${x === cur ? ' on' : ''}${x.a.active ? '' : ' dim'}" data-acc="${x.a.id}"><i>${x.a.kind === 'cash' ? '💵' : x.a.kind === 'custody' ? '👷' : '🏦'}</i><b>${esc(x.a.name)}</b><span class="${x.bal < 0 ? 'bad' : ''}">${nf(x.bal, 0)} ج.م</span><small>افتتاح ${nf(x.a.opening_balance, 0)} في ${fmtD(x.a.opening_date)}</small></button>`).join('')}</div>
   ${cur ? `<div class="secT">كشف حساب: ${esc(cur.a.name)} <button class="xs" data-acced="${cur.a.id}">تعديل الحساب</button></div>
   ${+cur.a.opening_balance === 0 && !cur.L.length ? '<div class="note">ابدأ بتعديل الحساب: اكتب رصيده الفعلي النهارده كرصيد افتتاح، وكل حركة بعد كده هتتحسب عليه.</div>' : ''}
   <div class="kpis"><div class="kpi k-ok"><b>${money(cur.inn)}</b><span>وارد</span></div><div class="kpi"><b>${money(cur.out)}</b><span>منصرف</span></div><div class="kpi"><b>${money(cur.bal)}</b><span>الرصيد</span></div></div>
@@ -2160,6 +2228,7 @@ async function renderBank() {
     if (b.dataset.acced) return accForm(S.accs.find(a => a.id === b.dataset.acced), re);
     const mv = b.dataset.mved ?? b.dataset.mvdl; if (mv != null) { const m = cur.L[+mv], t = m.src.k === 'tr' ? 'cash_transfers' : 'cash_income'; if (b.dataset.mved != null) return cashForm(m.src.k, m.src.x, re); if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'متأكد؟'; return; } const { error } = await S.sb.from(t).delete().eq('id', m.src.x.id); return error ? toast(error.message) : re(); }
     const k = b.dataset.bk; if (!k) return;
+    if (k === 'imp') return importAcctSheet(re);
     if (k === 'acc') return accForm(null, re); if (k === 'tr' || k === 'ci') return cashForm(k, null, re);
     if (k === 'ct') return custTxForm('issue', null, C.people, re);
     if (k === 'ga') return ledgerForm(null, 'acct', { sub: {}, sc: [], sup: [], inv: [] }, re, { ga: true, acc: cur?.a.id });
