@@ -541,3 +541,5 @@ table.bq tr.guide td{background:#fff6dc}
  .bq .ed input{width:100%}
 }
 @media(max-width:600px) and (prefers-color-scheme:dark){.bq tbody tr.guide[data-id]{background:#3a3220}}
+
+.stg{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;margin-top:3px}.stg span b{color:var(--acc)}
