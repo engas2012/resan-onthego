@@ -523,3 +523,21 @@ table.bq tr.guide td{background:#fff6dc}
 @media (prefers-color-scheme:dark){table.bq tr.guide td{background:#3a3220}}
 .tag.guidetag{color:#a86b00!important;border-color:#e8b84a;background:#fff3cf}
 .rsrc .gnew{color:#a86b00;font-weight:600}.rsrc .gold{color:var(--bad);font-weight:600}
+
+/* المقايسة على الموبايل: كارت لكل بند */
+.bq tr.gh{cursor:pointer}.bq .fold{display:inline-block;width:14px;color:var(--acc)}
+@media(max-width:600px){
+ .bq tr.gh{position:sticky;top:0;z-index:2;background:var(--bg);border-radius:8px;margin-top:10px}
+ .bq tbody tr[data-id]{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"code tot" "name name" "bld bld" "qty ex" "unit rate" "crate ctot";gap:4px 12px;margin:8px 0;padding:10px 4px;border:1px solid var(--line);border-radius:12px;background:var(--card,#fff)}
+ .bq tbody tr[data-id] td{flex-direction:column;justify-content:flex-start;align-items:flex-start;gap:0;padding:2px 8px;min-width:0}
+ .bq tbody tr[data-id] td::before{font-size:11px}
+ .bq td[data-l="الكود"]{grid-area:code;font-weight:700;color:var(--acc)}.bq td[data-l="الكود"]::before{content:none}
+ .bq td[data-l="الإجمالي المحدّث"]{grid-area:tot;align-items:flex-end!important;font-weight:700;font-size:15px}
+ .bq td[data-l="البند"]{grid-area:name;display:block!important;font-size:14px;line-height:1.5;white-space:normal;border-top:1px dashed var(--line);border-bottom:1px dashed var(--line);padding-block:6px}.bq td[data-l="البند"]::before{content:none}
+ .bq td[data-l="المبنى"]{grid-area:bld}.bq td[data-l="الكمية"]{grid-area:qty}.bq td[data-l="المنفذ"]{grid-area:ex}.bq td[data-l="الوحدة"]{grid-area:unit}
+ .bq td[data-l="السعر المحدّث"]{grid-area:rate}.bq td[data-l="السعر التعاقدي"]{grid-area:crate}.bq td[data-l="الإجمالي التعاقدي"]{grid-area:ctot}
+ .bq tbody tr.lack[data-id]{border-inline-start:4px solid var(--acc)}.bq tr.lack td:first-child{box-shadow:none}
+ .bq tbody tr.guide[data-id]{background:#fff6dc}.bq tbody tr.guide td{background:transparent}
+ .bq .ed input{width:100%}
+}
+@media(max-width:600px) and (prefers-color-scheme:dark){.bq tbody tr.guide[data-id]{background:#3a3220}}
