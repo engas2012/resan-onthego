@@ -68,7 +68,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.21.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.21.1</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -2157,7 +2157,7 @@ function acctGaCat(t) {
   const x = R.find(([re]) => re.test(t)); return x ? x[1] : 'أخرى';
 }
 function parseAcctSheet(A) {
-  const num = v => typeof v === 'number' && isFinite(v) ? v : 0, str = v => v == null ? '' : String(v).trim(), H = A[1] || [], D = A.slice(3);
+  const num = v => typeof v === 'number' && isFinite(v) ? v : 0, str = v => { const t = v == null ? '' : String(v).trim(); return /^=+$/.test(t) ? '' : t; }, H = A[1] || [], D = A.slice(3);
   const cols = []; for (let j = 18; j + 1 < Math.max(...A.slice(0, 50).map(r => r.length), 20); j += 2) if (D.some(r => num(r[j]) || num(r[j + 1]))) cols.push(j);
   const colL = j => { let s = '', n = j + 1; while (n) { s = String.fromCharCode(65 + (n - 1) % 26) + s; n = Math.floor((n - 1) / 26); } return s; };
   const accs = cols.map((j, i) => { let name = str(H[j]).replace(/\s+/g, ' ');
@@ -2169,8 +2169,8 @@ function parseAcctSheet(A) {
     const base = { d: acctDate(r[1]), desc: str(r[4]) || null, sup: str(r[5]) || null, ref: str(r[3]) || null };
     if (exp > 0) { const pid = ACCT_PRJ[pj] || null, txt = [base.desc, base.sup].join(' ');
       rows.push(pid ? { ...base, t: 'exp', pid, amt: exp, acc: cr[0]?.key || dr[0]?.key || null, mp: str(r[7]) || null, sp: str(r[8]) || null, cat: str(r[9]) || null, sub: str(r[10]) || null, ph: ACCT_PH[str(r[7])] || null }
-        : { ...base, t: 'exp', pid: null, amt: exp, acc: cr[0]?.key || dr[0]?.key || null, cat: acctGaCat(txt), sub: pj === 'المصنع' ? 'المصنع' : str(r[10]) || str(r[9]) || (pj && pj !== '=' && pj !== 'ريسان' ? pj : null) }); }
-    else if (rev > 0) { const pid = ACCT_PRJ[pj] || null; rows.push({ ...base, t: 'rev', pid, amt: rev, acc: dr[0]?.key || null, srcn: pid ? 'تحصيل مالك – ' + pj : 'وارد للشركة' + (pj && pj !== '=' && pj !== 'ريسان' ? ' – ' + pj : '') }); }
+        : { ...base, t: 'exp', pid: null, amt: exp, acc: cr[0]?.key || dr[0]?.key || null, cat: acctGaCat(txt), sub: pj === 'المصنع' ? 'المصنع' : str(r[10]) || str(r[9]) || (pj && pj !== 'ريسان' ? pj : null) }); }
+    else if (rev > 0) { const pid = ACCT_PRJ[pj] || null; rows.push({ ...base, t: 'rev', pid, amt: rev, acc: dr[0]?.key || null, srcn: pid ? 'تحصيل مالك – ' + pj : 'وارد للشركة' + (pj && pj !== 'ريسان' ? ' – ' + pj : '') }); }
     else if (dr.length && cr.length) rows.push({ ...base, t: 'tr', amt: num(r[dr[0].col]), acc: cr[0].key, acc2: dr[0].key });
     else if (dr.length) rows.push({ ...base, t: 'in', amt: num(r[dr[0].col]), acc: dr[0].key });
     else if (cr.length) rows.push({ ...base, t: 'out', amt: num(r[cr[0].col + 1]), acc: cr[0].key });
