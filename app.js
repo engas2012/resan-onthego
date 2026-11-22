@@ -66,7 +66,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.17.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.17.1</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -185,7 +185,7 @@ async function loadProject(pid) {
   P.phaseProg = pp.data || []; P.phases = ph.data || [];
   const rates = Object.fromEntries((rt.data || []).map(r => [r.item_id, +r.rate])), camts = Object.fromEntries((rt.data || []).map(r => [r.item_id, +r.contract_amount || 0])), rmeta = Object.fromEntries((rt.data || []).map(r => [r.item_id, r]));
   P.showRates = ['tech', 'finance', 'management'].includes(role(pid));
-  P.items = (it.data || []).map(i => { const q = +i.qty || 0, ex = +i.executed || 0, rate = rates[i.id] || 0; const pct = q > 0 ? ex / q : (i.pct_override != null ? +i.pct_override : 0); const camt = camts[i.id] || 0, rm = rmeta[i.id] || {}; return { ...i, reprice: !!i.reprice || !!i.price_need, ex, rate, camt, rsrc: rm.rate_source, rdoc: rm.rate_doc_id, rqid: rm.rate_quote_id, rdate: rm.rate_updated_at, crate: q > 0 ? camt / q : camt, pct: Math.max(0, pct), rem: q - ex, val: q * rate, w: camt > 0 ? camt : q * rate, known: q > 0 || i.pct_override != null }; });
+  P.items = (it.data || []).map(i => { const q = +i.qty || 0, ex = +i.executed || 0, rate = rates[i.id] || 0; const pct = q > 0 ? ex / q : (i.pct_override != null ? +i.pct_override : 0); const camt = camts[i.id] || 0, rm = rmeta[i.id] || {}; return { ...i, reprice: !!i.reprice || !!i.price_need, ex, rate, camt, rsrc: rm.rate_source, rdoc: rm.rate_doc_id, rqid: rm.rate_quote_id, rdate: rm.rate_updated_at, crate: q > 0 ? camt / q : camt, pct: Math.max(0, pct), rem: q - ex, val: q * rate, w: q * rate, known: q > 0 || i.pct_override != null }; });
   P.reports = rp.data || [];
   P.vendors = can('boq', pid) || can('tasks', pid) ? ((await S.sb.from('vendors').select('*').order('trade').order('name')).data || []) : [];
   P.guide = can('boq', pid) || can('tasks', pid) ? ((await S.sb.from('price_guide').select('*').order('sort')).data || []) : [];
@@ -1447,7 +1447,7 @@ async function projectReport(pid, btn) {
       can('inv', pid) ? S.sb.from('owner_invoices').select('*').eq('project_id', pid).order('no') : Promise.resolve({ data: [] }),
       can('store', pid) ? S.sb.rpc('stock_status2', { p_project: pid }) : Promise.resolve({ data: [] }),
       S.sb.rpc('site_updates', { p_project: pid, p_n: 14 })]);
-    const PP = P.phaseProg || [], ov = overall(PP), contract = (cl.data || []).reduce((s, x) => s + (+x.amount || +x.value || 0), 0) || P.items.reduce((s, i) => s + (+i.camt || 0), 0);
+    const PP = P.phaseProg || [], ov = overall(PP), contract = (cl.data || []).reduce((s, x) => s + (+x.amount || +x.value || 0), 0) ;
     // schedule
     const prog = Object.fromEntries((sp.data || []).map(x => [x.activity_id, x])), A = (sa.data || []), par = new Set(A.map(a => a.parent_id).filter(Boolean));
     const leaf = A.filter(a => !par.has(a.id) && a.start && a.finish).map(a => { const pr = prog[a.id]?.pct; const s0 = new Date(a.start), f0 = new Date(a.finish), t = new Date(tdy); const plan = t <= s0 ? 0 : t >= f0 ? 1 : (t - s0) / Math.max(f0 - s0, 864e5); return { ...a, pct: pr == null ? null : +pr, plan }; });
@@ -1457,10 +1457,10 @@ async function projectReport(pid, btn) {
     // site
     const U = su.data || [], lab = U.length ? Math.round(U.reduce((s, u) => s + (+u.labor || 0), 0) / U.length) : 0;
     const acts = U.flatMap(u => (u.acts || []).map(a => ({ d: u.report_date, t: a.desc || a.text || a.title || a.activity || (typeof a === 'string' ? a : ''), b: a.building || '' }))).filter(a => a.t).slice(0, 25);
-    const inProg = P.items.filter(i => +i.qty > 0 && i.ex > 0 && i.ex < +i.qty * 0.999).sort((a, b) => (b.camt || 0) - (a.camt || 0)).slice(0, 15);
+    const inProg = P.items.filter(i => +i.qty > 0 && i.ex > 0 && i.ex < +i.qty * 0.999).sort((a, b) => (b.val || 0) - (a.val || 0)).slice(0, 15);
     // cost
     const LG = lg.data || [], act = n => LG.filter(x => x.phase_n === n).reduce((s, x) => s + +x.expense, 0);
-    const costRows = PP.map(x => { const it = P.items.filter(i => i.phase_n === x.n), c = it.reduce((s, i) => s + (+i.camt || 0), 0), a = act(x.n); return { ...x, c, u: updPh(it, a, [x.n]).u, a }; });
+    const costRows = PP.map(x => { const it = P.items.filter(i => i.phase_n === x.n), c = (cl.data || []).filter(l => (l.phase_ns || []).map(Number).includes(x.n)).reduce((s, l) => s + (+l.value || 0) / Math.max((l.phase_ns || []).length, 1), 0), a = act(x.n); return { ...x, c, u: updPh(it, a, [x.n]).u, a }; });
     const ct = k => costRows.reduce((s, x) => s + x[k], 0);
     // invoices
     const I = (iv.data || []).filter(i => !isOwner || i.status !== 'draft'), Itot = I.reduce((s, i) => s + invSum(i), 0), Inet = I.reduce((s, i) => s + invPay(i).net, 0), lastI = I[I.length - 1];
