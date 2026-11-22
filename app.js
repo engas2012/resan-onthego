@@ -66,7 +66,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.16.3</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.16.4</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -2782,7 +2782,7 @@ function editUser(u, ctx) {
   d.addEventListener('click', async e => { if (e.target === d || e.target.closest('.dx')) close();
     if (e.target.id === 'pw') { const v = prompt('كلمة السر الجديدة (8 حروف على الأقل)'); if (v) toast((await adminFn({ action: 'password', user_id: u.id, password: v })).error || 'اتغيرت كلمة السر'); } });
   f.onsubmit = async e => { e.preventDefault(); const m = readMods(f), b = f.querySelector('button.p'); b.disabled = true; const errs = [];
-    const r1 = await S.sb.from('profiles').update({ full_name: f.n.value.trim() || u.full_name, org: m.org, ops: false }).eq('id', u.id); if (r1.error) errs.push(r1.error.message);
+    const r1 = await S.sb.rpc('admin_set_profile', { p_user: u.id, p_name: f.n.value.trim() || u.full_name, p_org: m.org || null, p_ops: false }); if (r1.error) errs.push(r1.error.message);
     for (const p of S.projects) { const role = m.roles.find(x => x.project_id === p.id)?.role, old = ctx.mem[u.id + '|' + p.id]; if (role === old) continue;
       const r = role ? await S.sb.from('project_members').upsert({ user_id: u.id, project_id: p.id, role }) : await S.sb.from('project_members').delete().eq('user_id', u.id).eq('project_id', p.id); if (r.error) errs.push(r.error.message); }
     const r2 = m.ops ? await S.sb.from('user_modules').upsert({ user_id: u.id, module: 'ops', position: m.ops }) : await S.sb.from('user_modules').delete().eq('user_id', u.id).eq('module', 'ops'); if (r2.error) errs.push(r2.error.message);
