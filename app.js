@@ -66,7 +66,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.18.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.18.1</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -1548,12 +1548,13 @@ async function payForm(kind, x = {}, inv = null, done, pre = {}) {
       ${S.finAny ? `<label>اتحط في حساب${accSel('acc', x.id ? x.account_id : (pre.acc || (S.accs || []).find(a => a.kind === 'bank' && a.active)?.id), '— مش محدد —')}</label>` : ''}<label>طريقة الدفع<select name="method"><option value="">—</option>${PAYM.map(m => `<option${m === x.method ? ' selected' : ''}>${m}</option>`).join('')}</select></label>
       <label>رقم التحويل / الشيك<input name="ref" value="${esc(x.ref || '')}"></label>
       <fieldset data-k="advance" class="wide phs"><legend>الدفعة المقدمة على مرحلة</legend>${P.phaseProg.map(ph => `<label class="chk"><input type="checkbox" name="ph" value="${ph.n}"${(x.phase_ns || pre.phases || []).includes(ph.n) ? ' checked' : ''}> ${ph.n}. ${esc(ph.name)}</label>`).join('')}</fieldset>
+      <label class="chk wide"><input type="checkbox" name="direct"${x.direct ? ' checked' : ''}> مدفوع مباشر من المالك لطرف تالت (مكتب/مورد) – مش وارد للخزينة</label>
       <label class="wide">ملاحظات<input name="notes" value="${esc(x.notes || pre.notes || '')}"></label>
       <div class="acts wide" style="margin:0"><button class="p">حفظ</button></div></form>`;
     document.body.append(d); d.showModal(); const f = d.querySelector('form'), sync = () => d.querySelectorAll('[data-k]').forEach(e => e.hidden = e.dataset.k !== f.kind.value); f.kind.onchange = sync; sync();
     f.inv.onchange = () => { const r = R.find(r => r.i.id === f.inv.value); if (r && !x.id) f.amount.value = Math.round(r.rem) || ''; };
     d.onclick = e => { if (e.target === d || e.target.closest('.dx')) { d.close(); d.remove(); } };
-    f.onsubmit = async e => { e.preventDefault(); const k = f.kind.value, rec = { project_id: P.id, kind: k, invoice_id: k === 'invoice' ? f.inv.value || null : null, phase_ns: k === 'advance' ? [...f.querySelectorAll('[name=ph]:checked')].map(c => +c.value) : null, amount: +f.amount.value, pay_date: f.date.value || null, status: f.status.value, method: f.method.value || null, ref: f.ref.value.trim() || null, notes: f.notes.value.trim() || null }; if (f.acc) rec.account_id = f.acc.value || null;
+    f.onsubmit = async e => { e.preventDefault(); const k = f.kind.value, rec = { project_id: P.id, kind: k, invoice_id: k === 'invoice' ? f.inv.value || null : null, phase_ns: k === 'advance' ? [...f.querySelectorAll('[name=ph]:checked')].map(c => +c.value) : null, amount: +f.amount.value, pay_date: f.date.value || null, status: f.status.value, method: f.method.value || null, ref: f.ref.value.trim() || null, notes: f.notes.value.trim() || null, direct: f.direct.checked }; if (f.acc) rec.account_id = rec.direct ? null : f.acc.value || null;
       if (!(rec.amount > 0)) return toast('اكتب المبلغ'); if (k === 'invoice' && !rec.invoice_id) return toast('اختار المستخلص');
       const { error } = x.id ? await S.sb.from('owner_payments').update(rec).eq('id', x.id) : await S.sb.from('owner_payments').insert(rec); if (error) return toast(error.message);
       d.close(); d.remove(); toast('اتسجلت الدفعة'); (done || renderAcct)(); };
@@ -1654,7 +1655,7 @@ async function renderAcct() {
   const due = sum(live, r => r.net), invPaid = sum(live, r => r.assumed ? r.net : r.paid), other = sum(PY.filter(x => x.kind === 'other' && got(x)), x => x.amount), recv = advGot + invPaid + other, rem = sum(live, r => r.rem);
   const billed = sum(live, r => r.works + r.fee), exp = sum(LG, x => x.expense), lrev = sum(LG, x => x.revenue);
   const phName = n => P.phaseProg.find(x => x.n === n)?.name || '';
-  const pr = x => `${PAYK[x.kind]}${x.kind === 'invoice' ? ' – مستخلص ' + (I.find(i => i.id === x.invoice_id)?.no ?? '؟') : ''}${x.phase_ns?.length ? ' – ' + x.phase_ns.map(n => n + '. ' + phName(n)).join('، ') : ''}`;
+  const pr = x => `${x.direct ? '<span class="tag" title="المالك دفعها مباشر لطرف تالت – بتتحسب في تسوية المالك بس مش وارد خزينة">مدفوع مباشر</span> ' : ''}${PAYK[x.kind]}${x.kind === 'invoice' ? ' – مستخلص ' + (I.find(i => i.id === x.invoice_id)?.no ?? '؟') : ''}${x.phase_ns?.length ? ' – ' + x.phase_ns.map(n => n + '. ' + phName(n)).join('، ') : ''}`;
   const acts = x => ed ? `<button data-ped="${x.id}">تعديل</button><button class="danger" data-pdel="${x.id}">حذف</button>` : '';
   const LIST = PY.filter(x => V.list === 'all' || x.kind === V.list).slice().reverse();
   const costRows = (() => { const m = {}; LG.forEach(x => { const k = x.phase_n || 0; (m[k] ||= { n: k, e: 0, r: 0 }); m[k].e += +x.expense; m[k].r += +x.revenue; }); return Object.values(m).sort((a, b) => (a.n || 99) - (b.n || 99)); })();
