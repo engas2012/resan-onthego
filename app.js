@@ -66,7 +66,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.16.4</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.16.5</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -2957,10 +2957,12 @@ function printBoq() {
   const nc = 6 + (multi ? 1 : 0) + (sr ? 5 : 0), phs = [...new Set(rows.map(r => r.phase_n))];
   const sumOf = L => ({ c: L.reduce((s, r) => s + ctot(r), 0), u: L.reduce((s, r) => s + r.val, 0) });
   const totRow = (lbl, L, cls) => { const t = sumOf(L); return `<tr class="${cls}"><td colspan="${nc - (sr ? 3 : 0)}">${lbl}</td>${sr ? `<td>${t.c ? nf(t.c, 0) : '–'}</td><td>${t.u ? nf(t.u, 0) : '–'}</td><td></td>` : ''}</tr>`; };
+  const hd = ['م', 'الكود', 'البند', ...(multi ? ['المبنى'] : []), 'الوحدة', 'الكمية', 'الإنجاز', ...(sr ? ['السعر التعاقدي', 'السعر المحدّث', 'الإجمالي التعاقدي', 'الإجمالي المحدّث', 'حالة السعر'] : [])];
+  const chRow = `<tr class="ch">${hd.map(h => `<td>${h}</td>`).join('')}</tr>`;
   let m = 0;
   const body = phs.map(n => { const PL = rows.filter(r => r.phase_n === n), gs = [...new Set(PL.map(r => r.group_name))];
     return `<tr class="ph"><td colspan="${nc}">${n}. ${esc(phN(n))}</td></tr>` + gs.map(g => { const L = PL.filter(r => r.group_name === g);
-      return `<tr class="gr"><td colspan="${nc}">${esc(g || '—')} <small>(${L.length} بند)</small></td></tr>` + L.map(r => `<tr class="${r.rsrc === 'web' && r.rate > 0 ? 'guide' : ''}"><td>${++m}</td><td class="cd">${esc(r.code)}</td><td class="nm">${esc(r.name)}${r.is_new ? ' <small class="nw">مستجد</small>' : ''}</td>${multi ? `<td>${esc(r.building || '')}</td>` : ''}<td>${esc(r.unit || '')}</td><td>${+r.qty ? nf(+r.qty) : '–'}</td><td>${r.known ? Math.round(r.pct * 100) + '%' : '–'}</td>${sr ? `<td>${r.crate ? nf(r.crate) : '–'}</td><td>${r.rate ? nf(r.rate) : '–'}</td><td>${ctot(r) ? nf(ctot(r), 0) : '–'}</td><td><b>${r.val ? nf(r.val, 0) : '–'}</b></td><td class="st">${st(r)}</td>` : ''}</tr>`).join('') + (sr ? totRow('إجمالي ' + esc(g || ''), L, 'gt') : ''); }).join('') + (sr ? totRow(`إجمالي المرحلة ${n}. ${esc(phN(n))}`, PL, 'pt') : ''); }).join('') + (sr ? totRow('الإجمالي الكلي', rows, 'all') : '');
+      return `<tr class="gr"><td colspan="${nc}">${esc(g || '—')} <small>(${L.length} بند)</small></td></tr>` + chRow + L.map(r => `<tr class="${r.rsrc === 'web' && r.rate > 0 ? 'guide' : ''}"><td>${++m}</td><td class="cd">${esc(r.code)}</td><td class="nm">${esc(r.name)}${r.is_new ? ' <small class="nw">مستجد</small>' : ''}</td>${multi ? `<td>${esc(r.building || '')}</td>` : ''}<td>${esc(r.unit || '')}</td><td>${+r.qty ? nf(+r.qty) : '–'}</td><td>${r.known ? Math.round(r.pct * 100) + '%' : '–'}</td>${sr ? `<td>${r.crate ? nf(r.crate) : '–'}</td><td>${r.rate ? nf(r.rate) : '–'}</td><td>${ctot(r) ? nf(ctot(r), 0) : '–'}</td><td><b>${r.val ? nf(r.val, 0) : '–'}</b></td><td class="st">${st(r)}</td>` : ''}</tr>`).join('') + (sr ? totRow('إجمالي ' + esc(g || ''), L, 'gt') : ''); }).join('') + (sr ? totRow(`إجمالي المرحلة ${n}. ${esc(phN(n))}`, PL, 'pt') : ''); }).join('') + (sr ? totRow('الإجمالي الكلي', rows, 'all') : '');
   const summ = sr ? `<table class="sm"><thead><tr><th>المرحلة</th><th>عدد البنود</th><th>الإجمالي التعاقدي</th><th>الإجمالي المحدّث</th><th>ناقص سعر</th><th>سعر استرشادي</th></tr></thead><tbody>${phs.map(n => { const L = rows.filter(r => r.phase_n === n), t = sumOf(L); return `<tr><td>${n}. ${esc(phN(n))}</td><td>${L.length}</td><td>${nf(t.c, 0)}</td><td>${nf(t.u, 0)}</td><td>${L.filter(r => priceState(r) !== 'ok' && !(r.rsrc === 'web' && r.rate > 0 && !r.price_need)).length || '–'}</td><td>${L.filter(r => r.rsrc === 'web' && r.rate > 0).length || '–'}</td></tr>`; }).join('')}<tr class="all"><td>الإجمالي</td><td>${rows.length}</td><td>${nf(sumOf(rows).c, 0)}</td><td>${nf(sumOf(rows).u, 0)}</td><td></td><td></td></tr></tbody></table>` : '';
   const html = `<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>مقايسة ${esc(p.name)} – ${today()}</title><base href="${location.href.split('#')[0]}"><style>
   @page{size:A4 landscape;margin:10mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:"Segoe UI",Tahoma,Arial,sans-serif;color:#111;margin:0;padding:6mm;font-size:11px}
@@ -2969,6 +2971,8 @@ function printBoq() {
   table.b th{background:#203864;color:#fff;padding:5px 3px;font-size:11px;border:1px solid #203864}table.b td{border:1px solid #bbb;padding:3px 4px;text-align:center;vertical-align:top}
   table.b td.nm{text-align:right;max-width:330px}table.b td.cd{white-space:nowrap;font-size:10px;color:#333}table.b td.st{font-size:10px;white-space:nowrap}
   tr.ph td{background:#203864;color:#fff;font-weight:700;font-size:13px;text-align:right!important}tr.gr td{background:#dce6f1;font-weight:700;text-align:right!important}
+  tr.ch td{background:#f7f9fc;color:#6b7a90;font-size:9.5px;font-weight:600;padding:2px 4px;border-color:#dde3ec}
+  @media screen{table.b thead th{position:sticky;top:46px;z-index:2}}
   tr.gt td{background:#f2f2f2;font-weight:700}tr.pt td{background:#b4c6e7;font-weight:700}tr.all td{background:#203864;color:#fff;font-weight:700;font-size:13px}
   tr.gt td:first-child,tr.pt td:first-child,tr.all td:first-child{text-align:left}tr.guide td{background:#fff3cf}.gd{color:#a86b00;font-weight:700}.bad{color:#c00}.nw{color:#2a6;font-weight:700}
   table.sm{width:auto;min-width:60%;margin:0 0 12px}table.sm th{background:#203864;color:#fff;padding:5px 10px}table.sm td{border:1px solid #999;padding:4px 10px;text-align:center}table.sm td:first-child{text-align:right}
@@ -2978,7 +2982,7 @@ function printBoq() {
   <div class="bar"><button onclick="print()">🖨️ طباعة / حفظ PDF</button></div>
   <div class="hd"><div><h1>المقايسة${sr ? ' والتكلفة' : ''} – ${esc(p.name)}</h1><div class="mt">${esc(p.place || '')}${p.owner_name ? ' · المالك: ' + esc(p.owner_name) : ''} · بتاريخ ${today().split('-').reverse().join('/')} · ${rows.length} بند${flt ? ' · ' + esc(flt) : ''}</div></div><img src="logo-dark.png" alt="ريسان"></div>
   ${summ}
-  <table class="b"><thead><tr><th>م</th><th>الكود</th><th>البند</th>${multi ? '<th>المبنى</th>' : ''}<th>الوحدة</th><th>الكمية</th><th>الإنجاز</th>${sr ? '<th>السعر التعاقدي</th><th>السعر المحدّث</th><th>الإجمالي التعاقدي</th><th>الإجمالي المحدّث</th><th>حالة السعر</th>' : ''}</tr></thead><tbody>${body}</tbody></table>
+  <table class="b"><thead><tr>${hd.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>
   ${sr ? '<div class="lg">الأسعار توريد وتركيب. الصفوف الصفرا «💡 سعر استرشادي»: سعر من السوق + هامش أمان، مش عرض سعر معتمد وصالح شهر من تاريخ تحديثه.</div>' : ''}
   <div class="ft">ريسان On the go · ${new Date().toLocaleString('en-GB')}</div>
   <script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script></body></html>`;
