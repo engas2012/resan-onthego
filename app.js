@@ -66,7 +66,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.16.2</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.16.3</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -2929,7 +2929,10 @@ async function renderBoq() {
     const btn = $('#bqS'); btn.disabled = true; btn.textContent = 'جاري الحفظ…'; const ch = [...F.pend.entries()]; let err = null;
     const R = ch.filter(([, v]) => 'rate' in v).map(([item_id, v]) => ({ item_id, rate: v.rate, rate_source: 'manual', rate_doc_id: null, rate_updated_at: new Date().toISOString() })); if (R.length) { const { error } = await S.sb.from('boq_rates').upsert(R); err = error; }
     const camtOf = (id, v) => { const r = P.items.find(x => x.id === id), q = v.qty ?? (+r.qty || 0), cr = v.crate ?? r.crate; return Math.round((q > 0 ? q * cr : cr) * 100) / 100; };
-    const CR = ch.filter(([id, v]) => 'crate' in v || ('qty' in v && P.items.find(x => x.id === id)?.camt)).map(([item_id, v]) => ({ item_id, contract_amount: camtOf(item_id, v) })); if (CR.length && !err) { const { error } = await S.sb.from('boq_rates').upsert(CR); err = error; }
+    const CR = ch.filter(([id, v]) => 'crate' in v || ('qty' in v && P.items.find(x => x.id === id)?.camt)).map(([item_id, v]) => ({ item_id, contract_amount: camtOf(item_id, v) })); if (CR.length && !err) { // التعاقدي ثابت من العقد على مستوى المرحلة: نحذّر لو التعديل هيغيّر إجمالي مرحلة
+      const nw = new Map(CR.map(x => [x.item_id, x.contract_amount])), dif = [...new Set(CR.map(x => P.items.find(i => i.id === x.item_id).phase_n))].map(n => { const L = P.items.filter(i => i.phase_n === n), o = L.reduce((t, i) => t + i.camt, 0), m = L.reduce((t, i) => t + (nw.has(i.id) ? nw.get(i.id) : i.camt), 0); return Math.abs(m - o) > 1 ? `المرحلة ${n}: ${nf(o, 0)} ← ${nf(m, 0)}` : ''; }).filter(Boolean);
+      if (dif.length && !confirm('تنبيه: الإجمالي التعاقدي للمرحلة ثابت من العقد، والتعديل ده هيغيّره:\n' + dif.join('\n') + '\n\nلو عاوز تغيّر توزيع التعاقدي بين البنود من غير ما الإجمالي يتغيّر استخدم «⚖️ سعر وحدة موحد».\nتكمل برضه؟')) { btn.disabled = false; return; }
+      const { error } = await S.sb.from('boq_rates').upsert(CR); err = error; }
     const ad = $('#bqD')?.value || today(), EX = ch.filter(([, v]) => 'ex' in v); for (const [id, v] of EX) { if (err) break; const { error } = await S.sb.rpc('adjust_executed', { p_item: id, p_total: v.ex, p_date: ad }); err = error; }
     const PO = ch.filter(([, v]) => 'pov' in v); for (const [id, v] of PO) { if (err) break; const { error } = await S.sb.from('boq_items').update({ pct_override: v.pov == null ? null : Math.min(Math.max(v.pov, 0), 100) / 100 }).eq('id', id); err = error; }
     const Q = ch.filter(([, v]) => 'qty' in v); for (let k = 0; k < Q.length && !err; k += 10) { const res = await Promise.all(Q.slice(k, k + 10).map(([id, v]) => S.sb.from('boq_items').update({ qty: v.qty }).eq('id', id))); err = res.find(x => x.error)?.error; }
