@@ -68,7 +68,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.21.2</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.21.3</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -1393,7 +1393,7 @@ async function renderStore() {
     const cov = need > 0 ? Math.max(0, b) / need : (b > 0 ? 1 : 0);
     const stt = !stocked ? ['follow', 'متابعة فقط'] : +r.shortage > 0 ? ['bad', 'ناقص'] : need > 0 && cov < 1.5 ? ['warn', 'قرب يخلص'] : b > 0 ? ['ok', 'كافي'] : ['idle', 'مفيش حركة'];
     return { r, m, b, need, cov, stt, c: col(r.material_id), stocked }; });
-  const nShort = info.filter(x => x.stt[0] === 'bad').length, nWarn = info.filter(x => x.stt[0] === 'warn').length, nOk = info.filter(x => x.stt[0] === 'ok').length;
+  const nShort = info.filter(x => x.stocked && x.stt[0] === 'bad').length, nWarn = info.filter(x => x.stt[0] === 'warn').length, nOk = info.filter(x => x.stt[0] === 'ok').length;
   const ring = (pct, c) => `<div class="ring" style="--p:${Math.min(pct, 1) * 100};--c:${c}"><span>${pct >= 10 ? '+999' : Math.round(pct * 100)}<small>%</small></span></div>`;
   const card = x => { const r = x.r; const used = +r.issued > 0 ? +r.issued : +r.consumed_est, rec = +r.rec_reports + +r.rec_moves + +r.adjusted;
     return `<div class="mcard s-${x.stt[0]}" style="--c:${x.c}"><div class="mhead"><span class="mic">${micon(r.name)}</span><div style="flex:1;min-width:0"><b>${esc(r.name)}</b><div class="mut" style="font-size:12px">${esc(r.unit)}</div></div><span class="mst">${x.stt[1]}</span></div>
@@ -1407,7 +1407,7 @@ async function renderStore() {
   const order = { bad: 0, warn: 1, ok: 2, idle: 3, follow: 4 };
   const itemOpt = '<option value="">— بدون بند —</option>' + P.items.filter(i => +i.qty > 0).map(i => `<option value="${esc(i.id)}">${esc(i.code + ' ' + i.name.slice(0, 55) + (i.building ? ' – ' + i.building : ''))}</option>`).join('');
   const form = `<form id="mvF" class="card mvform"><div class="seg mk">${Object.entries(MVK).map(([k, [l, , ic]]) => `<button type="button" data-kind="${k}" class="${k === 'receipt' ? 'on' : ''}">${ic} ${l.split(' /')[0]}</button>`).join('')}</div><input type="hidden" name="kind" value="receipt">
-    <div class="grid" style="margin-top:10px"><label>الخامة<select name="mat" required>${M.map(m => `<option value="${m.id}">${micon(m.name)} ${esc(m.name)} (${esc(m.unit)})</option>`).join('')}</select></label>
+    <div class="grid" style="margin-top:10px"><label>الخامة<select name="mat" required>${M.filter(m => m.stocked !== false).map(m => `<option value="${m.id}">${micon(m.name)} ${esc(m.name)} (${esc(m.unit)})</option>`).join('')}</select></label>
     <label>الكمية<input name="qty" type="number" step="any" inputmode="decimal" required></label><label>التاريخ<input name="d" type="date" value="${today()}"></label>
     <label data-k="receipt">المورد<input name="sup"></label><label data-k="issue return" class="wide">للبند<select name="item">${itemOpt}</select></label><label class="wide">ملاحظات<input name="note"></label></div>
     <div class="acts"><button class="p">تسجيل الحركة</button></div><p class="mut" style="margin:0;font-size:12px">الرصيد الموجود فعلاً سجّله كـ"تسوية". التسوية ممكن تكون بالسالب لو الجرد طلع أقل.</p></form>`;
@@ -1424,7 +1424,8 @@ async function renderStore() {
   $('#main').innerHTML = `<div class="sthead"><div><h2 style="margin:0">المخزن</h2><p class="mut" style="margin:2px 0 0;font-size:13px">المتابعة من ${fmtD(start)}${ed ? ' · <a href="#" id="stStart">تغيير</a>' : ''} · <a href="#" id="stHow">إزاي بيتحسب؟</a></p></div></div>
   <div class="note" id="stHowT" hidden>الوارد = توريدات التقارير المعتمدة + أذون الوارد. الرصيد = الوارد − أذون الصرف، ولو مفيش أذون صرف بيتحسب الاستهلاك من الكميات المنفذة × معدلات الاستهلاك. المطلوب = الكمية الباقية في البنود الجارية والبادئة خلال أسبوعين × المعدل + الحد الأدنى.</div>
   <div class="kpis"><div class="kpi k-bad"><b>${nShort}</b><span>خامات ناقصة</span></div><div class="kpi k-warn"><b>${nWarn}</b><span>قربت تخلص</span></div><div class="kpi k-ok"><b>${nOk}</b><span>كافية</span></div><div class="kpi"><b>${MV.length}</b><span>حركة مسجلة</span></div></div>
-  <div class="mgrid">${info.sort((x, y) => order[x.stt[0]] - order[y.stt[0]]).map(card).join('')}</div>
+  <div class="mgrid">${info.filter(x => x.stocked).sort((x, y) => order[x.stt[0]] - order[y.stt[0]]).map(card).join('')}</div>
+  ${info.some(x => !x.stocked) ? `<div class="note" style="margin-top:10px">🚚 <b>توريد مباشر على الصب – مش بيدخل المخزن:</b> ${info.filter(x => !x.stocked).map(x => `${esc(x.r.name)}${+x.r.rec_reports ? ` (اتورد ${nf(x.r.rec_reports, 1)} ${esc(x.r.unit)} من التقارير)` : ''}`).join(' · ')}</div>` : ''}
   <div class="sttabs"><div class="seg">${tabs.map(([k, l]) => `<button type="button" data-tab="${k}" class="${T.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div></div><div style="margin-top:10px">${pane}</div>`;
   const re = () => renderStore();
   bindPrep(re);
