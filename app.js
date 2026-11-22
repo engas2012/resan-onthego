@@ -66,7 +66,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.18.1</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.18.2</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -727,7 +727,7 @@ async function renderOwner() {
   const ring = p => { const r = 54, c = 2 * Math.PI * r; return `<svg viewBox="0 0 130 130" class="oring"><circle cx="65" cy="65" r="${r}" class="bg"/><circle cx="65" cy="65" r="${r}" class="fg" stroke-dasharray="${c * Math.min(p, 1)} ${c}"/><text x="65" y="62">${Math.round(p * 100)}%</text><text x="65" y="84" class="s">نسبة الإنجاز</text></svg>`; };
   let fin = '';
   if (can('acct', pid)) { const [iv, py] = await Promise.all([S.sb.from('owner_invoices').select('*').eq('project_id', pid).neq('status', 'draft'), S.sb.from('owner_payments').select('*').eq('project_id', pid)]); const I = iv.data || [], Y = py.data || [], got = y => y.status === 'received', sum = (A, f) => A.reduce((t, x) => t + (+f(x) || 0), 0);
-    if (I.length || Y.length) { const R = I.map(i => { const q = invPay(i), LP = Y.filter(y => y.kind === 'invoice' && y.invoice_id === i.id), paid = sum(LP.filter(got), y => y.amount), as = !LP.length && i.status === 'paid'; return { gross: q.works + q.fee, rem: as ? 0 : Math.max(q.net - paid, 0), ded: q.ded }; }), adv = sum(Y.filter(y => y.kind === 'advance' && got(y)), y => y.amount), recv = sum(Y.filter(got), y => y.amount), req = sum(Y.filter(y => y.status === 'requested'), y => y.amount), advBal = adv - sum(R, r => r.ded), due = sum(R, r => r.rem);
+    if (I.length || Y.length) { const R = I.map(i => { const q = invPay(i), LP = Y.filter(y => y.kind === 'invoice' && y.invoice_id === i.id), paid = sum(LP.filter(got), y => y.amount), as = !LP.length && i.status === 'paid'; return { gross: q.works + q.fee, rem: as ? 0 : Math.max(q.net - paid, 0), ded: q.ded }; }), adv = sum(Y.filter(y => y.kind === 'advance' && got(y)), y => y.amount), recv = sum(Y.filter(got), y => y.amount), req = sum(Y.filter(y => y.status === 'requested'), y => y.amount), advBal = recv - sum(R, r => r.gross), due = Math.max(-advBal, 0);
       fin = `<section class="osec"><h3>💰 الموقف المالي</h3><div class="otiles"><div><b>${money(sum(R, r => r.gross))}</b><span>قيمة المستخلصات (${I.length})</span></div><div><b>${money(recv)}</b><span>اللي اتدفع لحد دلوقتي</span></div><div class="${due > 1 ? 'warn' : ''}"><b>${money(due)}</b><span>${due > 1 ? 'مستحق من المستخلصات' : 'مفيش مستحقات متأخرة ✓'}</span></div><div><b>${money(advBal)}</b><span>رصيد الدفعات المقدمة${req ? `<br><small>مطلوب ${money(req)}</small>` : ''}</span></div></div><p class="mut">كل المبالغ بالجنيه المصري. <a href="#p/${pid}/acct">التفاصيل في الحسابات ←</a></p></section>`; } }
   let sch = ''; { const [sa, sd] = await Promise.all([S.sb.from('schedule_activities').select('finish,bl_finish').eq('project_id', pid), S.sb.from('schedule_delays').select('days,cause,status,affects_finish').eq('project_id', pid)]);
     const A = sa.data || [], fin = Math.max(0, ...A.map(x => TD(x.finish) || 0)), bf = Math.max(0, ...A.map(x => TD(x.bl_finish) || 0));
@@ -1627,7 +1627,7 @@ async function renderFinAll() {
     const I = (iv.data || []).filter(i => i.status !== 'draft'), PY = py.data || [];
     const R = I.map(i => { const q = invPay(i), L = PY.filter(x => x.kind === 'invoice' && x.invoice_id === i.id), paid = sum(L.filter(got), x => x.amount), assumed = !L.length && i.status === 'paid'; return { ...q, adv: q.works * (1 - +i.pay_pct), paid: assumed ? q.net : paid, rem: assumed ? 0 : Math.max(q.net - paid, 0) }; });
     const advGot = sum(PY.filter(x => x.kind === 'advance' && got(x)), x => x.amount), recv = advGot + sum(R, r => r.paid) + sum(PY.filter(x => x.kind === 'other' && got(x)), x => x.amount);
-    return { p, A, cost, rv, n: I.length, billed: sum(R, r => r.works + r.fee), recv, rem: sum(R, r => r.rem), advBal: advGot - sum(R, r => r.adv), exp: sum(lg.data || [], x => x.expense), pend: pend.count || 0, first: finViews(pid)[0] }; }));
+    return { p, A, cost, rv, n: I.length, billed: sum(R, r => r.works + r.fee), recv, rem: Math.max(sum(R, r => r.works + r.fee) - recv, 0), advBal: recv - sum(R, r => r.works + r.fee), exp: sum(lg.data || [], x => x.expense), pend: pend.count || 0, first: finViews(pid)[0] }; }));
   const anyA = rows.some(r => r.A), anyC = rows.some(r => r.cost), anyR = rows.some(r => r.rv), T = k => sum(rows, r => r[k]);
   const td = (r, k, l, cls = '') => `<td class="n ${cls}" data-l="${l}">${r.A || k === 'exp' && r.cost ? nf(r[k], 0) : '–'}</td>`;
   $('#main').innerHTML = `${anyA ? `<div class="kpis">
@@ -1653,7 +1653,7 @@ async function renderAcct() {
   const live = R.filter(r => r.i.status !== 'draft'), sum = (A, f) => A.reduce((s, x) => s + (+f(x) || 0), 0);
   const AD = PY.filter(x => x.kind === 'advance'), advGot = sum(AD.filter(got), x => x.amount), advReq = sum(AD.filter(x => !got(x)), x => x.amount), advUsed = sum(live, r => r.adv), advBal = advGot - advUsed;
   const due = sum(live, r => r.net), invPaid = sum(live, r => r.assumed ? r.net : r.paid), other = sum(PY.filter(x => x.kind === 'other' && got(x)), x => x.amount), recv = advGot + invPaid + other, rem = sum(live, r => r.rem);
-  const billed = sum(live, r => r.works + r.fee), exp = sum(LG, x => x.expense), lrev = sum(LG, x => x.revenue);
+  const billed = sum(live, r => r.works + r.fee), pBal = recv - billed, pRem = Math.max(-pBal, 0), exp = sum(LG, x => x.expense), lrev = sum(LG, x => x.revenue);
   const phName = n => P.phaseProg.find(x => x.n === n)?.name || '';
   const pr = x => `${x.direct ? '<span class="tag" title="المالك دفعها مباشر لطرف تالت – بتتحسب في تسوية المالك بس مش وارد خزينة">مدفوع مباشر</span> ' : ''}${PAYK[x.kind]}${x.kind === 'invoice' ? ' – مستخلص ' + (I.find(i => i.id === x.invoice_id)?.no ?? '؟') : ''}${x.phase_ns?.length ? ' – ' + x.phase_ns.map(n => n + '. ' + phName(n)).join('، ') : ''}`;
   const acts = x => ed ? `<button data-ped="${x.id}">تعديل</button><button class="danger" data-pdel="${x.id}">حذف</button>` : '';
@@ -1663,13 +1663,13 @@ async function renderAcct() {
   <div class="kpis">
     <div class="kpi"><b>${money(billed)}</b><span>قيمة المستخلصات المقدمة<br><small>أعمال ${money(sum(live, r => r.works))} + أتعاب ${money(sum(live, r => r.fee))}</small></span></div>
     <div class="kpi k-ok"><b>${money(recv)}</b><span>إجمالي المحصّل من المالك<br><small>مقدم ${money(advGot)} + مستخلصات ${money(invPaid)}${other ? ' + أخرى ' + money(other) : ''}</small></span></div>
-    <div class="kpi${rem > 0 ? ' k-bad' : ''}"><b>${money(rem)}</b><span>متأخرات على المالك<br><small>من صافي المستحق ${money(due)}</small></span></div>
-    <div class="kpi${advBal < 0 ? ' k-bad' : ''}"><b>${money(advBal)}</b><span>رصيد الدفعات المقدمة<br><small>مستلم ${money(advGot)} − اتخصم ${money(advUsed)}${advReq ? ' · مطلوب ' + money(advReq) : ''}</small></span></div>
+    <div class="kpi${pRem > 0 ? ' k-bad' : ''}"><b>${money(pRem)}</b><span>متأخرات على المالك<br><small>قيمة المستخلصات − كل المحصّل</small></span></div>
+    <div class="kpi${pBal < 0 ? ' k-bad' : ''}"><b>${money(Math.max(pBal, 0))}</b><span>رصيد المقدم عند المالك<br><small>المحصّل أكبر من المستخلصات${advReq ? ' · مطلوب ' + money(advReq) : ''}</small></span></div>
     ${cost ? `<div class="kpi${recv - exp < 0 ? ' k-warn' : ''}"><b>${money(exp)}</b><span>المصروف الفعلي (شيت الحسابات)<br><small>${recv - exp >= 0 ? 'المحصّل أكبر بـ ' + money(recv - exp) : 'المصروف أكبر من المحصّل بـ ' + money(exp - recv)}</small></span></div>` : ''}
   </div>
-  ${advBal < 0 ? `<div class="note">المخصوم من الدفعات المقدمة (${money(advUsed)}) أكبر من المقدم المستلم (${money(advGot)}). يا إما فيه دفعات مقدمة لسه ماتسجلتش، يا إما المستخلصات الجاية محتاجة تتصرف بنسبة أعلى.</div>` : ''}
+  ${false ? `<div class="note">المخصوم من الدفعات المقدمة (${money(advUsed)}) أكبر من المقدم المستلم (${money(advGot)}). يا إما فيه دفعات مقدمة لسه ماتسجلتش، يا إما المستخلصات الجاية محتاجة تتصرف بنسبة أعلى.</div>` : ''}
   <div class="secT">المستخلصات والدفعات</div>
-  ${I.length ? `<div class="card" style="padding:0"><div class="scroll"><table class="actb stack"><thead><tr><th>المستخلص</th><th>الحالة</th><th class="n">الأعمال</th><th class="n">الأتعاب</th><th class="n">يتخصم من المقدم</th><th class="n">صافي المستحق</th><th class="n">المنصرف</th><th class="n">المتبقي</th><th></th></tr></thead><tbody>
+  ${I.length ? `<div class="card" style="padding:0"><div class="scroll"><table class="actb stack"><thead><tr><th>المستخلص</th><th>الحالة</th><th class="n">الأعمال</th><th class="n">الأتعاب</th><th class="n">يتخصم من المقدم</th><th class="n">صافي المستحق</th><th class="n">المنصرف</th><th class="n" title="بنسبة الصرف المسجلة على المستخلص – الموقف الفعلي في الكروت فوق">المتبقي بالنسبة</th><th></th></tr></thead><tbody>
     ${R.map(r => `<tr class="${r.i.status === 'draft' ? 'dim' : ''}"><td data-l="المستخلص"><a href="#p/${P.id}/inv" data-iv="${r.i.id}"><b>${r.i.no}</b> ${esc(r.i.title || '')}</a><div class="mut" style="font-size:11px">${r.i.inv_date ? fmtD(r.i.inv_date) : 'بدون تاريخ'}${r.last ? ' · آخر دفعة ' + fmtD(r.last) : ''}</div></td><td data-l="الحالة"><span class="st ${IST[r.i.status][0]}">${IST[r.i.status][1]}</span></td>
       <td class="n" data-l="الأعمال">${nf(r.works, 0)}</td><td class="n" data-l="الأتعاب">${nf(r.fee, 0)}</td><td class="n" data-l="يتخصم من المقدم">${nf(r.adv, 0)}<div class="mut" style="font-size:11px">${Math.round((1 - r.i.pay_pct) * 100)}%</div></td><td class="n" data-l="صافي المستحق"><b>${nf(r.net, 0)}</b></td>
       <td class="n" data-l="المنصرف">${r.assumed ? '<span class="mut" title="المستخلص حالته اتصرف ومفيش تفاصيل دفعات متسجلة">اتصرف كله*</span>' : r.paid ? nf(r.paid, 0) : '–'}</td><td class="n ${r.rem > 0 ? 'bad' : ''}" data-l="المتبقي">${r.i.status === 'draft' ? 'مسودة' : r.over > 1 ? '<span class="mut">زيادة ' + nf(r.over, 0) + '</span>' : r.rem > 0 ? nf(r.rem, 0) : '✔'}</td>
