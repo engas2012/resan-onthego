@@ -68,7 +68,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.19.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.19.1</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -1594,7 +1594,7 @@ async function renderPhFin() {
   <div class="kpis">
     <div class="kpi k-ok"><b>${money(T('inflow'))}</b><span>الوارد للمراحل<br><small>مقدم ${money(T('got'))} + من المستخلصات ${money(T('wGot'))}${advNone ? `<br><b class="bad">+ مقدم مش متوزع ${money(advNone)}</b>` : ''}</small></span></div>
     <div class="kpi"><b>${money(T('out'))}</b><span>المنصرف على المراحل<br><small>${expNone ? 'غير موزع على مرحلة ' + money(expNone) : 'من القيود المعتمدة'}</small></span></div>
-    <div class="kpi${T('bal') < 0 ? ' k-bad' : ''}"><b>${money(T('bal'))}</b><span>${T('bal') < 0 ? 'عجز' : 'فائض'} (الوارد − المنصرف)</span></div>
+    <div class="kpi${T('bal') + advNone < 0 ? ' k-bad' : ' k-ok'}"><b>${money(T('bal') + advNone)}</b><span>${T('bal') + advNone < 0 ? 'عجز' : 'فائض'} (كل الوارد − المنصرف)${advNone ? `<br><small>منه مقدم مش متوزع ${money(advNone)}</small>` : ''}</span></div>
     <div class="kpi k-warn"><b>${money(Math.max(T('claim') - advNone, 0))}</b><span>ممكن نطالب بيه كدفعات مقدمة<br><small>${advNone ? 'بعد خصم المقدم اللي مش متوزع ' + money(advNone) + ' – وزّعه عشان الرقم يبقى دقيق لكل مرحلة' : 'متبقي مقدم ' + money(T('advRem'))}</small></span></div>
     <div class="kpi"><b>${money(feeGot)}</b><span>أتعاب الشركة المحصّلة<br><small>بره تمويل المراحل</small></span></div></div>
   <div class="card" style="padding:0"><div class="scroll"><table class="actb pft"><thead><tr><th>المرحلة</th><th class="n">السعر التقديري</th><th class="n">المقدم المستحق ${Math.round(AP * 100)}%</th><th class="n">المقدم المستلم</th><th class="n">أعمال مستخلصة</th><th class="n">اتخصم من المقدم</th><th class="n">رصيد المقدم</th><th class="n">وارد المستخلصات</th><th class="n">إجمالي الوارد</th><th class="n">المنصرف</th><th class="n">الفرق</th><th class="n">المطالبة</th><th></th></tr></thead><tbody>
