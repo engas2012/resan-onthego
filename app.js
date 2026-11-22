@@ -68,7 +68,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.21.1</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.21.2</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -2163,20 +2163,24 @@ function parseAcctSheet(A) {
   const accs = cols.map((j, i) => { let name = str(H[j]).replace(/\s+/g, ' ');
     if (!name) { const c = {}; D.forEach(r => { if (num(r[j])) { const k = str(r[4]).match(/عهد[ةه]\s*(?:م\s*[\/.]?\s*)?\/?\s*([^\s\d]+(?:\s+(?!لزوم|موقع|مصاريف)[^\s\d]+)?)/); if (k) c[k[1]] = (c[k[1]] || 0) + 1; } }); const g = Object.entries(c).sort((a, b) => b[1] - a[1])[0]; name = g ? `عهدة م/${g[0]} (عمود ${colL(j)})` : `حساب (عمود ${colL(j)})`; }
     return { i, key: 'sheet:' + colL(j), col: j, name, kind: /بنك/.test(name) ? 'bank' : /خزين/.test(name) ? 'cash' : 'custody' }; });
-  const rows = [], skip = [];
+  const rows = [], skip = [], cash = accs.filter(a => a.kind !== 'custody'), bank = cash.find(a => a.kind === 'bank') || cash[0];
+  // العهد بتتصرف وتتصفى في مصروفات: مصروف العهدة بيتحسب على البنك ويتكتب اسم العهدة عليه، وتحويلات العهد مش بتتسجل
   D.forEach((r, ri) => {
-    const pj = str(r[6]), rev = num(r[15]), exp = num(r[16]), dr = accs.filter(a => num(r[a.col]) > 0), cr = accs.filter(a => num(r[a.col + 1]) > 0);
+    const pj = str(r[6]), rev = num(r[15]), exp = num(r[16]), dr0 = accs.filter(a => num(r[a.col]) > 0), cr0 = accs.filter(a => num(r[a.col + 1]) > 0), cust = [...cr0, ...dr0].find(a => a.kind === 'custody');
+    const dr = dr0.filter(a => a.kind !== 'custody'), cr = cr0.filter(a => a.kind !== 'custody');
     const base = { d: acctDate(r[1]), desc: str(r[4]) || null, sup: str(r[5]) || null, ref: str(r[3]) || null };
     if (exp > 0) { const pid = ACCT_PRJ[pj] || null, txt = [base.desc, base.sup].join(' ');
-      rows.push(pid ? { ...base, t: 'exp', pid, amt: exp, acc: cr[0]?.key || dr[0]?.key || null, mp: str(r[7]) || null, sp: str(r[8]) || null, cat: str(r[9]) || null, sub: str(r[10]) || null, ph: ACCT_PH[str(r[7])] || null }
-        : { ...base, t: 'exp', pid: null, amt: exp, acc: cr[0]?.key || dr[0]?.key || null, cat: acctGaCat(txt), sub: pj === 'المصنع' ? 'المصنع' : str(r[10]) || str(r[9]) || (pj && pj !== 'ريسان' ? pj : null) }); }
-    else if (rev > 0) { const pid = ACCT_PRJ[pj] || null; rows.push({ ...base, t: 'rev', pid, amt: rev, acc: dr[0]?.key || null, srcn: pid ? 'تحصيل مالك – ' + pj : 'وارد للشركة' + (pj && pj !== 'ريسان' ? ' – ' + pj : '') }); }
-    else if (dr.length && cr.length) rows.push({ ...base, t: 'tr', amt: num(r[dr[0].col]), acc: cr[0].key, acc2: dr[0].key });
+      const ea = cr[0]?.key || dr[0]?.key || bank?.key || null, pm = cust && !cr.length ? cust.name : null;
+      rows.push(pid ? { ...base, t: 'exp', pid, amt: exp, acc: ea, pm, mp: str(r[7]) || null, sp: str(r[8]) || null, cat: str(r[9]) || null, sub: str(r[10]) || null, ph: ACCT_PH[str(r[7])] || null }
+        : { ...base, t: 'exp', pid: null, amt: exp, acc: ea, pm, cat: acctGaCat(txt), sub: pj === 'المصنع' ? 'المصنع' : str(r[10]) || str(r[9]) || (pj && pj !== 'ريسان' ? pj : null) }); }
+    else if (rev > 0) { const pid = ACCT_PRJ[pj] || null; rows.push({ ...base, t: 'rev', pid, amt: rev, acc: dr[0]?.key || bank?.key || null, srcn: pid ? 'تحصيل مالك – ' + pj : 'وارد للشركة' + (pj && pj !== 'ريسان' ? ' – ' + pj : '') }); }
+    else if (cust || (dr.length && cr.length && dr[0] === cr[0])) return;
+    else if (dr.length && cr.length && dr[0] !== cr[0]) rows.push({ ...base, t: 'tr', amt: num(r[dr[0].col]), acc: cr[0].key, acc2: dr[0].key });
     else if (dr.length) rows.push({ ...base, t: 'in', amt: num(r[dr[0].col]), acc: dr[0].key });
     else if (cr.length) rows.push({ ...base, t: 'out', amt: num(r[cr[0].col + 1]), acc: cr[0].key });
     else if (num(r[12]) || num(r[13])) skip.push(ri + 4);
   });
-  return { accs: accs.map(({ col, ...a }) => a), rows: rows.filter(x => x.amt > 0), skip };
+  return { accs: cash.map(({ col, ...a }) => a), rows: rows.filter(x => x.amt > 0), skip, cust: accs.filter(a => a.kind === 'custody').map(a => a.name) };
 }
 async function importAcctSheet(re) {
   const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.xlsx,.xls,.xlsm';
@@ -2194,8 +2198,8 @@ async function importAcctSheet(re) {
     <tr><td>مصروفات إدارية</td><td class="n">${nf(sm(x => x.t === 'exp' && !x.pid && x.cat !== 'دفعات_موردين'), 0)}</td><td></td></tr>
     <tr><td>دفعات موردين تحت التوزيع</td><td class="n">${nf(sm(x => x.t === 'exp' && !x.pid && x.cat === 'دفعات_موردين'), 0)}</td><td></td></tr>
     <tr><td>وارد للشركة (تمويل)</td><td></td><td class="n">${nf(sm(x => x.t === 'rev' && !x.pid), 0)}</td></tr>
-    <tr><td>تحويلات بين البنك والعهد</td><td class="n">${R.rows.filter(x => x.t === 'tr').length} حركة</td><td class="n">${nf(sm(x => x.t === 'tr'), 0)}</td></tr></tbody></table>
-    <p style="font-size:13px;margin:10px 0 4px"><b>الحسابات (${R.accs.length}):</b> ${R.accs.map(a => esc(a.name)).join(' · ')}</p>
+    </tbody></table>
+    <p style="font-size:13px;margin:10px 0 4px"><b>الحسابات:</b> ${R.accs.map(a => esc(a.name)).join(' · ')}${R.cust.length ? `<br><span class="mut" style="font-size:12px">العهد (${R.cust.length}) بتتصفى في مصروفات، فمصروفاتها بتتحسب على البنك ويتكتب عليها اسم العهدة، وتحويلات العهد مش بتتسجل كحركات.</span>` : ''}</p>
     <p class="mut" style="font-size:12px">${R.rows.filter(x => !x.d).length} قيد من غير تاريخ في الشيت. الحسابات الجديدة تقدر تغيّر اسمها بعد الاستيراد وهيفضل محفوظ.</p>
     <div class="acts"><button class="p" id="impGo">استيراد</button></div>`;
     document.body.append(d); d.showModal(); const close = () => { d.close(); d.remove(); };
