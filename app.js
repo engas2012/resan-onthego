@@ -24,6 +24,8 @@ const CAN = {
   ledger: ['finance', 'management'],
   boq: ['tech', 'finance', 'management'],
   meet: ['tech', 'finance', 'management'],
+  orders: ['tech', 'finance', 'management', 'store'],
+  ordersEd: ['tech', 'management', 'store'],
   inv: ['tech', 'finance', 'management', 'owner', 'consultant'],
   invEdit: ['tech', 'finance', 'management'],
   quotes: ['tech', 'finance', 'management', 'consultant', 'owner'],
@@ -69,7 +71,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.24.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.25.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -104,8 +106,8 @@ async function afterLogin(user) {
 }
 
 /* ---------------- layout & routing ---------------- */
-const VIEWS = [['status', 'الموقف التنفيذي', null], ['meet', 'تقرير الاجتماع', 'meet'], ['schedule', 'الجدول الزمني', 'sched'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة التقارير', 'review'], ['log', 'سجل التقارير', 'log'], ['tasks', 'مهام المكتب الفني', 'tasks'], ['boq', 'المقايسة والتكلفة', 'boq'], ['quotes', 'عروض الأسعار', 'quotes'], ['subs', 'عقود المقاولين', 'subs'], ['acct', 'ملخص الحسابات', 'acct'], ['phfin', 'حساب المراحل', 'ledger'], ['ledger', 'القيود والمصروفات', 'ledgerEd'], ['custody', 'العهدة', 'custody'], ['inv', 'المستخلصات', 'inv'], ['ded', 'الخصومات المعلقة', 'ded'], ['store', 'المخزن', 'store'], ['docs', 'المستندات', 'docs']];
-const NAVG = [['متابعة المشروع', '📊', ['status', 'meet', 'schedule']], ['التقارير اليومية', '📝', ['report', 'review', 'log']], ['المكتب الفني والتسعير', '📐', ['tasks', 'boq', 'quotes', 'subs']], ['المخزن والمستندات', '📦', ['store', 'docs']]];
+const VIEWS = [['status', 'الموقف التنفيذي', null], ['meet', 'تقرير الاجتماع', 'meet'], ['schedule', 'الجدول الزمني', 'sched'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة التقارير', 'review'], ['log', 'سجل التقارير', 'log'], ['tasks', 'مهام المكتب الفني', 'tasks'], ['boq', 'المقايسة والتكلفة', 'boq'], ['quotes', 'عروض الأسعار', 'quotes'], ['orders', 'الطلبيات', 'orders'], ['subs', 'عقود المقاولين', 'subs'], ['acct', 'ملخص الحسابات', 'acct'], ['phfin', 'حساب المراحل', 'ledger'], ['ledger', 'القيود والمصروفات', 'ledgerEd'], ['custody', 'العهدة', 'custody'], ['inv', 'المستخلصات', 'inv'], ['ded', 'الخصومات المعلقة', 'ded'], ['store', 'المخزن', 'store'], ['docs', 'المستندات', 'docs']];
+const NAVG = [['متابعة المشروع', '📊', ['status', 'meet', 'schedule']], ['التقارير اليومية', '📝', ['report', 'review', 'log']], ['المكتب الفني والتسعير', '📐', ['tasks', 'boq', 'quotes', 'orders', 'subs']], ['المخزن والمستندات', '📦', ['store', 'docs']]];
 const FINV = ['acct', 'phfin', 'ledger', 'inv', 'ded'], FINC = { acct: 'acct', phfin: 'ledger', ledger: 'ledgerEd', inv: 'inv', ded: 'ded' };
 const finOn = () => finPids().length > 0 || S.projects.some(p => can('custody', p.id));
 const FINCO = () => [['fin', 'ملخص المشروعات', finPids().length > 0], ['fin/bank', 'البنك والخزينة', S.finAny], ['fin/ga', 'المصروفات الإدارية', S.finAny], ['fin/custody', 'العهد', S.projects.some(p => can('custody', p.id))], ['fin/people', 'حسابات الأفراد', S.admin]].filter(x => x[2]);
@@ -147,6 +149,7 @@ async function route() {
     if (view === 'log' && can('log', pid)) return renderLog();
     if (view === 'boq' && can('boq', pid)) return renderBoq();
     if (view === 'meet' && can('meet', pid)) return renderMeet();
+    if (view === 'orders' && can('orders', pid)) return renderOrders();
     if (view === 'schedule' && can('sched', pid)) return renderSchedule();
     if (view === 'docs' && can('docs', pid)) return renderDocs();
     if (view === 'quotes' && can('quotes', pid)) return renderQuotes();
@@ -3045,6 +3048,94 @@ async function importLedger(file) {
     for (const pid of pids) { if (!can('ledger', pid)) continue; const { error } = await S.sb.from('ledger_entries').delete().eq('project_id', pid).eq('source', 'excel'); err = err || error;
       const L = out.filter(x => x.project_id === pid); for (let k = 0; k < L.length && !err; k += 500) { const { error: e2 } = await S.sb.from('ledger_entries').insert(L.slice(k, k + 500)); err = e2; } }
     if (err) { $('#lgGo').disabled = false; return toast('حصلت مشكلة: ' + err.message); } toast('اتحدثت بيانات الحسابات'); S.P.contract = null; location.hash.endsWith('/acct') ? renderAcct() : renderBoq(); };
+}
+/* ---------------- الطلبيات (طلبيات التوريد من بنود المقايسة) ---------------- */
+const ORDS = { draft: ['مسودة', ''], requested: ['مطلوبة للاعتماد', 'pend'], approved: ['معتمدة', 'run'], ordered: ['اتطلبت من المورد', 'run'], partial: ['وصل جزء', 'warn'], delivered: ['اتوردت بالكامل', 'appr'], cancelled: ['ملغية', 'ret'] };
+const ORD_LUMP = /مقطوع|نظام|جملة|بند|ملف|مشروع/;
+async function renderOrders() {
+  const P = S.P, pid = P.id, ed = can('ordersEd', pid), V = (S.or ||= { tab: 'need', ph: '', b: '', q: '', st: 'live', due: '', lead: 30, sel: new Set() });
+  $('#main').innerHTML = '<p class="mut">جاري التحميل…</p>';
+  const [oq, lq, aq, lk] = await Promise.all([S.sb.from('supply_orders').select('*').eq('project_id', pid).order('no', { ascending: false }), S.sb.from('supply_order_lines').select('*, supply_orders!inner(project_id,status)').eq('supply_orders.project_id', pid),
+    S.sb.from('schedule_activities').select('id,phase_n,start,finish,is_summary').eq('project_id', pid), S.sb.from('schedule_activity_items').select('activity_id,item_id')]);
+  if (oq.error) return $('#main').innerHTML = `<div class="note">${esc(oq.error.message)}</div>`;
+  const O = oq.data || [], L = lq.data || [], A = aq.data || [], LK = lk.data || [], T0 = today(), sum = (X, f) => X.reduce((t, x) => t + (+f(x) || 0), 0);
+  if (!(P.items || []).length) { const [it, rt] = await Promise.all([S.sb.from('boq_progress').select('*').eq('project_id', pid).order('sort'), S.sb.from('boq_rates').select('item_id,rate')]); const R = Object.fromEntries((rt.data || []).map(r => [r.item_id, +r.rate])); P.items = (it.data || []).map(i => ({ ...i, ex: +i.executed || 0, rate: R[i.id] || 0, pct: +i.qty > 0 ? (+i.executed || 0) / +i.qty : 0 })); }
+  if (!P.vendors?.length) P.vendors = (await S.sb.from('vendors').select('*').order('trade').order('name')).data || [];
+  const live = o => o.status !== 'cancelled', ordQ = id => sum(L.filter(l => l.item_id === id && live(l.supply_orders)), l => l.qty), recQ = id => sum(L.filter(l => l.item_id === id && live(l.supply_orders)), l => l.received_qty);
+  const phStart = n => A.filter(a => a.phase_n === n && a.start).map(a => a.start).sort()[0];
+  const itStart = id => { const ids = LK.filter(k => k.item_id === id).map(k => k.activity_id); return A.filter(a => ids.includes(a.id) && a.start).map(a => a.start).sort()[0]; };
+  const addD = (d, n) => new Date(Date.parse(d) + n * 864e5).toISOString().slice(0, 10);
+  const phDone = n => (P.phaseProg.find(x => x.n === n)?.pct || 0) >= 0.995;
+  const rows = P.items.filter(r => +r.qty > 0 && !phDone(r.phase_n)).map(r => { const q = +r.qty, ord = ordQ(r.id), rec = recQ(r.id), toOrd = Math.max(q - Math.max(ord, r.ex || 0), 0), st = itStart(r.id) || phStart(r.phase_n), by = st ? addD(st, -V.lead) : null;
+    const due = !toOrd ? 'ok' : !by ? 'nodate' : by < T0 ? 'late' : by <= addD(T0, 21) ? 'now' : 'later'; return { r, q, ord, rec, toOrd, st, by, due, lump: ORD_LUMP.test(r.unit || '') }; });
+  const DUE = { late: ['فات ميعاد الطلب', 'ret'], now: ['اطلب خلال 3 أسابيع', 'warn'], later: ['لاحقاً', ''], nodate: ['مش في الجدول', 'pend'], ok: ['اتطلب بالكامل', 'appr'] };
+  const flt = rows.filter(x => (!V.ph || String(x.r.phase_n) === V.ph) && (!V.b || x.r.building === V.b) && (!V.due || x.due === V.due) && (V.due === 'ok' || x.toOrd > 0) && (!V.q || (x.r.code + ' ' + x.r.name + ' ' + x.r.group_name).includes(V.q)));
+  const keys = [...new Set(flt.map(x => x.r.phase_n + '|' + x.r.group_name))], phs = [...new Set(rows.map(x => x.r.phase_n))].sort((a, b) => a - b), bs = [...new Set(rows.map(x => x.r.building).filter(Boolean))];
+  const pend = rows.filter(x => x.toOrd > 0), kpi = k => pend.filter(x => x.due === k);
+  const OL = O.filter(o => V.st === 'all' || (V.st === 'live' ? !['delivered', 'cancelled'].includes(o.status) : o.status === V.st)), oVal = o => sum(L.filter(l => l.order_id === o.id), l => l.qty * (l.rate || 0));
+  $('#main').innerHTML = `<div class="sthead"><div><h2 style="margin:0">الطلبيات – توريدات بنود المقايسة</h2><p class="mut" style="margin:2px 0 0;font-size:13px">جدول الاحتياج بيطلع من المقايسة: الكمية − (المطلوب في طلبيات أو المنفذ أيهما أكبر). ميعاد الطلب = بداية النشاط في الجدول الزمني − مدة التوريد.</p></div>
+  <div class="acts" style="margin:0"><button class="${V.tab === 'need' ? 'p' : ''}" data-tab="need">جدول الاحتياج</button><button class="${V.tab === 'list' ? 'p' : ''}" data-tab="list">الطلبيات (${O.filter(o => !['delivered', 'cancelled'].includes(o.status)).length})</button></div></div>
+  ${V.tab === 'need' ? `<div class="kpis">${['late', 'now', 'later', 'nodate'].map(k => `<button type="button" class="kpi${k === 'late' && kpi(k).length ? ' k-bad' : k === 'now' && kpi(k).length ? ' k-warn' : ''}${V.due === k ? ' on' : ''}" data-due="${k}" style="text-align:right"><b>${kpi(k).length}</b><span>${DUE[k][0]}<br><small>${P.showRates !== false ? money(sum(kpi(k), x => x.toOrd * x.r.rate)) + ' ج.م' : ''}</small></span></button>`).join('')}</div>
+  <div class="filters"><select id="orPh"><option value="">كل المراحل الجارية والجاية</option>${phs.map(n => `<option value="${n}"${String(n) === V.ph ? ' selected' : ''}>${n}. ${esc(P.phaseProg.find(x => x.n === n)?.name || '')}</option>`).join('')}</select>${bs.length > 1 ? `<select id="orB"><option value="">كل المباني</option>${bs.map(b => `<option${b === V.b ? ' selected' : ''}>${esc(b)}</option>`).join('')}</select>` : ''}<select id="orDue"><option value="">كل المواعيد</option>${Object.entries(DUE).map(([k, l]) => `<option value="${k}"${k === V.due ? ' selected' : ''}>${l[0]}</option>`).join('')}</select><input id="orQ" type="search" placeholder="بحث في البنود" value="${esc(V.q)}"><label class="edd">مدة التوريد (يوم)<input type="number" id="orLead" value="${V.lead}" style="width:70px"></label></div>
+  ${ed ? `<div class="editbar" id="orBar"${V.sel.size ? '' : ' hidden'}><span>${V.sel.size} بند متعلّم</span><button class="ok" id="orMk">+ عمل طلبية بالبنود دي</button><button id="orClr">إلغاء التعليم</button></div>` : ''}
+  ${flt.length ? `<div class="card" style="padding:0"><div class="scroll"><table class="stack it"><thead><tr>${ed ? '<th></th>' : ''}<th>البند</th>${bs.length > 1 ? '<th>المبنى</th>' : ''}<th>الوحدة</th><th class="n">الكمية</th><th class="n">المنفذ</th><th class="n">في طلبيات</th><th class="n">المطلوب طلبه</th><th class="n">القيمة</th><th>يبدأ</th><th>اطلب قبل</th><th>الحالة</th></tr></thead><tbody>
+  ${keys.map(k => { const G = flt.filter(x => x.r.phase_n + '|' + x.r.group_name === k), ids = G.filter(x => x.toOrd > 0).map(x => x.r.id), allSel = ids.length && ids.every(i => V.sel.has(i));
+    return `<tr class="gh"><td colspan="${11 + (ed ? 1 : 0) + (bs.length > 1 ? 1 : 0) - 1}">${ed && ids.length ? `<input type="checkbox" data-gsel="${esc(k)}"${allSel ? ' checked' : ''}> ` : ''}${G[0].r.phase_n}. ${esc(P.phaseProg.find(x => x.n === G[0].r.phase_n)?.name || '')} – ${esc(G[0].r.group_name)} <span class="mut">(${G.length})</span></td><td class="n">${nf(sum(G, x => x.toOrd * x.r.rate), 0)}</td></tr>` +
+    G.map(x => `<tr${x.r.on_hold ? ' class="mut"' : ''}>${ed ? `<td>${x.toOrd > 0 ? `<input type="checkbox" data-sel="${esc(x.r.id)}"${V.sel.has(x.r.id) ? ' checked' : ''}>` : ''}</td>` : ''}<td data-l="البند"><b>${esc(x.r.code)}</b> ${esc(x.r.name)}${x.r.on_hold ? ' <span class="tag">⏸ معلّق</span>' : ''}${x.lump ? ' <span class="tag">مقطوعية</span>' : ''}</td>${bs.length > 1 ? `<td data-l="المبنى">${esc(x.r.building || '')}</td>` : ''}<td data-l="الوحدة">${esc(x.r.unit || '')}</td><td class="n" data-l="الكمية">${nf(x.q)}</td><td class="n" data-l="المنفذ">${x.r.ex ? nf(x.r.ex) : '–'}</td><td class="n" data-l="في طلبيات">${x.ord ? nf(x.ord) + (x.rec ? `<div class="mut" style="font-size:11px">وصل ${nf(x.rec)}</div>` : '') : '–'}</td><td class="n" data-l="المطلوب"><b>${x.toOrd ? nf(x.toOrd) : '–'}</b></td><td class="n" data-l="القيمة">${x.toOrd && x.r.rate ? nf(x.toOrd * x.r.rate, 0) : '–'}</td><td data-l="يبدأ">${x.st ? fmtD(x.st) : '–'}</td><td data-l="اطلب قبل">${x.by ? fmtD(x.by) : '–'}</td><td data-l="الحالة"><span class="tag ${DUE[x.due][1]}">${DUE[x.due][0]}</span></td></tr>`).join(''); }).join('')}
+  </tbody></table></div></div>` : '<div class="note">مفيش بنود محتاجة طلبيات بالفلتر ده.</div>'}` :
+  `<div class="acts" style="margin:6px 0">${[['live', 'الجارية'], ['ordered', 'اتطلبت'], ['delivered', 'اتوردت'], ['cancelled', 'ملغية'], ['all', 'الكل']].map(([k, l]) => `<button class="${V.st === k ? 'p' : ''}" data-ost="${k}">${l}</button>`).join('')}${ed ? '<button class="p" id="orNew" style="margin-inline-start:auto">+ طلبية فاضية</button>' : ''}</div>
+  ${OL.length ? `<div class="card" style="padding:0"><div class="scroll"><table class="actb stack"><thead><tr><th>رقم</th><th>الطلبية</th><th>المورد</th><th class="n">البنود</th><th class="n">القيمة</th><th>مطلوبة يوم</th><th>الحالة</th><th></th></tr></thead><tbody>
+  ${OL.map(o => { const ls = L.filter(l => l.order_id === o.id), rq = sum(ls, l => l.qty), rc = sum(ls, l => l.received_qty), late = o.need_date && o.need_date < T0 && !['delivered', 'cancelled'].includes(o.status);
+    return `<tr><td data-l="رقم"><b>${o.no}</b></td><td data-l="الطلبية"><b>${esc(o.title)}</b>${o.phase_n ? `<div class="mut" style="font-size:11px">مرحلة ${o.phase_n}</div>` : ''}</td><td data-l="المورد">${esc(o.vendor_name || P.vendors.find(v => v.id === o.vendor_id)?.name || '–')}</td><td class="n" data-l="البنود">${ls.length}${rq ? `<div class="mut" style="font-size:11px">وصل ${Math.round(rc / rq * 100)}%</div>` : ''}</td><td class="n" data-l="القيمة">${nf(oVal(o), 0)}</td><td data-l="مطلوبة يوم" class="${late ? 'bad' : ''}">${o.need_date ? fmtD(o.need_date) : '–'}</td><td data-l="الحالة"><span class="tag ${ORDS[o.status][1]}">${ORDS[o.status][0]}</span></td><td class="qa"><button class="xs" data-ord="${o.id}">فتح</button></td></tr>`; }).join('')}</tbody></table></div></div>` : '<div class="note">مفيش طلبيات بالفلتر ده. اعمل طلبية من «جدول الاحتياج» بتعليم البنود.</div>'}`}`;
+  const re = () => renderOrders(), M = $('#main'), bar = () => { const b = $('#orBar'); if (b) { b.hidden = !V.sel.size; b.querySelector('span').textContent = `${V.sel.size} بند متعلّم`; } };
+  // نموذج الطلبية: جديدة (من بنود متعلّمة) أو تعديل
+  const form = (o, pre = []) => { const d = document.createElement('dialog'); d.className = 'adlg'; d.style.maxWidth = '980px';
+    let lines = o ? L.filter(l => l.order_id === o.id).sort((a, b) => (a.sort || 0) - (b.sort || 0)).map(l => ({ ...l })) : pre.map((x, k) => ({ item_id: x.r.id, description: x.r.code + ' – ' + x.r.name, unit: x.r.unit, qty: x.toOrd, rate: x.r.rate || null, received_qty: 0, sort: k }));
+    const it0 = lines[0] && P.items.find(r => r.id === lines[0].item_id), sug = it0 ? vendorsFor(it0) : [], ph0 = o?.phase_n ?? it0?.phase_n ?? null;
+    const need0 = o?.need_date || pre.map(x => x.by).filter(Boolean).sort()[0] || '';
+    const draw = () => { d.querySelector('#olT').innerHTML = lines.map((l, k) => `<tr><td>${esc(l.description)}</td><td>${esc(l.unit || '')}</td><td class="n"><input type="number" step="any" data-lq="${k}" value="${+l.qty}" style="width:90px"${ed ? '' : ' disabled'}></td><td class="n">${l.rate ? nf(l.rate) : '–'}</td><td class="n">${l.rate ? nf(l.qty * l.rate, 0) : '–'}</td><td class="n"><input type="number" step="any" data-lr="${k}" value="${+l.received_qty || 0}" style="width:80px"${ed ? '' : ' disabled'}></td><td>${ed ? `<button type="button" class="xs" data-ldel="${k}">✕</button>` : ''}</td></tr>`).join('') + `<tr class="tot"><td colspan="4">الإجمالي</td><td class="n">${nf(sum(lines, l => l.qty * (l.rate || 0)), 0)}</td><td colspan="2"></td></tr>`; };
+    d.innerHTML = `<div class="dh"><h3 style="margin:0;font-size:17px">${o ? 'طلبية رقم ' + o.no : '+ طلبية جديدة'}</h3><button type="button" class="dx">✕</button></div><form class="grid" style="margin-top:12px">
+    <label style="grid-column:1/-1">عنوان الطلبية<input name="title" required value="${esc(o?.title || (it0 ? it0.group_name + (pre.length > 1 ? ` (${pre.length} بند)` : '') : ''))}"></label>
+    <label>المورد<input name="vn" list="orVL" value="${esc(o?.vendor_name || P.vendors.find(v => v.id === o?.vendor_id)?.name || '')}" placeholder="${sug.length ? 'مقترح: ' + esc(sug.slice(0, 3).map(v => v.name).join('، ')) : 'اسم المورد'}"><datalist id="orVL">${[...sug, ...P.vendors.filter(v => !sug.includes(v))].map(v => `<option value="${esc(v.name)}">`).join('')}</datalist></label>
+    <label>مطلوبة في الموقع يوم<input type="date" name="need" value="${need0}"></label>
+    <label>تاريخ الطلب من المورد<input type="date" name="od" value="${o?.order_date || ''}"></label>
+    <label>الحالة<select name="st">${Object.entries(ORDS).map(([k, l]) => `<option value="${k}"${k === (o?.status || 'draft') ? ' selected' : ''}>${l[0]}</option>`).join('')}</select></label>
+    <label style="grid-column:1/-1">ملاحظات / مواصفات<input name="notes" value="${esc(o?.notes || '')}"></label>
+    <div style="grid-column:1/-1" class="scroll"><table class="stack"><thead><tr><th>البند</th><th>الوحدة</th><th class="n">الكمية المطلوبة</th><th class="n">سعر المقايسة</th><th class="n">القيمة</th><th class="n">الوارد</th><th></th></tr></thead><tbody id="olT"></tbody></table></div>
+    <div class="acts" style="grid-column:1/-1">${ed ? '<button class="p">حفظ</button>' : ''}${o ? `<button type="button" id="olPr">🖨️ طباعة الطلبية</button><button type="button" id="olWa">واتساب للمورد</button>${ed ? '<button type="button" class="danger" id="olDel">حذف</button>' : ''}` : ''}</div></form>`;
+    document.body.append(d); d.showModal(); draw(); const f = d.querySelector('form');
+    d.oninput = e => { const q = e.target.dataset.lq, r = e.target.dataset.lr; if (q != null) { lines[q].qty = +e.target.value || 0; } if (r != null) lines[r].received_qty = +e.target.value || 0; if (q != null) { const t = d.querySelector('.tot .n'); if (t) t.textContent = nf(sum(lines, l => l.qty * (l.rate || 0)), 0); } };
+    const printO = () => { const w = open('', '_blank'); if (!w) return toast('افتح النوافذ المنبثقة'); const proj = P.proj || S.projects.find(p => p.id === pid);
+      w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>طلبية ${o.no} – ${esc(o.title)}</title><style>body{font-family:"Segoe UI",Tahoma,sans-serif;margin:24px;color:#111}h1{font-size:19px;margin:0}table{border-collapse:collapse;width:100%;margin-top:12px}th,td{border:1px solid #999;padding:6px 8px;font-size:13px}th{background:#f3f1ec}.n{text-align:left}.hd{display:flex;justify-content:space-between;gap:12px;margin:10px 0}.sig{display:flex;justify-content:space-around;margin-top:50px;font-weight:700}@page{size:A4;margin:14mm}</style></head><body>
+      <h1>طلبية توريد رقم ${o.no} – ${esc(proj.name)}</h1><div class="hd"><div><b>${esc(o.title)}</b><br>المورد: ${esc(f.vn.value || '–')}</div><div>التاريخ: ${fmtD(o.order_date || T0)}<br>مطلوبة في الموقع: ${f.need.value ? fmtD(f.need.value) : '–'}</div></div>
+      <table><thead><tr><th>م</th><th>البيان</th><th>الوحدة</th><th class="n">الكمية</th><th>ملاحظات</th></tr></thead><tbody>${lines.map((l, k) => `<tr><td>${k + 1}</td><td>${esc(l.description)}</td><td>${esc(l.unit || '')}</td><td class="n">${nf(l.qty)}</td><td>${esc(l.note || '')}</td></tr>`).join('')}</tbody></table>
+      ${f.notes.value ? `<p><b>ملاحظات:</b> ${esc(f.notes.value)}</p>` : ''}<div class="sig"><span>المكتب الفني</span><span>مدير المشروع</span><span>المشتريات</span></div><script>onload=()=>print()<\/script></body></html>`); w.document.close(); };
+    d.onclick = async e => { if (e.target === d || e.target.closest('.dx')) { d.close(); d.remove(); return; }
+      const x = e.target.closest('[data-ldel]'); if (x) { lines.splice(+x.dataset.ldel, 1); draw(); return; }
+      if (e.target.id === 'olPr') return printO();
+      if (e.target.id === 'olWa') { const v = P.vendors.find(v => v.name === f.vn.value), ph = (v?.whatsapp || v?.phone || '').replace(/\D/g, '').replace(/^0/, '20'); const txt = `طلبية توريد رقم ${o.no} – ${(P.proj || {}).name || ''}\n${o.title}\n` + lines.map((l, k) => `${k + 1}. ${l.description} – ${nf(l.qty)} ${l.unit || ''}`).join('\n') + (f.need.value ? `\nمطلوبة في الموقع يوم ${fmtD(f.need.value)}` : ''); open(`https://wa.me/${ph}?text=${encodeURIComponent(txt)}`, '_blank'); return; }
+      if (e.target.id === 'olDel' && confirm(`تحذف طلبية رقم ${o.no}؟`)) { const { error } = await S.sb.from('supply_orders').delete().eq('id', o.id); if (error) return toast(error.message); d.close(); d.remove(); toast('اتحذفت'); re(); } };
+    f.onsubmit = async e => { e.preventDefault(); if (!lines.length) return toast('الطلبية مفيهاش بنود');
+      const vn = f.vn.value.trim(), vd = P.vendors.find(v => v.name === vn), rc = sum(lines, l => l.received_qty), rq = sum(lines, l => l.qty);
+      let st = f.st.value; if (!['cancelled', 'draft', 'requested'].includes(st) && rq > 0) st = rc >= rq ? 'delivered' : rc > 0 ? 'partial' : st;
+      const v = { project_id: pid, title: f.title.value.trim(), vendor_id: vd?.id || null, vendor_name: vn || null, phase_n: ph0, status: st, need_date: f.need.value || null, order_date: f.od.value || (st === 'ordered' && !o?.order_date ? T0 : null), notes: f.notes.value.trim() || null, updated_at: new Date().toISOString() };
+      let oid = o?.id; if (o) { const { error } = await S.sb.from('supply_orders').update(v).eq('id', oid); if (error) return toast(error.message); }
+      else { v.no = (Math.max(0, ...O.map(x => x.no)) || 0) + 1; const { data, error } = await S.sb.from('supply_orders').insert(v).select('id').single(); if (error) return toast(error.message); oid = data.id; }
+      if (o) { const { error } = await S.sb.from('supply_order_lines').delete().eq('order_id', oid); if (error) return toast(error.message); }
+      const { error: e2 } = await S.sb.from('supply_order_lines').insert(lines.map((l, k) => ({ order_id: oid, item_id: l.item_id || null, description: l.description, unit: l.unit || null, qty: +l.qty || 0, rate: l.rate ?? null, received_qty: +l.received_qty || 0, note: l.note || null, sort: k })));
+      if (e2) return toast(e2.message); d.close(); d.remove(); if (!o) V.sel.clear(); toast(o ? 'اتحفظت الطلبية' : 'اتعملت الطلبية رقم ' + v.no); if (!o) V.tab = 'list'; re(); }; };
+  M.onclick = e => { const t = e.target.closest('[data-tab]'); if (t) { V.tab = t.dataset.tab; return re(); }
+    const du = e.target.closest('[data-due]'); if (du) { V.due = V.due === du.dataset.due ? '' : du.dataset.due; return re(); }
+    const os = e.target.closest('[data-ost]'); if (os) { V.st = os.dataset.ost; return re(); }
+    const od = e.target.closest('[data-ord]'); if (od) return form(O.find(o => o.id === od.dataset.ord));
+    if (e.target.id === 'orNew') return form(null, []);
+    if (e.target.id === 'orMk') return form(null, rows.filter(x => V.sel.has(x.r.id)));
+    if (e.target.id === 'orClr') { V.sel.clear(); return re(); } };
+  M.onchange = e => { const s = e.target.dataset.sel, g = e.target.dataset.gsel;
+    if (s) { e.target.checked ? V.sel.add(s) : V.sel.delete(s); return bar(); }
+    if (g) { flt.filter(x => x.r.phase_n + '|' + x.r.group_name === g && x.toOrd > 0).forEach(x => e.target.checked ? V.sel.add(x.r.id) : V.sel.delete(x.r.id)); return re(); }
+    if (e.target.id === 'orPh') { V.ph = e.target.value; re(); } if (e.target.id === 'orB') { V.b = e.target.value; re(); } if (e.target.id === 'orDue') { V.due = e.target.value; re(); }
+    if (e.target.id === 'orQ') { V.q = e.target.value.trim(); re(); } if (e.target.id === 'orLead') { V.lead = Math.max(+e.target.value || 0, 0); re(); } };
 }
 /* ---------------- تقرير الاجتماع ---------------- */
 // تقرير بيتعرض في اجتماع المشروع: الإنجاز المنفذ (بدل التركيز على النسبة الكلية) + جاهزية التسعير للمراحل الجاية + التدفقات المطلوبة مربوطة بالمراحل
