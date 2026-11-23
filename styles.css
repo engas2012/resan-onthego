@@ -543,3 +543,6 @@ table.bq tr.guide td{background:#fff6dc}
 @media(max-width:600px) and (prefers-color-scheme:dark){.bq tbody tr.guide[data-id]{background:#3a3220}}
 
 .stg{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;margin-top:3px}.stg span b{color:var(--acc)}
+.bqops{display:inline-flex;gap:4px;margin-inline-start:6px;vertical-align:middle}
+.bqops .mini{padding:1px 6px;font-size:12px;line-height:1.4;min-height:0;border-radius:6px}
+.bqops [data-bdel]:hover{background:#fde2e2;border-color:#e5a3a3}
