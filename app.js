@@ -3077,7 +3077,7 @@ async function renderMeet() {
   const prepRows = UP.map(x => { const L = I.filter(r => r.phase_n === x.n), pr = L.filter(r => r.rate > 0 && !r.reprice), miss = L.filter(r => !(r.rate > 0) || r.reprice), qs = qOf(x.n);
     const prep = qs.filter(q => !q.adopted && q.status !== 'rejected'), adp = qs.filter(q => q.adopted), rf = (rq.data || []).filter(f => f.status !== 'closed' && (f.item_ids || []).some(id => L.some(r => r.id === id)));
     const wq = miss.filter(r => qIt(r.id).length), noq = miss.filter(r => !qIt(r.id).length);
-    return { x, L, pr, miss, prep, adp, rf, wq, noq, rdy: L.length ? pr.length / L.length : 1 }; });
+    return { x, L, pr, miss, prep, adp, rf, wq, noq, rdy: L.length ? pr.length / L.length : 1 }; }).filter(p => p.L.length);
   // ── 3) التدفقات المطلوبة
   const AP = +(pj.data?.adv_pct ?? 0.5), FEE = +(pj.data?.fee_rate ?? 0.15), PP = +(iv.data?.[0]?.pay_pct ?? 0.5), PHS = P.phases;
   const bud = n => { const p = PHS.find(z => z.n === n) || {}; return +p.budget_rev || +p.budget || 0; };
