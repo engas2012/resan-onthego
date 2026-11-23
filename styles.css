@@ -553,3 +553,10 @@ table.bq tr.guide td{background:#fff6dc}
 .meet .mprint{display:none;white-space:pre-wrap}
 @media print{.meet .mhead{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #222;margin-bottom:8px}.meet .mhead h2{margin:0}.meet textarea{display:none}.meet .mprint{display:block;border:1px solid #999;padding:10px;min-height:80px}.meet .secT{break-after:avoid}.meet .card,.mcard{break-inside:avoid}.meet details{display:block}.meet details>*{display:block}}
 button.kpi{border:1px solid var(--line);cursor:pointer;font:inherit;color:inherit}button.kpi.on{outline:2px solid var(--acc)}
+/* رسم التدفق الشهري */
+.mfwrap{padding:12px 14px;margin-top:10px}.mflow{width:100%;height:auto;display:block}
+.mflow text{font-family:inherit}.mflow .ax{font-size:11px;fill:var(--mut)}.mflow .vl{font-size:11.5px;font-weight:700;fill:var(--ink)}.mflow .gl{font-size:12px;fill:var(--ink)}.mflow .gp{font-size:10.5px;font-weight:700;fill:var(--ink)}
+.mflow .g{stroke:var(--line);stroke-width:1}.mflow .base{stroke:var(--mut);stroke-width:1}.mflow .oline{fill:none;stroke:#e34948;stroke-width:2;stroke-dasharray:5 4}.mflow .odot{fill:#e34948;stroke:var(--card,#fff);stroke-width:2}.mflow .odia{fill:#e34948;stroke:var(--card,#fff);stroke-width:1.5}
+.mflow .gz{fill:var(--line);fill-opacity:.25}.mflow .gz2{fill:transparent}.mflow .today{stroke:#e34948;stroke-width:1.5;stroke-dasharray:3 3}
+.mleg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;margin:0 0 8px}.mleg span{display:inline-flex;align-items:center;gap:5px}.mleg i{width:12px;height:12px;border-radius:3px;display:inline-block}.mleg i.ln{height:0;border-top:2px dashed #e34948;border-radius:0;width:18px}
+@media print{.mflow,.mleg i{-webkit-print-color-adjust:exact;print-color-adjust:exact}.mfwrap{break-inside:avoid}}

@@ -71,7 +71,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.26.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.27.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -3102,7 +3102,7 @@ async function renderOrders() {
       return `<tr><td data-l="رقم"><b>${o.no}</b></td><td data-l="الطلبية"><b>${esc(o.title)}</b>${o.phase_n ? `<div class="mut" style="font-size:11px">مرحلة ${o.phase_n}</div>` : ''}</td><td data-l="المورد">${esc(o.vendor_name || '–')}</td><td class="n" data-l="الخامات">${ls.length}${rq2 ? `<div class="mut" style="font-size:11px">وصل ${Math.round(rc / rq2 * 100)}%</div>` : ''}</td><td class="n" data-l="القيمة">${oVal(o) ? nf(oVal(o), 0) : '–'}</td><td data-l="مطلوبة يوم" class="${late ? 'bad' : ''}">${o.need_date ? fmtD(o.need_date) : '–'}</td><td data-l="الحالة"><span class="tag ${ORDS[o.status][1]}">${ORDS[o.status][0]}</span></td><td class="qa"><button class="xs" data-ord="${o.id}">فتح</button></td></tr>`; }).join('')}</tbody></table></div></div>` : '<div class="note">مفيش طلبيات بالفلتر ده. اعمل طلبية من «جدول الاحتياج» بتعليم البنود.</div>'}`;
   else body = `<p class="mut" style="font-size:13px">كل سطر بيحدد إزاي بند المقايسة (توريد وتركيب) يتحوّل لخامات توريد: أول سطر الكلمات بتاعته تطابق اسم البند أو مجموعته (والوحدة لو محددة) هو اللي بيتطبق. المعدل = كمية الخامة لكل وحدة من البند شامل الهالك.${ed ? '' : ' (التعديل للمكتب الفني والإدارة)'}</p>${ed ? '<div class="acts"><button class="p" id="rcNew">+ معدل جديد</button></div>' : ''}
     <div class="card" style="padding:0"><div class="scroll"><table class="stack"><thead><tr><th>الكلمات (بند / مجموعة)</th><th>وحدة البند</th><th>الخامات (المعدل لكل وحدة)</th><th>الماركات</th><th></th></tr></thead><tbody>${REC.map(x => `<tr><td data-l="الكلمات" style="font-size:12px">${esc(x.pattern.split('|').slice(0, 5).join(' / '))}${x.project_id ? ' <span class="tag">للمشروع</span>' : ''}</td><td data-l="الوحدة">${esc(x.item_unit || 'أي وحدة')}</td><td data-l="الخامات" style="font-size:12px">${(x.materials || []).map(m => `${esc(m[0])}: <b>${m[2]}</b> ${esc(m[1])}`).join('<br>')}</td><td data-l="الماركات" style="font-size:12px">${(x.materials || []).map(m => esc(m[3] || '–')).join('<br>')}</td><td class="qa">${ed ? `<button class="xs" data-rc="${x.id}">تعديل</button>` : ''}</td></tr>`).join('')}</tbody></table></div></div>`;
-  $('#main').innerHTML = `<div class="sthead"><div><h2 style="margin:0">الطلبيات – توريد خامات بنود المقايسة</h2><p class="mut" style="margin:2px 0 0;font-size:13px">المطلوب طلبه = كمية البند − (المطلوب في طلبيات أو المنفذ أيهما أكبر)، وبيتحوّل لخامات. ميعاد الطلب = بداية النشاط في الجدول الزمني − مدة التوريد.</p></div><div class="acts" style="margin:0">${tabs.map(([k, l]) => `<button class="${V.tab === k ? 'p' : ''}" data-tab="${k}">${l}</button>`).join('')}</div></div>${body}`;
+  $('#main').innerHTML = `<div class="sthead"><div><h2 style="margin:0">الطلبيات – توريد خامات بنود المقايسة</h2><p class="mut" style="margin:2px 0 0;font-size:13px">المطلوب طلبه = كمية البند − (المطلوب في طلبيات أو المنفذ أيهما أكبر)، وبيتحوّل لخامات. ميعاد الطلب = بداية النشاط في الجدول الزمني − مدة التوريد.</p></div><div class="acts" style="margin:0">${tabs.map(([k, l]) => `<button class="${V.tab === k ? 'p' : ''}" data-tab="${k}">${l}</button>`).join('')}<button id="orPrint" title="طباعة التاب الحالي – من نافذة الطباعة اختار حفظ PDF">🖨️ طباعة</button></div></div>${body}`;
   const re = () => renderOrders(), M = $('#main'), bar = () => { const b = $('#orBar'); if (b) { b.hidden = !V.sel.size; b.querySelector('span').textContent = `${V.sel.size} بند متعلّم`; } };
   const form = (o, pre = []) => { const d = document.createElement('dialog'); d.className = 'adlg'; d.style.maxWidth = '1050px';
     let lines = o ? L.filter(l => l.order_id === o.id).map(l => ({ ...l, name: l.description })) : agg(pre).map(t => ({ name: t.name, unit: t.unit, qty: Math.round(t.qty * 100) / 100, brands: t.brands, src: t.src.join('، '), rate: null, received_qty: 0 }));
@@ -3154,7 +3154,20 @@ async function renderOrders() {
       const mats = f.m.value.split('\n').map(s => s.split('|').map(t => t.trim())).filter(a => a[0]).map(([n, u, r, b]) => [n, u || 'عدد', +r || 1, b || '']); if (!mats.length) return toast('اكتب خامة واحدة على الأقل');
       const v = { pattern: f.pat.value.trim(), item_unit: f.u.value.trim() || null, sort: +f.s.value || 0, materials: mats, project_id: f.pj.checked ? pid : null, updated_at: new Date().toISOString() };
       const { error } = x ? await S.sb.from('supply_recipes').update(v).eq('id', x.id) : await S.sb.from('supply_recipes').insert(v); if (error) return toast(error.message); d.close(); d.remove(); toast('اتحفظ'); re(); }; };
-  M.onclick = e => { const t = e.target.closest('[data-tab]'); if (t) { V.tab = t.dataset.tab; return re(); }
+  const printTab = () => { const proj = P.proj || S.projects.find(p => p.id === pid), w = open('', '_blank'); if (!w) return toast('افتح النوافذ المنبثقة');
+    const phL = V.ph ? ' – مرحلة ' + V.ph + '. ' + (P.phaseProg.find(x => String(x.n) === V.ph)?.name || '') : '';
+    let title, head, rowsH;
+    if (V.tab === 'need' && V.view === 'mats') { title = 'جدول خامات التوريد المطلوبة' + phL; head = ['م', 'الخامة', 'الوحدة', 'الكمية', 'الماركات المقبولة (أقوى 3 في السوق)', 'من البنود'];
+      rowsH = agg(flt).map((t, k) => [k + 1, esc(t.name), esc(t.unit), fq(t.qty), esc(t.brands || '–'), `<small>${esc(t.src.join('، '))}</small>`]); }
+    else if (V.tab === 'need') { title = 'جدول احتياج التوريدات بالبنود' + phL; head = ['الكود', 'البند', 'المطلوب', 'الخامات المطلوبة (توريد فقط)', 'اطلب قبل'];
+      rowsH = flt.filter(x => x.toOrd > 0).map(x => [esc(x.r.code), esc(x.r.name), nf(x.toOrd) + ' ' + esc(x.r.unit || ''), x.mats.map(t => `${esc(t.name)}: <b>${fq(t.qty)}</b> ${esc(t.unit)}<br><small>${esc(t.brands || '')}</small>`).join('<br>'), x.by ? fmtD(x.by) : '–']); }
+    else if (V.tab === 'list') { title = 'الطلبيات'; head = ['رقم', 'الطلبية', 'المورد', 'الخامات (الكمية – الماركات)', 'مطلوبة يوم', 'الحالة'];
+      rowsH = OL.map(o => [o.no, esc(o.title), esc(o.vendor_name || '–'), L.filter(l => l.order_id === o.id).map(l => `${esc(l.description)}: <b>${fq(+l.qty)}</b> ${esc(l.unit || '')}${l.brands ? ` <small>(${esc(l.brands)})</small>` : ''}`).join('<br>'), o.need_date ? fmtD(o.need_date) : '–', ORDS[o.status][0]]); }
+    else { title = 'الخامات والماركات المعتمدة لكل نوع بند'; head = ['نوع البند (الكلمات)', 'وحدة البند', 'الخامة', 'المعدل لكل وحدة', 'الماركات'];
+      rowsH = REC.flatMap(x => (x.materials || []).map((m, i) => [i ? '' : esc(x.pattern.split('|').slice(0, 4).join(' / ')), i ? '' : esc(x.item_unit || 'أي وحدة'), esc(m[0]), m[2] + ' ' + esc(m[1]), esc(m[3] || '–')])); }
+    w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>${esc(title)}</title><style>body{font-family:"Segoe UI",Tahoma,sans-serif;margin:20px;color:#111}h1{font-size:18px;margin:0 0 4px}table{border-collapse:collapse;width:100%;margin-top:10px}th,td{border:1px solid #999;padding:5px 7px;font-size:12px;vertical-align:top}th{background:#f3f1ec}small{color:#555}@page{size:A4 landscape;margin:12mm}</style></head><body><h1>${esc(title)} – ${esc(proj.name)}</h1><div style="font-size:12px;color:#555">${fmtD(T0)} · توريد فقط بدون تركيب · ${rowsH.length} سطر</div>
+      <table><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rowsH.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table><script>onload=()=>print()<\/script></body></html>`); w.document.close(); };
+  M.onclick = e => { if (e.target.id === 'orPrint') return printTab(); const t = e.target.closest('[data-tab]'); if (t) { V.tab = t.dataset.tab; return re(); }
     const vw = e.target.closest('[data-view]'); if (vw) { V.view = vw.dataset.view; return re(); }
     const du = e.target.closest('[data-due]'); if (du) { V.due = V.due === du.dataset.due ? '' : du.dataset.due; return re(); }
     const os = e.target.closest('[data-ost]'); if (os) { V.st = os.dataset.ost; return re(); }
@@ -3169,6 +3182,57 @@ async function renderOrders() {
     if (e.target.id === 'orPh') { V.ph = e.target.value; re(); } if (e.target.id === 'orB') { V.b = e.target.value; re(); } if (e.target.id === 'orDue') { V.due = e.target.value; re(); }
     if (e.target.id === 'orQ') { V.q = e.target.value.trim(); re(); } if (e.target.id === 'orLead') { V.lead = Math.max(+e.target.value || 0, 0); re(); } };
 }
+// رسم التدفق المالي الشهري: أعمدة المطلوب من المالك (مقسّمة بالمراحل) + خط الطلبيات المستحقة للموردين + جدول زمني للمراحل
+const MPAL = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
+function meetFlowChart({ flows, openInv, orders, nM, T0, own, PP, FEE, phName }) {
+  const D = s => Date.parse(s), d0 = new Date(T0.slice(0, 7) + '-01T00:00:00Z'), MS = [];
+  for (let k = 0; k <= nM; k++) { const d = new Date(Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth() + k, 1)); MS.push(d.toISOString().slice(0, 10)); }
+  const mi = s => { if (!s || D(s) < D(MS[0])) return 0; for (let k = 0; k < nM; k++) if (D(s) < D(MS[k + 1])) return k; return -1; };
+  const AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'], mLbl = k => { const d = new Date(MS[k]); return AR[d.getUTCMonth()] + ' ' + String(d.getUTCFullYear()).slice(2); };
+  const col = n => MPAL[(n - 1) % 8], M = Array.from({ length: nM }, () => ({ ph: {}, adv: {}, oi: 0, ord: 0, ordEst: false, ordN: 0 }));
+  flows.forEach(f => { const n = f.x.n, rem = f.B * (1 - Math.min(f.x.pct, 1)); if (f.ask > 1) { M[0].adv[n] = (M[0].adv[n] || 0) + f.ask; }
+    if (!f.s0 || !f.s1) return; const from = D(f.s1) < D(T0) ? null : (D(f.s0) > D(T0) ? f.s0 : T0);
+    if (!from) { M[0].ph[n] = (M[0].ph[n] || 0) + rem * (PP + FEE); if (f.advRem > 1) M[0].adv[n] = (M[0].adv[n] || 0) + f.advRem; return; }
+    const tot = Math.max((D(f.s1) - D(from)) / 864e5, 1);
+    for (let k = 0; k < nM; k++) { const a = Math.max(D(MS[k]), D(from)), b = Math.min(D(MS[k + 1]), D(f.s1)); if (b > a) M[k].ph[n] = (M[k].ph[n] || 0) + rem * ((b - a) / 864e5 / tot) * (PP + FEE); }
+    const ka = mi(from); if (ka >= 0 && f.advRem > 1) M[ka].adv[n] = (M[ka].adv[n] || 0) + f.advRem; });
+  M[0].oi = openInv.reduce((t, o) => t + o.due, 0);
+  orders.forEach(o => { const k = mi(o.date); if (k < 0) return; M[k].ord += o.val; M[k].ordN++; if (o.est) M[k].ordEst = true; });
+  const PHN = [...new Set(flows.map(f => f.x.n))].filter(n => M.some(m => (m.ph[n] || 0) + (m.adv[n] || 0) > 1)).sort((a, b) => a - b);
+  const own_ = m => PHN.reduce((t, n) => t + (m.ph[n] || 0) + (m.adv[n] || 0), 0) + m.oi;
+  const mx = Math.max(1, ...M.map(own_), ...(own ? [] : M.map(m => m.ord))), mm = v => v >= 1e6 ? (v / 1e6).toFixed(v >= 1e7 ? 0 : 1) + ' م' : Math.round(v / 1e3) + ' ألف';
+  const W = 960, L = 64, R = 16, T = 24, H = 260, cw = (W - L - R) / nM, bw = Math.min(56, cw * 0.55), y = v => T + H - v / mx * H;
+  const ticks = [0, .25, .5, .75, 1].map(t => t * mx);
+  let svg = `<svg viewBox="0 0 ${W} ${T + H + 40}" class="mflow" role="img" aria-label="التدفق المالي الشهري" dir="ltr">`;
+  svg += ticks.map(v => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" class="g"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" class="ax">${v ? mm(v) : '0'}</text>`).join('');
+  M.forEach((m, k) => { const cx = L + cw * k + cw / 2; let acc = 0; const segs = [];
+    if (m.oi > 1) segs.push(['#8a8f98', m.oi, 'مستخلصات مقدمة لسه ماتصرفتش']);
+    PHN.forEach(n => { if ((m.adv[n] || 0) > 1) segs.push([col(n), m.adv[n], `${n}. ${phName(n)} – دفعة مقدمة`, 'adv']); if ((m.ph[n] || 0) > 1) segs.push([col(n), m.ph[n], `${n}. ${phName(n)} – مستخلصات أعمال`]); });
+    segs.forEach(([c, v, t, kind], i) => { const y1 = y(acc + v), h = Math.max(y(acc) - y1 - (i ? 2 : 0), 1); svg += `<rect x="${cx - bw / 2}" y="${y1}" width="${bw}" height="${h}" rx="${i === segs.length - 1 ? 4 : 0}" fill="${c}"${kind === 'adv' ? ' fill-opacity=".55"' : ''}><title>${esc(mLbl(k) + ' – ' + t + ': ' + nf(v, 0) + ' ج.م')}</title></rect>`; acc += v; });
+    if (acc > 1) svg += `<text x="${cx}" y="${y(acc) - 6}" text-anchor="middle" class="vl">${mm(acc)}</text>`;
+    svg += `<text x="${cx}" y="${T + H + 18}" text-anchor="middle" class="ax">${mLbl(k)}</text>`; });
+  svg += `<line x1="${L}" x2="${W - R}" y1="${T + H}" y2="${T + H}" class="base"/>`;
+  if (!own && M.some(m => m.ord > 1)) { const pts = M.map((m, k) => [L + cw * k + cw / 2, y(m.ord)]);
+    svg += `<polyline points="${pts.map(p => p.join(',')).join(' ')}" class="oline"/>` + pts.map((p, k) => `<circle cx="${p[0]}" cy="${p[1]}" r="5" class="odot"><title>${esc(mLbl(k) + ' – طلبيات توريد مستحقة: ' + nf(M[k].ord, 0) + ' ج.م (' + M[k].ordN + ' طلبية' + (M[k].ordEst ? '، فيها قيمة تقديرية' : '') + ')')}</title></circle>`).join(''); }
+  svg += '</svg>';
+  // الجدول الزمني للمراحل
+  const GW = 960, GL = 190, gc = (GW - GL - R) / nM, rh = 30, FL = flows.filter(f => f.s0 && f.s1 && D(f.s1) >= D(MS[0]) && D(f.s0) < D(MS[nM]));
+  const gx = s => GL + Math.min(Math.max((D(s) - D(MS[0])) / (D(MS[nM]) - D(MS[0])), 0), 1) * (GW - GL - R);
+  let g = `<svg viewBox="0 0 ${GW} ${FL.length * rh + 34}" class="mflow" role="img" aria-label="الجدول الزمني للمراحل" dir="ltr">`;
+  for (let k = 0; k < nM; k++) g += `<rect x="${GL + gc * k}" y="0" width="${gc}" height="${FL.length * rh + 22}" class="${k % 2 ? 'gz' : 'gz2'}"/><text x="${GL + gc * k + gc / 2}" y="14" text-anchor="middle" class="ax">${mLbl(k)}</text>`;
+  FL.forEach((f, i) => { const yy = 22 + i * rh, x1 = gx(f.s0), x2 = gx(f.s1), c = col(f.x.n), late = D(f.s1) < D(T0) && f.x.pct < 0.995;
+    g += `<text x="${GL - 8}" y="${yy + 19}" text-anchor="start" direction="rtl" class="gl">${esc(f.x.n + '. ' + phName(f.x.n))}</text>`;
+    g += `<rect x="${x1}" y="${yy + 7}" width="${Math.max(x2 - x1, 3)}" height="16" rx="4" fill="${c}" fill-opacity=".22"><title>${esc(phName(f.x.n) + ': ' + fmtD(f.s0) + ' ← ' + fmtD(f.s1))}</title></rect>`;
+    const xp = x1 + (x2 - x1) * Math.min(f.x.pct, 1); if (xp > x1 + 1) g += `<rect x="${x1}" y="${yy + 7}" width="${xp - x1}" height="16" rx="4" fill="${c}"/>`;
+    g += `<text x="${Math.min(x2, GW - R) - 4}" y="${yy + 19}" text-anchor="end" class="gp">${Math.round(f.x.pct * 100)}%${late ? ' ⚠' : ''}</text>`;
+    if (!own) orders.filter(o => o.ph === f.x.n && o.date && D(o.date) >= D(MS[0]) && D(o.date) < D(MS[nM])).forEach(o => { const ox = gx(o.date); g += `<path d="M${ox} ${yy + 3} l6 6 -6 6 -6 -6z" class="odia"><title>${esc('طلبية ' + o.no + ' – ' + o.title + ' – مطلوبة ' + fmtD(o.date))}</title></path>`; }); });
+  const tx = gx(T0); g += `<line x1="${tx}" x2="${tx}" y1="18" y2="${FL.length * rh + 22}" class="today"/><text x="${tx + 4}" y="${FL.length * rh + 32}" class="ax">النهارده</text></svg>`;
+  const leg = `<div class="mleg">${PHN.map(n => `<span><i style="background:${col(n)}"></i>${n}. ${esc(phName(n))}</span>`).join('')}<span><i style="background:${col(PHN[0] || 1)};opacity:.55"></i>الدفعة المقدمة (لون أفتح)</span>${M[0].oi > 1 ? '<span><i style="background:#8a8f98"></i>مستخلصات مقدمة</span>' : ''}${!own && M.some(m => m.ord > 1) ? '<span><i class="ln"></i>طلبيات توريد مستحقة للموردين</span>' : ''}</div>`;
+  const tbl = `<details class="gp"><summary><span>جدول الأرقام بالشهر</span></summary><table class="stack"><thead><tr><th>الشهر</th>${PHN.map(n => `<th class="n">${n}. ${esc(phName(n))}</th>`).join('')}<th class="n">مستخلصات مقدمة</th><th class="n">المطلوب من المالك</th>${own ? '' : '<th class="n">طلبيات للموردين</th>'}</tr></thead><tbody>${M.map((m, k) => `<tr><td>${mLbl(k)}</td>${PHN.map(n => `<td class="n">${(m.ph[n] || 0) + (m.adv[n] || 0) > 1 ? nf((m.ph[n] || 0) + (m.adv[n] || 0), 0) : '–'}</td>`).join('')}<td class="n">${m.oi > 1 ? nf(m.oi, 0) : '–'}</td><td class="n"><b>${nf(own_(m), 0)}</b></td>${own ? '' : `<td class="n">${m.ord > 1 ? nf(m.ord, 0) + (m.ordEst ? '*' : '') : '–'}</td>`}</tr>`).join('')}</tbody></table>${own ? '' : '<p class="mut" style="font-size:11px">* قيمة تقديرية: الطلبية لسه مالهاش أسعار مورد، فاتحسبت 65% من قيمة بنودها في المقايسة.</p>'}</details>`;
+  const tot = M.reduce((t, m) => t + own_(m), 0), otot = M.reduce((t, m) => t + m.ord, 0), peak = M.reduce((b, m, k) => own_(m) > own_(M[b]) ? k : b, 0);
+  const kp = `<div class="kpis"><div class="kpi k-warn"><b>${money(tot)}</b><span>المطلوب من المالك خلال ${nM} شهور</span></div><div class="kpi"><b>${mLbl(peak)}</b><span>أعلى شهر<br><small>${money(own_(M[peak]))} ج.م</small></span></div>${own ? '' : `<div class="kpi"><b>${money(otot)}</b><span>طلبيات توريد مستحقة للموردين<br><small>${orders.length} طلبية مفتوحة</small></span></div>`}</div>`;
+  return `${kp}<div class="card mfwrap"><h4 style="margin:0 0 6px">التدفق المطلوب بالشهر</h4>${leg}${svg}</div><div class="card mfwrap"><h4 style="margin:0 0 6px">المراحل على الجدول الزمني${own ? '' : ' ومواعيد الطلبيات (◆)'}</h4>${g}</div>${tbl}`;
+}
 /* ---------------- تقرير الاجتماع ---------------- */
 // تقرير بيتعرض في اجتماع المشروع: الإنجاز المنفذ (بدل التركيز على النسبة الكلية) + جاهزية التسعير للمراحل الجاية + التدفقات المطلوبة مربوطة بالمراحل
 async function renderMeet() {
@@ -3176,14 +3240,17 @@ async function renderMeet() {
   if (!M.from) { const d = new Date(Date.now() - 14 * 864e5); M.from = d.toISOString().slice(0, 10); }
   $('#main').innerHTML = '<p class="mut">جاري تجهيز تقرير الاجتماع…</p>';
   const T0 = today(), T1 = new Date(Date.parse(T0) + M.h * 864e5).toISOString().slice(0, 10);
-  const [pe, pj, py, iv, sa, fp, rq] = await Promise.all([
+  const [pe, pj, py, iv, sa, fp, rq, so, sl, si] = await Promise.all([
     S.sb.from('progress_entries').select('item_id,qty,stage,entry_date').eq('project_id', pid).gte('entry_date', M.from).lte('entry_date', T0),
     S.sb.from('projects').select('adv_pct,fee_rate').eq('id', pid).single(),
     S.sb.from('owner_payments').select('kind,status,invoice_id,phase_ns,amount').eq('project_id', pid),
     S.sb.from('owner_invoices').select('*').eq('project_id', pid).in('status', ['submitted', 'approved']),
     S.sb.from('schedule_activities').select('phase_n,start,finish,is_summary').eq('project_id', pid).not('phase_n', 'is', null),
     can('ledger', pid) ? S.sb.from('fin_pending').select('*').eq('project_id', pid).eq('status', 'open') : Promise.resolve({ data: [] }),
-    S.sb.from('rfqs').select('id,vendor_name,item_ids,status,due_date,subject').eq('project_id', pid)]);
+    S.sb.from('rfqs').select('id,vendor_name,item_ids,status,due_date,subject').eq('project_id', pid),
+    S.sb.from('supply_orders').select('id,no,title,phase_n,status,need_date,order_date').eq('project_id', pid).not('status', 'in', '(cancelled,delivered)'),
+    S.sb.from('supply_order_lines').select('order_id,qty,rate,supply_orders!inner(project_id)').eq('supply_orders.project_id', pid),
+    S.sb.from('supply_order_items').select('order_id,item_id,qty,supply_orders!inner(project_id)').eq('supply_orders.project_id', pid)]);
   const sum = (A, f) => A.reduce((s, x) => s + (+f(x) || 0), 0), pc = v => Math.round(v * 100) + '%', I = P.items.filter(r => !heldOut(r)), PH = P.phaseProg;
   const done = x => x.pct >= 0.995, PHd = PH.filter(done), PHr = PH.filter(x => x.pct > 0 && !done(x));
   // ── 1) الإنجاز
@@ -3216,6 +3283,9 @@ async function renderMeet() {
   const openInv = (iv.data || []).map(i => ({ i, due: Math.max(invPay(i).net - paidOf(i), 0) })).filter(o => o.due > 1);
   const askT = sum(flows, f => f.ask), advT = sum(flows, f => f.advNeed), invT = sum(flows, f => f.invNeed), oiT = sum(openInv, o => o.due), reqT = askT + advT + invT + oiT;
   const pendNo = (fp.data || []).filter(f => f.kind === 'payable' && !f.phase_n && (!f.due_date || f.due_date <= T1)), pendT = sum(flows, f => f.pendT) + sum(pendNo, f => f.amount);
+  const ORD = (so.data || []).map(o => { const ls = (sl.data || []).filter(l => l.order_id === o.id), v = sum(ls, l => l.qty * (l.rate || 0)), est = !(v > 0);
+    return { no: o.no, title: o.title, ph: o.phase_n, date: o.need_date || o.order_date || T0, est, val: est ? 0.65 * sum((si.data || []).filter(x => x.order_id === o.id), x => x.qty * (P.items.find(r => r.id === x.item_id)?.rate || 0)) : v }; });
+  const nM = Math.max(3, Math.min(12, Math.ceil(M.h / 30))), phName = n => PH.find(x => x.n === n)?.name || '';
   const own = M.own, notesK = 'meet-notes-' + pid; let notes = ''; try { notes = localStorage.getItem(notesK) || ''; } catch (e) { }
   $('#main').innerHTML = `<div class="meet">
   <div class="sthead noprint"><div><h2 style="margin:0">تقرير الاجتماع</h2><p class="mut" style="margin:2px 0 0;font-size:13px">أول نسخة: الإنجاز المنفذ، وجاهزية التسعير للمراحل الجاية، والتدفقات المطلوبة مربوطة بالمراحل.</p></div>
@@ -3249,6 +3319,8 @@ async function renderMeet() {
   <p class="mut" style="font-size:12px">الأعمال المخططة في الفترة = الجزء المتبقي من السعر التقديري للمرحلة (حسب نسبة إنجازها)، متوزع على المدة الباقية من المرحلة في الجدول الزمني، والمرحلة المتأخرة عن الجدول باقيها كله بيتحسب في الفترة. المقدم بيتطلب للمراحل اللي شغلها داخل في الفترة. المستخلصات المتوقعة = الأعمال المخططة × ${Math.round(PP * 100)}% + أتعاب ${Math.round(FEE * 100)}%.</p>
   ${!own && pendNo.length ? `<p class="mut" style="font-size:12px">مستحقات مش مربوطة بمرحلة: ${pendNo.map(f => esc(f.description || f.party || '') + ' ' + nf(f.amount, 0)).join(' · ')}</p>` : ''}
 
+  <div class="secT">التدفق المالي الشهري – المراحل والطلبيات</div>
+  ${meetFlowChart({ flows, openInv, orders: ORD, nM, T0, own: M.own, PP, FEE, phName })}
   <div class="secT">4. قرارات ومطلوبات الاجتماع</div>
   <textarea id="mtN" rows="5" style="width:100%" placeholder="اكتب القرارات والمطلوب من كل طرف… (بتتحفظ على الجهاز ده وبتطلع في الطباعة)">${esc(notes)}</textarea>
   <div class="mprint" id="mtNp"></div></div>`;
