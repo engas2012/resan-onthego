@@ -23,6 +23,7 @@ const CAN = {
   editBoq: ['tech', 'management'],
   ledger: ['finance', 'management'],
   boq: ['tech', 'finance', 'management'],
+  meet: ['tech', 'finance', 'management'],
   inv: ['tech', 'finance', 'management', 'owner', 'consultant'],
   invEdit: ['tech', 'finance', 'management'],
   quotes: ['tech', 'finance', 'management', 'consultant', 'owner'],
@@ -68,7 +69,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.23.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.24.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -103,8 +104,8 @@ async function afterLogin(user) {
 }
 
 /* ---------------- layout & routing ---------------- */
-const VIEWS = [['status', 'الموقف التنفيذي', null], ['schedule', 'الجدول الزمني', 'sched'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة التقارير', 'review'], ['log', 'سجل التقارير', 'log'], ['tasks', 'مهام المكتب الفني', 'tasks'], ['boq', 'المقايسة والتكلفة', 'boq'], ['quotes', 'عروض الأسعار', 'quotes'], ['subs', 'عقود المقاولين', 'subs'], ['acct', 'ملخص الحسابات', 'acct'], ['phfin', 'حساب المراحل', 'ledger'], ['ledger', 'القيود والمصروفات', 'ledgerEd'], ['custody', 'العهدة', 'custody'], ['inv', 'المستخلصات', 'inv'], ['ded', 'الخصومات المعلقة', 'ded'], ['store', 'المخزن', 'store'], ['docs', 'المستندات', 'docs']];
-const NAVG = [['متابعة المشروع', '📊', ['status', 'schedule']], ['التقارير اليومية', '📝', ['report', 'review', 'log']], ['المكتب الفني والتسعير', '📐', ['tasks', 'boq', 'quotes', 'subs']], ['المخزن والمستندات', '📦', ['store', 'docs']]];
+const VIEWS = [['status', 'الموقف التنفيذي', null], ['meet', 'تقرير الاجتماع', 'meet'], ['schedule', 'الجدول الزمني', 'sched'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة التقارير', 'review'], ['log', 'سجل التقارير', 'log'], ['tasks', 'مهام المكتب الفني', 'tasks'], ['boq', 'المقايسة والتكلفة', 'boq'], ['quotes', 'عروض الأسعار', 'quotes'], ['subs', 'عقود المقاولين', 'subs'], ['acct', 'ملخص الحسابات', 'acct'], ['phfin', 'حساب المراحل', 'ledger'], ['ledger', 'القيود والمصروفات', 'ledgerEd'], ['custody', 'العهدة', 'custody'], ['inv', 'المستخلصات', 'inv'], ['ded', 'الخصومات المعلقة', 'ded'], ['store', 'المخزن', 'store'], ['docs', 'المستندات', 'docs']];
+const NAVG = [['متابعة المشروع', '📊', ['status', 'meet', 'schedule']], ['التقارير اليومية', '📝', ['report', 'review', 'log']], ['المكتب الفني والتسعير', '📐', ['tasks', 'boq', 'quotes', 'subs']], ['المخزن والمستندات', '📦', ['store', 'docs']]];
 const FINV = ['acct', 'phfin', 'ledger', 'inv', 'ded'], FINC = { acct: 'acct', phfin: 'ledger', ledger: 'ledgerEd', inv: 'inv', ded: 'ded' };
 const finOn = () => finPids().length > 0 || S.projects.some(p => can('custody', p.id));
 const FINCO = () => [['fin', 'ملخص المشروعات', finPids().length > 0], ['fin/bank', 'البنك والخزينة', S.finAny], ['fin/ga', 'المصروفات الإدارية', S.finAny], ['fin/custody', 'العهد', S.projects.some(p => can('custody', p.id))], ['fin/people', 'حسابات الأفراد', S.admin]].filter(x => x[2]);
@@ -145,6 +146,7 @@ async function route() {
     if (view === 'review' && can('review', pid)) return renderReview();
     if (view === 'log' && can('log', pid)) return renderLog();
     if (view === 'boq' && can('boq', pid)) return renderBoq();
+    if (view === 'meet' && can('meet', pid)) return renderMeet();
     if (view === 'schedule' && can('sched', pid)) return renderSchedule();
     if (view === 'docs' && can('docs', pid)) return renderDocs();
     if (view === 'quotes' && can('quotes', pid)) return renderQuotes();
@@ -3043,6 +3045,94 @@ async function importLedger(file) {
     for (const pid of pids) { if (!can('ledger', pid)) continue; const { error } = await S.sb.from('ledger_entries').delete().eq('project_id', pid).eq('source', 'excel'); err = err || error;
       const L = out.filter(x => x.project_id === pid); for (let k = 0; k < L.length && !err; k += 500) { const { error: e2 } = await S.sb.from('ledger_entries').insert(L.slice(k, k + 500)); err = e2; } }
     if (err) { $('#lgGo').disabled = false; return toast('حصلت مشكلة: ' + err.message); } toast('اتحدثت بيانات الحسابات'); S.P.contract = null; location.hash.endsWith('/acct') ? renderAcct() : renderBoq(); };
+}
+/* ---------------- تقرير الاجتماع ---------------- */
+// تقرير بيتعرض في اجتماع المشروع: الإنجاز المنفذ (بدل التركيز على النسبة الكلية) + جاهزية التسعير للمراحل الجاية + التدفقات المطلوبة مربوطة بالمراحل
+async function renderMeet() {
+  const P = S.P, pid = P.id, M = S.mt ||= { from: '', h: 90, own: false };
+  if (!M.from) { const d = new Date(Date.now() - 14 * 864e5); M.from = d.toISOString().slice(0, 10); }
+  $('#main').innerHTML = '<p class="mut">جاري تجهيز تقرير الاجتماع…</p>';
+  const T0 = today(), T1 = new Date(Date.parse(T0) + M.h * 864e5).toISOString().slice(0, 10);
+  const [pe, pj, py, iv, sa, fp, rq] = await Promise.all([
+    S.sb.from('progress_entries').select('item_id,qty,stage,entry_date').eq('project_id', pid).gte('entry_date', M.from).lte('entry_date', T0),
+    S.sb.from('projects').select('adv_pct,fee_rate').eq('id', pid).single(),
+    S.sb.from('owner_payments').select('kind,status,invoice_id,phase_ns,amount').eq('project_id', pid),
+    S.sb.from('owner_invoices').select('*').eq('project_id', pid).in('status', ['submitted', 'approved']),
+    S.sb.from('schedule_activities').select('phase_n,start,finish,is_summary').eq('project_id', pid).not('phase_n', 'is', null),
+    can('ledger', pid) ? S.sb.from('fin_pending').select('*').eq('project_id', pid).eq('status', 'open') : Promise.resolve({ data: [] }),
+    S.sb.from('rfqs').select('id,vendor_name,item_ids,status,due_date,subject').eq('project_id', pid)]);
+  const sum = (A, f) => A.reduce((s, x) => s + (+f(x) || 0), 0), pc = v => Math.round(v * 100) + '%', I = P.items.filter(r => !heldOut(r)), PH = P.phaseProg;
+  const done = x => x.pct >= 0.995, PHd = PH.filter(done), PHr = PH.filter(x => x.pct > 0 && !done(x));
+  // ── 1) الإنجاز
+  const st = I.filter(r => r.pct > 0), stPct = groupPct(st), fin = I.filter(r => r.pct >= 0.999);
+  const per = {}; (pe.data || []).forEach(e => { const k = e.item_id; (per[k] ||= { q: 0, st: new Set() }).q += +e.qty || 0; per[k].st.add(e.stage || 'pour'); });
+  const perR = Object.entries(per).map(([id, v]) => { const r = P.items.find(x => x.id === id); return r && Math.abs(v.q) > 0 ? { r, q: v.q, gain: +r.qty > 0 ? v.q / +r.qty : 0, val: (v.st.has('pour') ? v.q : 0) * r.rate, stg: [...v.st] } : null; }).filter(Boolean).sort((a, b) => b.val - a.val || b.gain - a.gain);
+  const perVal = sum(perR, x => x.val), conc = sum(perR.filter(x => x.stg.includes('pour') && /م3|م³/.test(x.r.unit || '') && /خرسان|اساس|أساس|اعمد|أعمد|حوائط|اسقف|أسقف|دك|سقف/.test(x.r.group_name + x.r.name)), x => x.q);
+  const runCards = PHr.map(x => { const L = I.filter(r => r.phase_n === x.n), s = L.filter(r => r.pct > 0), d = L.filter(r => r.pct >= 0.999);
+    const gs = [...new Set(L.map(r => r.group_name))].map(g => ({ g, p: groupPct(L.filter(r => r.group_name === g)), n: L.filter(r => r.group_name === g).length })).filter(g => g.p > 0).sort((a, b) => b.p - a.p);
+    return `<div class="mcard"><div class="mh"><b>${x.n}. ${esc(x.name)}</b><span class="mbig">${pc(x.pct)}</span></div>${bar(x.pct)}<div class="mut" style="font-size:12px;margin:4px 0">${d.length} بند خلص · ${s.length - d.length} جاري · ${L.length - s.length} لسه</div>${gs.slice(0, 6).map(g => `<div class="mrow"><span>${esc(g.g)}</span><b class="${g.p >= 0.995 ? 'ok' : ''}">${g.p >= 0.995 ? '✓ خلص' : pc(g.p)}</b></div>`).join('')}</div>`; }).join('');
+  // ── 2) جاهزية التسعير للمراحل الجاية
+  const curN = (PHr[0] || PH.find(x => !done(x)) || {}).n || 1, UP = PH.filter(x => !done(x) && x.n >= curN);
+  const Q = P.quotes || [], qOf = n => Q.filter(q => P.items.find(r => r.id === q.item_id)?.phase_n === n), CH = (P.check || []).filter(c => c.category === 'pricing' || /سعر|تسعير/.test(c.title || ''));
+  const prepRows = UP.map(x => { const L = I.filter(r => r.phase_n === x.n), pr = L.filter(r => r.rate > 0 && !r.reprice), miss = L.filter(r => !(r.rate > 0) || r.reprice), qs = qOf(x.n);
+    const prep = qs.filter(q => !q.adopted && q.status !== 'rejected'), adp = qs.filter(q => q.adopted), rf = (rq.data || []).filter(f => f.status !== 'closed' && (f.item_ids || []).some(id => L.some(r => r.id === id)));
+    const wq = miss.filter(r => qIt(r.id).length), noq = miss.filter(r => !qIt(r.id).length);
+    return { x, L, pr, miss, prep, adp, rf, wq, noq, rdy: L.length ? pr.length / L.length : 1 }; });
+  // ── 3) التدفقات المطلوبة
+  const AP = +(pj.data?.adv_pct ?? 0.5), FEE = +(pj.data?.fee_rate ?? 0.15), PP = +(iv.data?.[0]?.pay_pct ?? 0.5), PHS = P.phases;
+  const bud = n => { const p = PHS.find(z => z.n === n) || {}; return +p.budget_rev || +p.budget || 0; };
+  const adv = { got: {}, ask: {} }; (py.data || []).filter(y => y.kind === 'advance').forEach(y => { const ns = (y.phase_ns || []).filter(n => PHS.some(p => p.n === n)); if (!ns.length) return; const b = sum(ns, n => bud(n) || 1);
+    ns.forEach(n => { const k = y.status === 'received' ? 'got' : y.status === 'requested' ? 'ask' : null; if (k) adv[k][n] = (adv[k][n] || 0) + +y.amount * (bud(n) || 1) / b; }); });
+  const D = s => Date.parse(s), ov = (a, b) => Math.max(0, Math.min(D(b), D(T1)) - Math.max(D(a), D(T0))) / 864e5;
+  const flows = PH.filter(x => !done(x)).map(x => { const A = (sa.data || []).filter(a => a.phase_n === x.n && a.start && a.finish), B = bud(x.n), rem = B * (1 - Math.min(x.pct, 1));
+    let share = 0, s0 = null, s1 = null; if (A.length) { s0 = A.map(a => a.start).sort()[0]; s1 = A.map(a => a.finish).sort().pop(); const from = D(s1) < D(T0) ? null : (D(s0) > D(T0) ? s0 : T0); share = !from ? 1 : ov(from, s1) / Math.max((D(s1) - D(from)) / 864e5, 1); }
+    const works = rem * share, active = works > 1, advRem = Math.max(AP * B - (adv.got[x.n] || 0) - (adv.ask[x.n] || 0), 0), advNeed = active ? advRem : 0, invNeed = works * PP + works * FEE;
+    const pend = (fp.data || []).filter(f => f.phase_n === x.n && f.kind === 'payable' && (!f.due_date || f.due_date <= T1));
+    return { x, B, s0, s1, works, active, advRem, advNeed, invNeed, ask: adv.ask[x.n] || 0, pend, pendT: sum(pend, f => f.amount) }; }).filter(f => f.B || f.pend.length);
+  const paidOf = i => sum((py.data || []).filter(y => y.kind === 'invoice' && y.invoice_id === i.id && y.status === 'received'), y => y.amount);
+  const openInv = (iv.data || []).map(i => ({ i, due: Math.max(invPay(i).net - paidOf(i), 0) })).filter(o => o.due > 1);
+  const askT = sum(flows, f => f.ask), advT = sum(flows, f => f.advNeed), invT = sum(flows, f => f.invNeed), oiT = sum(openInv, o => o.due), reqT = askT + advT + invT + oiT;
+  const pendNo = (fp.data || []).filter(f => f.kind === 'payable' && !f.phase_n && (!f.due_date || f.due_date <= T1)), pendT = sum(flows, f => f.pendT) + sum(pendNo, f => f.amount);
+  const own = M.own, notesK = 'meet-notes-' + pid; let notes = ''; try { notes = localStorage.getItem(notesK) || ''; } catch (e) { }
+  $('#main').innerHTML = `<div class="meet">
+  <div class="sthead noprint"><div><h2 style="margin:0">تقرير الاجتماع</h2><p class="mut" style="margin:2px 0 0;font-size:13px">أول نسخة: الإنجاز المنفذ، وجاهزية التسعير للمراحل الجاية، والتدفقات المطلوبة مربوطة بالمراحل.</p></div>
+  <div class="acts" style="margin:0"><label class="edd">المنفذ من تاريخ<input type="date" id="mtF" value="${M.from}"></label><label class="edd">التدفقات لمدة<select id="mtH">${[30, 60, 90, 180].map(h => `<option value="${h}"${h === M.h ? ' selected' : ''}>${h} يوم</option>`).join('')}</select></label><label class="chk"><input type="checkbox" id="mtO"${own ? ' checked' : ''}> نسخة المالك</label><button class="p" id="mtP">🖨️ طباعة / PDF</button></div></div>
+  <div class="mhead"><h2>تقرير اجتماع – ${esc(P.proj.name)}</h2><span>${fmtD(T0)} · الفترة من ${fmtD(M.from)}</span></div>
+
+  <div class="secT">1. الإنجاز المنفذ</div>
+  <div class="kpis">
+    <div class="kpi k-ok"><b>${PHd.length} / ${PH.length}</b><span>مراحل خلصت<br><small>${PHd.map(x => esc(x.name)).join(' · ') || '–'}</small></span></div>
+    <div class="kpi k-ok"><b>${pc(stPct)}</b><span>إنجاز الأعمال اللي بدأت<br><small>${st.length} بند بدأ تنفيذه</small></span></div>
+    <div class="kpi"><b>${fin.length}</b><span>بند اتنفذ بالكامل<br><small>من ${I.length} بند في المقايسة</small></span></div>
+    <div class="kpi"><b>${perR.length}</b><span>بند اتشغل عليه في الفترة${conc ? `<br><small>منها ${nf(conc, 1)} م3 خرسانة</small>` : ''}${!own && perVal ? `<br><small>قيمة أعمال ${money(perVal)}</small>` : ''}</span></div></div>
+  ${runCards ? `<div class="mgrid">${runCards}</div>` : '<p class="mut">مفيش مرحلة جارية دلوقتي.</p>'}
+  ${perR.length ? `<h3 style="margin:14px 0 6px">اللي اتنفذ من ${fmtD(M.from)} لحد النهارده</h3><div class="card" style="padding:0"><div class="scroll"><table class="stack"><thead><tr><th>البند</th><th>المرحلة</th><th class="n">المنفذ في الفترة</th><th class="n">زيادة النسبة</th><th class="n">نسبة البند الآن</th></tr></thead><tbody>${perR.slice(0, 25).map(x => `<tr><td data-l="البند"><b>${esc(x.r.code)}</b> ${esc(x.r.name)}${x.r.building ? ` <span class="mut">– ${esc(x.r.building)}</span>` : ''}${x.stg.some(s => s !== 'pour') ? ` <span class="tag">${x.stg.map(s => STG[s] || s).join(' + ')}</span>` : ''}</td><td data-l="المرحلة">${x.r.phase_n}</td><td class="n" data-l="المنفذ">${nf(x.q)} ${esc(x.r.unit || '')}</td><td class="n ok" data-l="الزيادة">${x.gain ? '+' + pc(x.gain) : '–'}</td><td class="n" data-l="الآن">${pc(Math.min(x.r.pct, 1))}</td></tr>`).join('')}</tbody></table></div></div>${perR.length > 25 ? `<p class="mut" style="font-size:12px">و ${perR.length - 25} بند تاني.</p>` : ''}` : `<p class="mut">مفيش منفذ متسجل من ${fmtD(M.from)}.</p>`}
+  <p class="mut" style="font-size:12px">النسبة الكلية للمشروع ${pc(overall(PH))} – دي بتحسب كل المراحل بما فيها اللي لسه ماجاش وقتها (التشطيبات والكهروميكانيك واللاندسكيب)، علشان كده الأدق في المتابعة هو إنجاز كل مرحلة جارية وإنجاز الأعمال اللي بدأت.</p>
+
+  <div class="secT">2. عروض الأسعار الجاري إعدادها للمراحل الجاية</div>
+  <div class="card" style="padding:0"><div class="scroll"><table class="stack"><thead><tr><th>المرحلة</th><th class="n">البنود</th><th class="n">متسعّرة</th><th>جاهزية التسعير</th><th class="n">عروض تحت الإعداد / المراجعة</th><th class="n">عروض معتمدة</th><th class="n">طلبات أسعار مفتوحة</th><th class="n">بنود محتاجة عروض</th></tr></thead><tbody>
+  ${prepRows.map(p => `<tr><td data-l="المرحلة"><b>${p.x.n}. ${esc(p.x.name)}</b></td><td class="n" data-l="البنود">${p.L.length}</td><td class="n" data-l="متسعّرة">${p.pr.length}</td><td data-l="الجاهزية">${bar(p.rdy)}</td><td class="n" data-l="تحت الإعداد">${p.prep.length || '–'}</td><td class="n" data-l="معتمدة">${p.adp.length || '–'}</td><td class="n" data-l="طلبات">${p.rf.length || '–'}</td><td class="n ${p.noq.length ? 'bad' : ''}" data-l="محتاجة عروض">${p.noq.length || '–'}</td></tr>`).join('')}</tbody></table></div></div>
+  ${prepRows.filter(p => p.prep.length).map(p => `<details class="gp" open><summary><span>${p.x.n}. ${esc(p.x.name)} – عروض جاري إعدادها (${p.prep.length})</span></summary><table class="stack"><tbody>${p.prep.map(q => { const r = P.items.find(z => z.id === q.item_id); return `<tr><td>${esc(r?.code || '')} ${esc(r?.name || '')}</td><td>${esc(q.supplier || P.vendors.find(v => v.id === q.vendor_id)?.name || '')}</td><td>${QST[q.status]?.[1] || q.status}</td>${own ? '' : `<td class="n">${q.unit_rate ? nf(q.unit_rate) : ''}</td>`}</tr>`; }).join('')}</tbody></table></details>`).join('')}
+  ${prepRows.filter(p => p.noq.length).length ? `<details class="gp"><summary><span>البنود اللي لسه محتاجة عروض أسعار (${sum(prepRows, p => p.noq.length)})</span></summary>${prepRows.filter(p => p.noq.length).map(p => `<div style="margin:6px 0"><b>${p.x.n}. ${esc(p.x.name)}</b><div class="mut" style="font-size:12px">${p.noq.slice(0, 40).map(r => esc(r.code + ' ' + r.name)).join(' · ')}${p.noq.length > 40 ? ` … و ${p.noq.length - 40} بند` : ''}</div></div>`).join('')}</details>` : ''}
+
+  <div class="secT">3. التدفقات المطلوبة خلال ${M.h} يوم (لحد ${fmtD(T1)})</div>
+  <div class="kpis">
+    <div class="kpi k-warn"><b>${money(reqT)}</b><span>إجمالي المطلوب من المالك<br><small>${[askT && 'مطالبات قائمة ' + money(askT), advT && 'دفعات مقدمة ' + money(advT), invT && 'مستخلصات متوقعة ' + money(invT), oiT && 'مستخلصات مقدمة ' + money(oiT)].filter(Boolean).join(' · ') || '–'}</small></span></div>
+    ${own ? '' : `<div class="kpi"><b>${money(pendT)}</b><span>مستحقات مقاولين وموردين خلال الفترة<br><small>من المستحقات المفتوحة في الحسابات</small></span></div>`}</div>
+  <div class="card" style="padding:0"><div class="scroll"><table class="actb"><thead><tr><th>المرحلة</th><th>التوقيت في الجدول</th><th class="n">السعر التقديري</th><th class="n">أعمال مخططة في الفترة</th><th class="n">مطالبات مقدم قائمة</th><th class="n">مقدم مطلوب (${Math.round(AP * 100)}%)</th><th class="n">مستخلصات متوقعة</th>${own ? '' : '<th class="n">مستحقات مقاولين/موردين</th>'}<th class="n">المطلوب من المالك</th></tr></thead><tbody>
+  ${flows.map(f => { const tot = f.ask + f.advNeed + f.invNeed; return `<tr${f.active ? '' : ' class="mut"'}><td><b>${f.x.n}. ${esc(f.x.name)}</b> <span class="mut">${pc(f.x.pct)}</span></td><td style="font-size:12px">${f.s0 ? fmtD(f.s0) + ' ← ' + fmtD(f.s1) : '<span class="mut">مش في الجدول</span>'}${f.s1 && f.s1 < T0 ? ' <span class="tag">متأخرة عن الجدول</span>' : ''}</td><td class="n">${f.B ? nf(f.B, 0) : '–'}</td><td class="n">${f.works > 1 ? nf(f.works, 0) : '–'}</td><td class="n">${f.ask > 1 ? nf(f.ask, 0) : '–'}</td><td class="n">${f.advNeed > 1 ? nf(f.advNeed, 0) : f.advRem > 1 ? `<span class="mut" title="المرحلة مش داخلة في الفترة">${nf(f.advRem, 0)} لاحقاً</span>` : '–'}</td><td class="n">${f.invNeed > 1 ? nf(f.invNeed, 0) : '–'}</td>${own ? '' : `<td class="n">${f.pendT ? nf(f.pendT, 0) : '–'}</td>`}<td class="n"><b>${tot > 1 ? nf(tot, 0) : '–'}</b></td></tr>`; }).join('')}
+  ${openInv.length ? `<tr><td colspan="2"><b>مستخلصات مقدمة ولسه ماتصرفتش</b><div class="mut" style="font-size:12px">${openInv.map(o => 'مستخلص ' + o.i.no).join(' · ')}</div></td><td colspan="${own ? 4 : 5}"></td><td class="n"><b>${nf(oiT, 0)}</b></td></tr>` : ''}
+  <tr class="tot"><td colspan="2">الإجمالي</td><td class="n">${nf(sum(flows, f => f.B), 0)}</td><td class="n">${nf(sum(flows, f => f.works), 0)}</td><td class="n">${nf(askT, 0)}</td><td class="n">${nf(advT, 0)}</td><td class="n">${nf(invT, 0)}</td>${own ? '' : `<td class="n">${nf(pendT, 0)}</td>`}<td class="n">${nf(reqT, 0)}</td></tr></tbody></table></div></div>
+  <p class="mut" style="font-size:12px">الأعمال المخططة في الفترة = الجزء المتبقي من السعر التقديري للمرحلة (حسب نسبة إنجازها)، متوزع على المدة الباقية من المرحلة في الجدول الزمني، والمرحلة المتأخرة عن الجدول باقيها كله بيتحسب في الفترة. المقدم بيتطلب للمراحل اللي شغلها داخل في الفترة. المستخلصات المتوقعة = الأعمال المخططة × ${Math.round(PP * 100)}% + أتعاب ${Math.round(FEE * 100)}%.</p>
+  ${!own && pendNo.length ? `<p class="mut" style="font-size:12px">مستحقات مش مربوطة بمرحلة: ${pendNo.map(f => esc(f.description || f.party || '') + ' ' + nf(f.amount, 0)).join(' · ')}</p>` : ''}
+
+  <div class="secT">4. قرارات ومطلوبات الاجتماع</div>
+  <textarea id="mtN" rows="5" style="width:100%" placeholder="اكتب القرارات والمطلوب من كل طرف… (بتتحفظ على الجهاز ده وبتطلع في الطباعة)">${esc(notes)}</textarea>
+  <div class="mprint" id="mtNp"></div></div>`;
+  const re = () => renderMeet();
+  $('#mtF').onchange = e => { M.from = e.target.value || M.from; re(); }; $('#mtH').onchange = e => { M.h = +e.target.value; re(); }; $('#mtO').onchange = e => { M.own = e.target.checked; re(); };
+  const nt = $('#mtN'), sync = () => { $('#mtNp').textContent = nt.value; try { localStorage.setItem(notesK, nt.value); } catch (e) { } }; nt.oninput = sync; sync();
+  $('#mtP').onclick = () => { sync(); print(); };
 }
 async function renderBoq() {
   if (!S.P.contract) { const [c, l] = await Promise.all([S.sb.from('contract_lines').select('*').eq('project_id', S.P.id).order('sort'), S.sb.rpc('ledger_summary', { p_project: S.P.id })]); S.P.contract = c.data || []; S.P.ledger = (l.data || []).map(x => ({ ...x, expense: +x.expense, revenue: +x.revenue })); }

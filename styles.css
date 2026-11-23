@@ -546,3 +546,9 @@ table.bq tr.guide td{background:#fff6dc}
 .bqops{display:inline-flex;gap:4px;margin-inline-start:6px;vertical-align:middle}
 .bqops .mini{padding:1px 6px;font-size:12px;line-height:1.4;min-height:0;border-radius:6px}
 .bqops [data-bdel]:hover{background:#fde2e2;border-color:#e5a3a3}
+/* تقرير الاجتماع */
+.meet .mhead{display:none}.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:10px}
+.mcard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px}.mcard .mh{display:flex;justify-content:space-between;align-items:center;gap:8px}.mbig{font-size:24px;font-weight:800;color:var(--acc)}
+.mrow{display:flex;justify-content:space-between;font-size:13px;padding:3px 0;border-top:1px dashed var(--line)}.mrow b.ok{color:#1d7a4f}
+.meet .mprint{display:none;white-space:pre-wrap}
+@media print{.meet .mhead{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #222;margin-bottom:8px}.meet .mhead h2{margin:0}.meet textarea{display:none}.meet .mprint{display:block;border:1px solid #999;padding:10px;min-height:80px}.meet .secT{break-after:avoid}.meet .card,.mcard{break-inside:avoid}.meet details{display:block}.meet details>*{display:block}}
