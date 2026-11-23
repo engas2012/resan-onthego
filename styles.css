@@ -560,3 +560,10 @@ button.kpi{border:1px solid var(--line);cursor:pointer;font:inherit;color:inheri
 .mflow .gz{fill:var(--line);fill-opacity:.25}.mflow .gz2{fill:transparent}.mflow .today{stroke:#e34948;stroke-width:1.5;stroke-dasharray:3 3}
 .mleg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;margin:0 0 8px}.mleg span{display:inline-flex;align-items:center;gap:5px}.mleg i{width:12px;height:12px;border-radius:3px;display:inline-block}.mleg i.ln{height:0;border-top:2px dashed #e34948;border-radius:0;width:18px}
 @media print{.mflow,.mleg i{-webkit-print-color-adjust:exact;print-color-adjust:exact}.mfwrap{break-inside:avoid}}
+.mcards{display:flex;align-items:stretch;gap:4px;overflow-x:auto;padding:4px 0 10px;margin-top:8px}.marr{align-self:center;color:var(--mut);font-size:22px}
+.mcard2{flex:1 0 150px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px 0;display:flex;flex-direction:column;gap:6px;position:relative;overflow:hidden}
+.mcard2.peak{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}.mmon{font-size:12px;color:var(--mut);font-weight:700}.mtot{font-size:22px;font-weight:800}.mtot small{font-size:11px;color:var(--mut);font-weight:400}
+.mstrip{display:flex;height:8px;border-radius:5px;overflow:hidden;gap:2px;background:var(--line)}.mstrip i{display:block;height:100%}
+.mtop{display:flex;flex-direction:column;gap:3px;font-size:11.5px}.mtop div{display:flex;align-items:center;gap:5px}.mtop i{width:8px;height:8px;border-radius:2px;flex:none}.mtop span{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mtop b{font-size:11.5px}
+.mord{font-size:11px;color:#b3261e;background:#fdecea;border-radius:6px;padding:2px 6px;align-self:flex-start}
+@media print{.mcards{flex-wrap:wrap}.mcard2,.mstrip i,.mtop i{-webkit-print-color-adjust:exact;print-color-adjust:exact}.marr{display:none}}
