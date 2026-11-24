@@ -71,7 +71,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.29.1</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.29.2</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -3348,7 +3348,7 @@ async function renderMeet() {
   const curN = (PHr[0] || PH.find(x => !done(x)) || {}).n || 1, UP = PH.filter(x => !done(x) && x.n >= curN);
   const Q = P.quotes || [], qOf = n => Q.filter(q => P.items.find(r => r.id === q.item_id)?.phase_n === n), CH = (P.check || []).filter(c => c.category === 'pricing' || /سعر|تسعير/.test(c.title || ''));
   const prepRows = UP.map(x => { const L = I.filter(r => r.phase_n === x.n), pr = L.filter(r => r.rate > 0 && !r.reprice), miss = L.filter(r => !(r.rate > 0) || r.reprice), qs = qOf(x.n);
-    const prep = qs.filter(q => !q.adopted && q.status !== 'rejected'), adp = qs.filter(q => q.adopted), rf = (rq.data || []).filter(f => f.status !== 'closed' && (f.item_ids || []).some(id => L.some(r => r.id === id)));
+    const prep = qs.filter(q => !q.adopted && !['rejected', 'submitted'].includes(q.status)), adp = qs.filter(q => q.adopted), rf = (rq.data || []).filter(f => f.status !== 'closed' && (f.item_ids || []).some(id => L.some(r => r.id === id)));
     const wq = miss.filter(r => qIt(r.id).length), noq = miss.filter(r => !qIt(r.id).length);
     return { x, L, pr, miss, prep, adp, rf, wq, noq, rdy: L.length ? pr.length / L.length : 1 }; }).filter(p => p.L.length);
   // ── 3) التدفقات المطلوبة
@@ -3386,7 +3386,7 @@ async function renderMeet() {
   <p class="mut" style="font-size:12px">النسبة الكلية للمشروع ${pc(overall(PH))} – دي بتحسب كل المراحل بما فيها اللي لسه ماجاش وقتها (التشطيبات والكهروميكانيك واللاندسكيب)، علشان كده الأدق في المتابعة هو إنجاز كل مرحلة جارية وإنجاز الأعمال اللي بدأت.</p>
 
   <div class="secT">2. عروض الأسعار الجاري إعدادها للمراحل الجاية</div>
-  <div class="card" style="padding:0"><div class="scroll"><table class="stack"><thead><tr><th>المرحلة</th><th class="n">البنود</th><th class="n">متسعّرة</th><th>جاهزية التسعير</th><th class="n">عروض تحت الإعداد / المراجعة</th><th class="n">عروض معتمدة</th><th class="n">طلبات أسعار مفتوحة</th><th class="n">بنود محتاجة عروض</th></tr></thead><tbody>
+  <div class="card" style="padding:0"><div class="scroll"><table class="stack"><thead><tr><th>المرحلة</th><th class="n">البنود</th><th class="n">متسعّرة</th><th>جاهزية التسعير</th><th class="n">عروض تحت الإعداد</th><th class="n">عروض معتمدة</th><th class="n">طلبات أسعار مفتوحة</th><th class="n">بنود محتاجة عروض</th></tr></thead><tbody>
   ${prepRows.map(p => `<tr><td data-l="المرحلة"><b>${p.x.n}. ${esc(p.x.name)}</b></td><td class="n" data-l="البنود">${p.L.length}</td><td class="n" data-l="متسعّرة">${p.pr.length}</td><td data-l="الجاهزية">${bar(p.rdy)}</td><td class="n" data-l="تحت الإعداد">${p.prep.length || '–'}</td><td class="n" data-l="معتمدة">${p.adp.length || '–'}</td><td class="n" data-l="طلبات">${p.rf.length || '–'}</td><td class="n ${p.noq.length ? 'bad' : ''}" data-l="محتاجة عروض">${p.noq.length || '–'}</td></tr>`).join('')}</tbody></table></div></div>
   ${prepRows.filter(p => p.prep.length).map(p => `<details class="gp" open><summary><span>${p.x.n}. ${esc(p.x.name)} – عروض جاري إعدادها (${p.prep.length})</span></summary><table class="stack"><tbody>${p.prep.map(q => { const r = P.items.find(z => z.id === q.item_id); return `<tr><td>${esc(r?.code || '')} ${esc(r?.name || '')}</td><td>${esc(q.supplier || P.vendors.find(v => v.id === q.vendor_id)?.name || '')}</td><td>${QST[q.status]?.[1] || q.status}</td>${own ? '' : `<td class="n">${q.unit_rate ? nf(q.unit_rate) : ''}</td>`}</tr>`; }).join('')}</tbody></table></details>`).join('')}
   ${prepRows.filter(p => p.noq.length).length ? `<details class="gp"><summary><span>البنود اللي لسه محتاجة عروض أسعار (${sum(prepRows, p => p.noq.length)})</span></summary>${prepRows.filter(p => p.noq.length).map(p => `<div style="margin:6px 0"><b>${p.x.n}. ${esc(p.x.name)}</b><div class="mut" style="font-size:12px">${p.noq.slice(0, 40).map(r => esc(r.code + ' ' + r.name)).join(' · ')}${p.noq.length > 40 ? ` … و ${p.noq.length - 40} بند` : ''}</div></div>`).join('')}</details>` : ''}
@@ -3410,7 +3410,7 @@ async function renderMeet() {
   const re = () => renderMeet();
   $('#mtF').onchange = e => { M.from = e.target.value || M.from; re(); }; $('#mtH').onchange = e => { M.h = +e.target.value; re(); }; $('#mtO').onchange = e => { M.own = e.target.checked; re(); };
   const nt = $('#mtN'), sync = () => { $('#mtNp').textContent = nt.value; try { localStorage.setItem(notesK, nt.value); } catch (e) { } }; nt.oninput = sync; sync();
-  $('#mtP').onclick = () => { sync(); print(); };
+  $('#mtP').onclick = () => { sync(); const pg = document.createElement('style'); pg.textContent = '@page{size:A4 landscape;margin:8mm}'; document.head.append(pg); document.body.classList.add('meetpr'); const done = () => { pg.remove(); document.body.classList.remove('meetpr'); removeEventListener('afterprint', done); }; addEventListener('afterprint', done); print(); };
 }
 async function renderBoq() {
   if (!S.P.contract) { const [c, l] = await Promise.all([S.sb.from('contract_lines').select('*').eq('project_id', S.P.id).order('sort'), S.sb.rpc('ledger_summary', { p_project: S.P.id })]); S.P.contract = c.data || []; S.P.ledger = (l.data || []).map(x => ({ ...x, expense: +x.expense, revenue: +x.revenue })); }
