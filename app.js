@@ -71,7 +71,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.30.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.31.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -108,6 +108,12 @@ async function afterLogin(user) {
 /* ---------------- layout & routing ---------------- */
 const VIEWS = [['status', 'الموقف التنفيذي', null], ['meet', 'تقرير الاجتماع', 'meet'], ['schedule', 'الجدول الزمني', 'sched'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة التقارير', 'review'], ['log', 'سجل التقارير', 'log'], ['tasks', 'مهام المكتب الفني', 'tasks'], ['boq', 'المقايسة والتكلفة', 'boq'], ['quotes', 'عروض الأسعار', 'quotes'], ['orders', 'الطلبيات', 'orders'], ['subs', 'عقود المقاولين', 'subs'], ['acct', 'ملخص الحسابات', 'acct'], ['phfin', 'حساب المراحل', 'ledger'], ['ledger', 'القيود والمصروفات', 'ledgerEd'], ['custody', 'العهدة', 'custody'], ['inv', 'المستخلصات', 'inv'], ['ded', 'الخصومات المعلقة', 'ded'], ['store', 'المخزن', 'store'], ['docs', 'المستندات', 'docs']];
 const NAVG = [['متابعة المشروع', '📊', ['status', 'meet', 'schedule']], ['التقارير اليومية', '📝', ['report', 'review', 'log']], ['المكتب الفني والتسعير', '📐', ['tasks', 'boq', 'quotes', 'orders', 'subs']], ['المخزن والمستندات', '📦', ['store', 'docs']]];
+const NAVK = ['track', 'reports', 'tech', 'store'];
+const secOf = v => NAVK[NAVG.findIndex(g => g[2].includes(v))] || 'track';
+// المشروعات اللي المستخدم يقدر يفتح فيها شاشة معيّنة
+const viewPids = v => { const d = VIEWS.find(x => x[0] === v); return S.projects.filter(p => !d?.[2] || can(d[2], p.id)).map(p => p.id); };
+const secViews = k => { const g = NAVG[NAVK.indexOf(k)]; return g ? g[2].filter(v => viewPids(v).length) : []; };
+function secNav(cur) { return `<div class="ngrp">${NAVG.map((g, i) => [g, NAVK[i]]).filter(([, k]) => secViews(k).length).map(([g, k]) => `<a href="#c/${k}" class="${k === cur ? 'on' : ''}"><i>${g[1]}</i>${g[0]}</a>`).join('')}<a href="#home" class="${cur ? '' : 'on'}"><i>🏗️</i>المشروعات</a></div>`; }
 const FINV = ['acct', 'phfin', 'ledger', 'inv', 'ded'], FINC = { acct: 'acct', phfin: 'ledger', ledger: 'ledgerEd', inv: 'inv', ded: 'ded' };
 const finOn = () => finPids().length > 0 || S.projects.some(p => can('custody', p.id));
 const FINCO = () => [['fin', 'ملخص المشروعات', finPids().length > 0], ['fin/bank', 'البنك والخزينة', S.finAny], ['fin/ga', 'المصروفات الإدارية', S.finAny], ['fin/custody', 'العهد', S.projects.some(p => can('custody', p.id))], ['fin/people', 'حسابات الأفراد', S.admin]].filter(x => x[2]);
@@ -129,11 +135,11 @@ function projNav(pid, view) {
 const setBadge = (id, n) => { (S.bn ||= {})[id] = n; const b = document.getElementById(id); if (b) { b.hidden = !n; b.textContent = n > 999 ? '999+' : n; }
   document.querySelectorAll('[data-gb]').forEach(g => { const t = g.dataset.gb.split(' ').reduce((a, v) => a + (S.bn[BADGE[v]] || 0), 0); g.hidden = !t; g.textContent = t > 999 ? '999+' : t; }); };
 function shell(pid, view) {
-  const p = pid && S.projects.find(x => x.id === pid), fin = /^fin(\/|$)/.test(view) || (p && FINV.includes(view));
+  const p = pid && S.projects.find(x => x.id === pid), fin = /^fin(\/|$)/.test(view) || (p && FINV.includes(view)), sec = !p && /^c\//.test(view) ? view.slice(2) : '', con = !p && view === 'home';
   return `<header><div class="hbar"><a class="brandlink" href="${hubOn() ? '#start' : '#home'}" title="الصفحة الرئيسية">${LOGO()}<span class="otg">On the go</span></a>
   <div class="who2"><a class="bell${view === 'alerts' ? ' on' : ''}" href="#alerts" title="التنبيهات"><svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span class="badge" id="bellN" hidden></span></a><a class="homeb${!p && (view === 'start' || (!hubOn() && !(['admin', 'staff', 'alerts', 'hr', 'ops', 'study'].includes(view) || /^fin/.test(view)))) ? ' on' : ''}" href="${hubOn() ? '#start' : '#home'}"><svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M5.5 9.5V20h5v-6h3v6h5V9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>الرئيسية</a>${p ? `<span class="roleTag">${ROLE[role(pid)] || ''}</span>` : ''}<span class="uname">${esc(S.profile.full_name || S.profile.email)}</span>${S.admin ? '<a href="#admin" class="adm">المستخدمين</a>' : ''}<button id="out">خروج</button></div></div>
-  ${fin ? `<div class="ptitle">${modCrumb('fin')}<h1>الحسابات – ${p ? esc(p.name) : FINT[view] || ''}</h1>${p ? `<p>${esc(p.place || '')} · المالك: ${esc(p.owner_name)}</p>` : ''}</div>` : p ? `<div class="ptitle">${modCrumb('home')}<h1>${esc(p.name + ' – ' + p.place)}</h1><p>المالك: ${esc(p.owner_name)} · المقاول العام: ${esc(p.contractor_name)} · الاستشاري: ${esc(p.consultant_name)}</p></div>` : `<div class="ptitle">${modCrumb(view)}<h1>${esc(MODT[modOf(view)] || 'متابعة مشروعات الغردقة')}</h1></div>`}
-  <nav class="${p || fin ? 'pnav' : ''}">${fin ? finNav(p ? pid : null, view) : p ? projNav(pid, view) : ''}</nav></header><main id="main"><p class="mut">جاري التحميل…</p></main>`;
+  ${fin ? `<div class="ptitle">${modCrumb('fin')}<h1>الحسابات – ${p ? esc(p.name) : FINT[view] || ''}</h1>${p ? `<p>${esc(p.place || '')} · المالك: ${esc(p.owner_name)}</p>` : ''}</div>` : p ? `<div class="ptitle">${modCrumb('home')}${NAVG.some(g => g[2].includes(view)) ? ` <span class="crumb">›</span> <a class="crumb" href="#c/${secOf(view)}">${esc(NAVG[NAVK.indexOf(secOf(view))][0])}</a>` : ''}<h1>${S.projects.length > 1 ? `<select class="pswitch" data-view="${view}" aria-label="تغيير المشروع">${S.projects.map(x => `<option value="${x.id}"${x.id === pid ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select> – ${esc(p.place)}` : esc(p.name + ' – ' + p.place)}</h1><p>المالك: ${esc(p.owner_name)} · المقاول العام: ${esc(p.contractor_name)} · الاستشاري: ${esc(p.consultant_name)}</p></div>` : `<div class="ptitle">${modCrumb(view)}${sec && !hubOn() ? `<a class="crumb" href="#home">Construction</a>` : ''}<h1>${sec ? esc(NAVG[NAVK.indexOf(sec)]?.[0] || '') : esc(MODT[modOf(view)] || 'متابعة مشروعات الغردقة')}</h1></div>`}
+  <nav class="${p || fin || sec || con ? 'pnav' : ''}">${fin ? finNav(p ? pid : null, view) : p ? projNav(pid, view) : sec || con ? secNav(sec) : ''}</nav></header><main id="main"><p class="mut">جاري التحميل…</p></main>`;
 }
 async function route() {
   document.querySelector('.selbar')?.remove();
@@ -170,6 +176,7 @@ async function route() {
   if (h === 'study' && S.studyU) return renderStudy();
   if (h === 'start' && hubOn()) return renderHub();
   if (h === 'alerts') return renderAlerts();
+  if (/^c\//.test(h) && S.projects.length) return renderSection(h.slice(2));
   if (h === 'fin' && finPids().length) return renderFinAll();
   if (h === 'fin' && finOn()) { location.hash = '#fin/custody'; return; }
   if (h === 'fin/bank' && S.finAny) return renderBank();
@@ -180,6 +187,7 @@ async function route() {
   if (!S.projects.length && S.studyU) { location.hash = '#study'; return; }
   renderHome();
 }
+document.addEventListener('change', e => { const t = e.target.closest?.('select.pswitch'); if (!t) return; const v = t.dataset.view; location.hash = `#p/${t.value}/${viewPids(v).includes(t.value) ? v : 'status'}`; });
 const bindOut = () => { $('#out').onclick = () => S.sb.auth.signOut(); updateBell(); };
 
 /* ---------------- data ---------------- */
@@ -670,9 +678,16 @@ async function importUnits(file, mall) {
   draw();
 }
 
+function renderSection(k) {
+  const vs = secViews(k), lab = Object.fromEntries(VIEWS.map(v => [v[0], v[1]])), ic = { status: '📊', meet: '🗓️', schedule: '📅', report: '✍️', review: '✅', log: '🗂️', tasks: '📋', boq: '📐', quotes: '💬', orders: '🚚', subs: '🤝', store: '📦', docs: '📁' };
+  if (!vs.length) { location.hash = '#home'; return; }
+  $('#main').innerHTML = `<p class="mut" style="margin-top:0">اختار الفرع وبعدين المشروع.</p><div class="secv">${vs.map(v => `<div class="card secc"><div class="sch"><span class="sti">${ic[v] || '•'}</span><b>${esc(lab[v])}</b></div><div class="secp">${viewPids(v).map(id => { const p = S.projects.find(x => x.id === id); return `<a class="btn" href="#p/${id}/${v}">${esc(p.name)}<small>${esc(p.place || '')}</small></a>`; }).join('')}</div></div>`).join('')}</div>`;
+}
 async function renderHome() {
   const cards = await Promise.all(S.projects.map(async p => { const [a, w, u] = await Promise.all([S.sb.rpc('phase_progress', { p_project: p.id }), S.sb.rpc('active_work', { p_project: p.id, p_limit: 8 }), S.sb.rpc('site_updates', { p_project: p.id, p_n: 2 })]); return { p, list: a.data || [], work: w.data || [], upd: u.data || [] }; }));
-  $('#main').innerHTML = `<h2>المشاريع</h2><div class="pgrid">${cards.map(({ p, list, work, upd }) => `<article class="pc"><div class="row2"><div><h2>${esc(p.name)}</h2><div class="mut">${esc(p.place)}${p.land ? ' · أرض ' + esc(p.land) : ''} · <span class="roleTag">${ROLE[role(p.id)] || ''}</span></div></div><div class="pbig">${list.length ? Math.round(overall(list) * 100) + '%' : '–'}</div></div>
+  const secs = NAVG.map((g, i) => [g, NAVK[i]]).filter(([, k]) => secViews(k).length), lab = Object.fromEntries(VIEWS.map(v => [v[0], v[1]]));
+  $('#main').innerHTML = `<h2>الأقسام</h2><div class="secg">${secs.map(([g, k]) => `<a class="sect" href="#c/${k}"><div class="sti">${g[1]}</div><div><b>${esc(g[0])}</b><div class="mut">${secViews(k).map(v => esc(lab[v])).join(' · ')}</div></div><span class="sgo">←</span></a>`).join('')}</div>
+  <h2>المشروعات <span class="mut" style="font-size:13px;font-weight:400">اختصار للدخول على مشروع</span></h2><div class="pgrid">${cards.map(({ p, list, work, upd }) => `<article class="pc"><div class="row2"><div><h2>${esc(p.name)}</h2><div class="mut">${esc(p.place)}${p.land ? ' · أرض ' + esc(p.land) : ''} · <span class="roleTag">${ROLE[role(p.id)] || ''}</span></div></div><div class="pbig">${list.length ? Math.round(overall(list) * 100) + '%' : '–'}</div></div>
   <dl class="who"><dt>المالك</dt><dd>${esc(p.owner_name)}</dd><dt>المقاول العام</dt><dd>${esc(p.contractor_name)}</dd><dt>الاستشاري</dt><dd>${esc(p.consultant_name)}</dd></dl>
   <div class="mbars">${list.map(x => `<div><span>${x.n}. ${esc(x.name)}</span><div class="bar${x.pct >= 1 ? ' full' : ''}"><u style="width:${Math.min(x.pct, 1) * 100}%"></u></div><em>${Math.round(x.pct * 100)}%</em></div>`).join('')}</div>
   ${liveWork(p, work, upd)}
