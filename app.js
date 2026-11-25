@@ -71,7 +71,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.33.3</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.33.4</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -3073,8 +3073,9 @@ const ORD_SUP = 0.7; // نصيب التوريد من سعر البند (توري
 function ordRec(r, R) { const t = (s, x) => { try { return new RegExp(x.pattern, 'i').test(s); } catch { return false; } }, nm = r.name || '';
   return R.find(x => x.project_id && (!x.item_unit || x.item_unit === r.unit) && t(nm, x)) || R.find(x => (!x.item_unit || x.item_unit === r.unit) && t(nm, x)) || R.find(x => x.item_unit && x.item_unit === r.unit && t(nm + ' ' + (r.group_name || ''), x)); }
 const ordLump = u => /مقطوع|جملة|^lum|L\.?S|نظام|^بند$/i.test(u || '');
-function ordMats(r, q, R, rate) { const rc = ordRec(r, R);
-  const nm = ordClean(r.name) || r.name, sup = (+rate || 0) * ORD_SUP, rd = v => v > 0 ? Math.round(v * 100) / 100 : null;
+function ordMats(r, q, R, rate, lab) { const rc = ordRec(r, R);
+  const nm = ordClean(r.name) || r.name, sup = +lab > 0 && +rate > +lab ? +rate - +lab : (+rate || 0) * ORD_SUP, // لو فيه مصنعية فعلية من عرض: التوريد = السعر − المصنعية
+    rd = v => v > 0 ? Math.round(v * 100) / 100 : null;
   if (!rc) return [{ name: nm, unit: r.unit || 'عدد', f: 1, qty: q, rate: rd(sup), brands: '', guide: true, miss: true, lump: ordLump(r.unit) }];
   // بند مقطوعية/جملة: ماينفعش نحوّله لمتر أو عدد بمعدل، فبيطلع سطر واحد والكمية التفصيلية حسب الحصر
   if (ordLump(r.unit) && !rc.project_id && !(rc.materials || []).every(m => m[1] === 'نفس وحدة البند')) return [{ name: nm, unit: r.unit, f: 1, qty: q, rate: rd(sup), brands: (rc.materials || [])[0]?.[3] || '', guide: true, lump: true }];
@@ -3125,13 +3126,13 @@ async function renderOrders() {
   $('#main').innerHTML = '<p class="mut">جاري التحميل…</p>';
   const [oq, lq, iq, aq, lk, rq, ...rtq] = await Promise.all([S.sb.from('supply_orders').select('*').eq('project_id', pid).order('no', { ascending: false }), S.sb.from('supply_order_lines').select('*, supply_orders!inner(project_id)').eq('supply_orders.project_id', pid).order('sort'),
     S.sb.from('supply_order_items').select('*, supply_orders!inner(project_id,status,pkg,stage,no)').eq('supply_orders.project_id', pid),
-    S.sb.from('schedule_activities').select('id,phase_n,start,finish').eq('project_id', pid), S.sb.from('schedule_activity_items').select('activity_id,item_id'), S.sb.from('supply_recipes').select('*').or(`project_id.is.null,project_id.eq.${pid}`).order('sort'), ...[0, 1, 2].map(k => S.sb.from('boq_rates').select('item_id,rate').order('item_id').range(k * 1000, k * 1000 + 999))]);
+    S.sb.from('schedule_activities').select('id,phase_n,start,finish').eq('project_id', pid), S.sb.from('schedule_activity_items').select('activity_id,item_id'), S.sb.from('supply_recipes').select('*').or(`project_id.is.null,project_id.eq.${pid}`).order('sort'), ...[0, 1, 2].map(k => S.sb.from('boq_rates').select('item_id,rate,labor_rate').order('item_id').range(k * 1000, k * 1000 + 999))]);
   if (oq.error) return $('#main').innerHTML = `<div class="note">${esc(oq.error.message)}</div>`;
   const O = oq.data || [], L = lq.data || [], OI = iq.data || [], A = aq.data || [], LK = lk.data || [], T0 = today(), sum = (X, f) => X.reduce((t, x) => t + (+f(x) || 0), 0);
   const REC = (rq.data || []).sort((a, b) => (b.project_id ? 1 : 0) - (a.project_id ? 1 : 0) || (a.sort || 0) - (b.sort || 0));
   if (!(P.items || []).length) { const it = await S.sb.from('boq_progress').select('*').eq('project_id', pid).order('sort'); P.items = (it.data || []).map(i => ({ ...i, ex: +i.executed || 0, rate: 0, pct: +i.qty > 0 ? (+i.executed || 0) / +i.qty : 0 })); }
   if (!P.vendors?.length) P.vendors = (await S.sb.from('vendors').select('*').order('trade').order('name')).data || [];
-  const RT = Object.fromEntries(rtq.flatMap(x => x.data || []).map(x => [x.item_id, +x.rate || 0])), rateOf = r => RT[r.id] || +r.rate || 0;
+  const RTD = rtq.flatMap(x => x.data || []), RT = Object.fromEntries(RTD.map(x => [x.item_id, +x.rate || 0])), LB = Object.fromEntries(RTD.filter(x => +x.labor_rate > 0).map(x => [x.item_id, +x.labor_rate])), rateOf = r => RT[r.id] || +r.rate || 0;
   const ordQ = id => sum(OI.filter(x => x.item_id === id && x.supply_orders.status !== 'cancelled'), x => x.qty);
   const phStart = n => A.filter(a => a.phase_n === n && a.start).map(a => a.start).sort()[0];
   const itStart = id => { const ids = LK.filter(k => k.item_id === id).map(k => k.activity_id); return A.filter(a => ids.includes(a.id) && a.start).map(a => a.start).sort()[0]; };
@@ -3141,7 +3142,7 @@ async function renderOrders() {
   // المباني والمحارة والعزل بتتورّد من الموقع حسب الحاجة، فمش داخلين في الطلبيات
   const siteSup = r => { const n = r.name || '', g = r.group_name || ''; if (/اختبار|نافورة|تكييف|HVAC|مجاري|صرف|سباكة|حريق|كهرب|تيار|مواسير|كابل|صوف|دهان/.test(g + ' ' + n)) return false; if (/بلاط|تيرازو|وزرة|رخام|سيراميك/.test(n)) return false; return /مباني|مبانى|طوب|بياض|محار|لياسة|عزل|بيتومين|ميول/.test(n) || /^(أعمال |اعمال )?(المباني|البياض|العزل)|عزل الأسطح|العزل الداخلي/.test(g); };
   const rows = P.items.filter(r => +r.qty > 0 && r.phase_n > structN && !siteSup(r) && !phDone(r.phase_n) && !(+r.ex > 0) && !(+r.pct_override > 0) && !(/-5F$/.test(r.id) && is5(r) && P.items.some(p => p.id === r.id.replace(/-5F$/, '')))).map(r => { const w5 = is5(r), c5 = w5 ? r : F5.get(r.id), q = +r.qty, ord = ordQ(r.id), toOrd = w5 ? 0 : q, q5 = c5 ? +c5.qty : 0, ist = itStart(r.id), st = ist || phStart(r.phase_n), by = st ? addD(st, -V.lead) : null;
-    const due = w5 ? 'held' : !toOrd ? 'ok' : !by ? 'nodate' : by < T0 ? (ist ? 'late' : 'now') : by <= addD(T0, 21) ? 'now' : 'later'; const mats = ordMats(r, toOrd, REC, rateOf(r)), mats5 = c5 ? ordMats(c5, q5, REC, rateOf(c5)) : [];
+    const due = w5 ? 'held' : !toOrd ? 'ok' : !by ? 'nodate' : by < T0 ? (ist ? 'late' : 'now') : by <= addD(T0, 21) ? 'now' : 'later'; const mats = ordMats(r, toOrd, REC, rateOf(r), LB[r.id]), mats5 = c5 ? ordMats(c5, q5, REC, rateOf(c5), LB[c5.id]) : [];
     const ML = new Map(); mats.forEach(m => ML.set(m.name + '|' + m.unit, { ...m, q5: 0 })); mats5.forEach(m => { const k = m.name + '|' + m.unit, e = ML.get(k); if (e) { e.q5 = m.qty; e.rate = e.rate || m.rate; } else ML.set(k, { ...m, q5: m.qty, qty: 0 }); });
     return { r, q, ord, toOrd, q5, c5, st, by, due, nm: ordClean(r.name) || r.name, brands: ordBrands(r, REC), mats, ML: [...ML.values()], val: sum(mats, m => m.qty * (m.rate || 0)), val5: sum(mats5, m => m.qty * (m.rate || 0)) }; });
   const DUE = { late: ['فات ميعاد الطلب (حسب نشاط البند)', 'ret'], now: ['اطلب دلوقتي / خلال 3 أسابيع', 'warn'], later: ['لاحقاً', ''], nodate: ['مش في الجدول', 'pend'], ok: ['اتطلب بالكامل', 'appr'], held: ['الدور الخامس – معلّق', 'pend'] };
