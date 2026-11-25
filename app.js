@@ -71,7 +71,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.33.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.33.1</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -3135,7 +3135,9 @@ async function renderOrders() {
   const addD = (d, n) => new Date(Date.parse(d) + n * 864e5).toISOString().slice(0, 10), phDone = n => (P.phaseProg.find(x => x.n === n)?.pct || 0) >= 0.995;
   const structN = P.phaseProg.find(x => /هيكل/.test(x.name))?.n ?? 4;
   const is5 = r => !!r.on_hold && /الخامس/.test(r.hold_reason || ''), F5 = new Map(P.items.filter(r => /-5F$/.test(r.id) && is5(r)).map(r => [r.id.replace(/-5F$/, ''), r]));
-  const rows = P.items.filter(r => +r.qty > 0 && r.phase_n > structN && !phDone(r.phase_n) && !(+r.ex > 0) && !(+r.pct_override > 0) && !(/-5F$/.test(r.id) && is5(r) && P.items.some(p => p.id === r.id.replace(/-5F$/, '')))).map(r => { const w5 = is5(r), c5 = w5 ? r : F5.get(r.id), q = +r.qty, ord = ordQ(r.id), toOrd = w5 ? 0 : q, q5 = c5 ? +c5.qty : 0, ist = itStart(r.id), st = ist || phStart(r.phase_n), by = st ? addD(st, -V.lead) : null;
+  // المباني والمحارة والعزل بتتورّد من الموقع حسب الحاجة، فمش داخلين في الطلبيات
+  const siteSup = r => { const n = r.name || '', g = r.group_name || ''; if (/اختبار|نافورة|تكييف|HVAC|مجاري|صرف|سباكة|حريق|كهرب|تيار|مواسير|كابل|صوف|دهان/.test(g + ' ' + n)) return false; return /مباني|مبانى|طوب|بياض|محار|لياسة|عزل|بيتومين|ميول/.test(n) || /^(أعمال |اعمال )?(المباني|البياض|العزل)|عزل الأسطح|العزل الداخلي/.test(g); };
+  const rows = P.items.filter(r => +r.qty > 0 && r.phase_n > structN && !siteSup(r) && !phDone(r.phase_n) && !(+r.ex > 0) && !(+r.pct_override > 0) && !(/-5F$/.test(r.id) && is5(r) && P.items.some(p => p.id === r.id.replace(/-5F$/, '')))).map(r => { const w5 = is5(r), c5 = w5 ? r : F5.get(r.id), q = +r.qty, ord = ordQ(r.id), toOrd = w5 ? 0 : q, q5 = c5 ? +c5.qty : 0, ist = itStart(r.id), st = ist || phStart(r.phase_n), by = st ? addD(st, -V.lead) : null;
     const due = w5 ? 'held' : !toOrd ? 'ok' : !by ? 'nodate' : by < T0 ? (ist ? 'late' : 'now') : by <= addD(T0, 21) ? 'now' : 'later'; const mats = ordMats(r, toOrd, REC, rateOf(r)), mats5 = c5 ? ordMats(c5, q5, REC, rateOf(c5)) : [];
     const ML = new Map(); mats.forEach(m => ML.set(m.name + '|' + m.unit, { ...m, q5: 0 })); mats5.forEach(m => { const k = m.name + '|' + m.unit, e = ML.get(k); if (e) { e.q5 = m.qty; e.rate = e.rate || m.rate; } else ML.set(k, { ...m, q5: m.qty, qty: 0 }); });
     return { r, q, ord, toOrd, q5, c5, st, by, due, nm: ordClean(r.name) || r.name, brands: ordBrands(r, REC), mats, ML: [...ML.values()], val: sum(mats, m => m.qty * (m.rate || 0)), val5: sum(mats5, m => m.qty * (m.rate || 0)) }; });
@@ -3149,7 +3151,7 @@ async function renderOrders() {
   const PKS = [...PK.values()].map(B => { const ls = [...B.lines.values()].filter(l => l.qty > 1e-6 || l.q5 > 1e-6).map(l => ({ ...l, rate: l.cq ? Math.round(l.cv / l.cq * 100) / 100 : null, qty: Math.round(l.qty * 1000) / 1000, q5: Math.round(l.q5 * 1000) / 1000, src: [...l.src] })).sort((a, b) => b.qty * (b.rate || 0) - a.qty * (a.rate || 0));
     if (OFIT.has(B.k) && V.fit > 0 && !ls.some(l => /قطع خاصة|فيتنج|fitting|كيعان|وصلات/i.test(l.name))) { const pp = ls.filter(l => /مواسير|ماسورة|pipe/i.test(l.name)), pv = sum(pp, l => l.qty * (l.rate || 0)), pv5 = sum(pp, l => l.q5 * (l.rate || 0));
       if (pv > 0 || pv5 > 0) { const base = pv || pv5; ls.push({ name: `قطع خاصة وفيتنج (كيعان، تيهات، جلب، مسلوب، حوامل) – تقدير ${V.fit}% من قيمة المواسير`, unit: 'مقطوعية', qty: pv ? 1 : 0, q5: Math.round(pv5 / base * 1000) / 1000, rate: Math.round(base * V.fit / 100), guide: true, brands: '', src: [...new Set(pp.flatMap(l => l.src))], fit: true }); } }
-    return { ...B, ls, val: sum(ls, l => l.qty * (l.rate || 0)), val5: sum(ls, l => l.q5 * (l.rate || 0)), left: [...B.items.values()].some(v => v > 0) }; }).filter(B => B.k !== 'civil' && (B.ls.length || B.ords.size)); // المباني والمحارة بتتورّد من الموقع حسب الحاجة
+    return { ...B, ls, val: sum(ls, l => l.qty * (l.rate || 0)), val5: sum(ls, l => l.q5 * (l.rate || 0)), left: [...B.items.values()].some(v => v > 0) }; }).filter(B => !['civil', 'iso'].includes(B.k) && (B.ls.length || B.ords.size)); // المباني والمحارة بتتورّد من الموقع حسب الحاجة
   const home = {}; PKS.forEach(B => { const n = Math.min(...B.phs.filter(n => n !== 9), 99); home[B.k] = Math.min(home[B.k] ?? 99, n === 99 ? 9 : n); });
   const pkOrd = Object.keys(OPKG), PKF = PKS.filter(B => (!V.ph || String(home[B.k]) === V.ph) && (!V.q || B.ls.some(l => (l.name + ' ' + l.src.join(' ')).includes(V.q)) || OPKG[B.k].includes(V.q)));
   V.pl ||= new Set(); const plk = (B, l) => B.key + '|' + l.name + '|' + l.unit;
@@ -3162,7 +3164,7 @@ async function renderOrders() {
   let body = '';
   // ===== اختيار البنود → جدول توريد مبسّط (البند + الكمية + الأنواع) =====
   V.si ||= new Set();
-  const PIK = rows.filter(x => (x.toOrd > 0 || x.q5 > 0) && (!V.b || x.r.building === V.b)).map(x => ({ x, k: ordCls(x.ML[0] || { name: x.nm }, x.r)[0] })).filter(o => o.k !== 'civil');
+  const PIK = rows.filter(x => (x.toOrd > 0 || x.q5 > 0) && (!V.b || x.r.building === V.b)).map(x => ({ x, k: ordCls(x.ML[0] || { name: x.nm }, x.r)[0] })).filter(o => !['civil', 'iso'].includes(o.k));
   const pikG = pkOrd.filter(k => PIK.some(o => o.k === k));
   const sheetLines = () => { const sel = PIK.filter(o => V.si.has(o.x.r.id)), mm = new Map();
     sel.forEach(({ x, k }) => x.ML.forEach(m => { const q = (m.qty || 0) + (V.f5 ? m.q5 || 0 : 0); if (!(q > 0)) return; const key = m.name + '|' + m.unit, e = mm.get(key) || (mm.set(key, { name: m.name, unit: m.unit, qty: 0, brands: m.brands || '', rate: m.rate, k, src: new Set() }), mm.get(key)); e.qty += q; e.src.add(x.r.code); }));
