@@ -425,10 +425,10 @@ body.opsro #selT{display:none!important}
 nav.pnav{display:block}
 nav.pnav .ngrp{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
 nav.pnav .ngrp::-webkit-scrollbar{display:none}
-nav.pnav .ngrp a{border-radius:10px 10px 0 0;white-space:nowrap;flex:0 0 auto}
+nav.pnav .ngrp a{border-radius:10px 10px 0 0;white-space:nowrap;flex:0 0 auto;display:inline-flex;align-items:center;gap:6px}
 nav.pnav .ngrp a i{font-style:normal;font-size:16px}
 nav.pnav .nsub{display:flex;gap:6px;background:var(--bg);margin:0 calc(-1*max(4vw,16px));padding:10px max(4vw,16px) 0;overflow-x:auto;border-bottom:1px solid var(--line);scrollbar-width:none}
-nav.pnav .nsub a{color:var(--ink);opacity:.7;border-radius:99px;min-height:38px;padding:6px 14px;font-size:14px;white-space:nowrap;border:1px solid var(--line);margin-bottom:10px;background:var(--card)}
+nav.pnav .nsub a{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;color:var(--ink);opacity:.7;border-radius:99px;min-height:38px;padding:6px 14px;font-size:14px;white-space:nowrap;border:1px solid var(--line);margin-bottom:10px;background:var(--card)}
 nav.pnav .nsub a.on{opacity:1;background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:700}
 @media (max-width:640px){nav.pnav .ngrp a{padding:10px 10px;font-size:14px}}
 /* quotes */
