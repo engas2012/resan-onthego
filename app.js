@@ -7,22 +7,24 @@ const today = () => { const d = new Date(); return new Date(d - d.getTimezoneOff
 const toast = t => { const m = $('#msg'); m.textContent = t; m.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => m.classList.remove('on'), 2800); };
 const bar = p => `<div class="pct"><div class="bar${p >= 1 ? ' full' : ''}" style="flex:1"><u style="width:${Math.min(Math.max(p, 0), 1) * 100}%"></u></div><span>${Math.round(p * 100)}%</span></div>`;
 
-const ROLE = { site: 'مهندس الموقع', tech: 'المكتب الفني', consultant: 'الاستشاري', owner: 'المالك', finance: 'الماليات', management: 'الإدارة', store: 'أمين المخزن' };
+const ROLE = { site: 'مهندس الموقع', exec: 'مدير التنفيذ', tech: 'المكتب الفني', consultant: 'الاستشاري', owner: 'المالك', finance: 'الماليات', management: 'الإدارة', store: 'أمين المخزن' };
 const CAN = {
-  items: ['site', 'tech', 'consultant', 'finance', 'management'],
+  items: ['site', 'exec', 'tech', 'consultant', 'finance', 'management'],
+  stasks: ['site', 'exec', 'tech', 'management'],
+  stasksEd: ['exec', 'management'],
   report: ['site', 'tech'],
   review: ['tech', 'management'],
-  log: ['site', 'tech', 'management'],
-  docs: ['tech', 'finance', 'management'],
+  log: ['site', 'exec', 'tech', 'management'],
+  docs: ['exec', 'tech', 'finance', 'management'],
   tasks: ['tech', 'finance', 'management', 'consultant'],
-  store: ['tech', 'finance', 'management', 'store'],
-  sched: ['tech', 'consultant', 'owner', 'finance', 'management', 'store'],
-  fullRep: ['tech', 'consultant', 'owner', 'finance', 'management', 'store'],
+  store: ['exec', 'tech', 'finance', 'management', 'store'],
+  sched: ['exec', 'tech', 'consultant', 'owner', 'finance', 'management', 'store'],
+  fullRep: ['exec', 'tech', 'consultant', 'owner', 'finance', 'management', 'store'],
   storeMove: ['tech', 'management', 'store'],
-  docsUp: ['site', 'tech', 'management'],
+  docsUp: ['site', 'exec', 'tech', 'management'],
   editBoq: ['tech', 'management'],
   ledger: ['finance', 'management'],
-  boq: ['tech', 'finance', 'management'],
+  boq: ['exec', 'tech', 'finance', 'management'],
   meet: ['tech', 'finance', 'management'],
   orders: ['tech', 'finance', 'management', 'store'],
   ordersEd: ['tech', 'management', 'store'],
@@ -30,7 +32,7 @@ const CAN = {
   invEdit: ['tech', 'finance', 'management'],
   quotes: ['tech', 'finance', 'management', 'consultant', 'owner'],
   acct: ['finance', 'management', 'owner'],
-  subs: ['tech', 'finance', 'management'],
+  subs: ['exec', 'tech', 'finance', 'management'],
   ledgerEd: ['finance', 'management'],
   custody: ['site', 'tech', 'store', 'finance', 'management'],
   acctEdit: ['finance', 'management'],
@@ -71,7 +73,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.33.6</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.34.0</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -106,8 +108,8 @@ async function afterLogin(user) {
 }
 
 /* ---------------- layout & routing ---------------- */
-const VIEWS = [['status', 'الموقف التنفيذي', null], ['meet', 'تقرير الاجتماع', 'meet'], ['schedule', 'الجدول الزمني', 'sched'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة التقارير', 'review'], ['log', 'سجل التقارير', 'log'], ['tasks', 'مهام المكتب الفني', 'tasks'], ['boq', 'المقايسة والتكلفة', 'boq'], ['quotes', 'عروض الأسعار', 'quotes'], ['orders', 'الطلبيات', 'orders'], ['subs', 'عقود المقاولين', 'subs'], ['acct', 'ملخص الحسابات', 'acct'], ['phfin', 'حساب المراحل', 'ledger'], ['ledger', 'القيود والمصروفات', 'ledgerEd'], ['custody', 'العهدة', 'custody'], ['inv', 'المستخلصات', 'inv'], ['ded', 'الخصومات المعلقة', 'ded'], ['store', 'المخزن', 'store'], ['docs', 'المستندات', 'docs']];
-const NAVG = [['متابعة المشروع', '📊', ['status', 'meet', 'schedule']], ['التقارير اليومية', '📝', ['report', 'review', 'log']], ['المكتب الفني والتسعير', '📐', ['tasks', 'boq', 'quotes', 'orders', 'subs']], ['المخزن والمستندات', '📦', ['store', 'docs']]];
+const VIEWS = [['status', 'الموقف التنفيذي', null], ['meet', 'تقرير الاجتماع', 'meet'], ['schedule', 'الجدول الزمني', 'sched'], ['stasks', 'مهام الموقع', 'stasks'], ['report', 'تقرير يومي', 'report'], ['review', 'مراجعة التقارير', 'review'], ['log', 'سجل التقارير', 'log'], ['tasks', 'مهام المكتب الفني', 'tasks'], ['boq', 'المقايسة والتكلفة', 'boq'], ['quotes', 'عروض الأسعار', 'quotes'], ['orders', 'الطلبيات', 'orders'], ['subs', 'عقود المقاولين', 'subs'], ['acct', 'ملخص الحسابات', 'acct'], ['phfin', 'حساب المراحل', 'ledger'], ['ledger', 'القيود والمصروفات', 'ledgerEd'], ['custody', 'العهدة', 'custody'], ['inv', 'المستخلصات', 'inv'], ['ded', 'الخصومات المعلقة', 'ded'], ['store', 'المخزن', 'store'], ['docs', 'المستندات', 'docs']];
+const NAVG = [['متابعة المشروع', '📊', ['status', 'meet', 'schedule', 'stasks']], ['التقارير اليومية', '📝', ['report', 'review', 'log']], ['المكتب الفني والتسعير', '📐', ['tasks', 'boq', 'quotes', 'orders', 'subs']], ['المخزن والمستندات', '📦', ['store', 'docs']]];
 const NAVK = ['track', 'reports', 'tech', 'store'];
 const secOf = v => NAVK[NAVG.findIndex(g => g[2].includes(v))] || 'track';
 // المشروعات اللي المستخدم يقدر يفتح فيها شاشة معيّنة
@@ -124,7 +126,7 @@ function finNav(pid, view) {
   const pl = p => { const vs = finViews(p); return vs.includes(view) ? view : vs[0]; };
   return `<div class="ngrp"><a href="#${CO[0]?.[0] || 'fin'}" class="${pid ? '' : 'on'}"><i>🏢</i>الشركة</a>${PS.map(p => `<a href="#p/${p}/${pl(p)}" class="${p === pid ? 'on' : ''}"><i>🏗️</i>${esc(S.projects.find(x => x.id === p).name)}</a>`).join('')}</div>${pid ? `<div class="nsub">${finViews(pid).map(v => `<a href="#p/${pid}/${v}" class="${v === view ? 'on' : ''}">${lab[v]}</a>`).join('')}</div>` : CO.length > 1 ? `<div class="nsub">${CO.map(([h, l]) => `<a href="#${h}" class="${h === view ? 'on' : ''}">${l}${h === 'fin/custody' ? ` <span class="badge" id="custN"${bn('custN') ? '' : ' hidden'}>${bn('custN') || ''}</span>` : ''}</a>`).join('')}</div>` : ''}`;
 }
-const BADGE = { review: 'pendN', tasks: 'taskN', quotes: 'quoteN', custody: 'custN' };
+const BADGE = { stasks: 'stkN', review: 'pendN', tasks: 'taskN', quotes: 'quoteN', custody: 'custN' };
 function projNav(pid, view) {
   const vis = VIEWS.filter(v => !v[2] || can(v[2], pid)), lab = Object.fromEntries(vis.map(v => [v[0], v[1]]));
   const G = NAVG.map(([t, ic, vs]) => [t, ic, vs.filter(v => v in lab)]).filter(g => g[2].length), cur = G.find(g => g[2].includes(view)) || G[0];
@@ -164,6 +166,7 @@ async function route() {
     if (view === 'subs' && can('subs', pid)) return renderSubs();
     if (view === 'ledger' && can('ledgerEd', pid)) return renderLedger();
     if (view === 'tasks' && can('tasks', pid)) return renderTasks();
+    if (view === 'stasks' && can('stasks', pid)) return renderSiteTasks();
     if (view === 'store' && can('store', pid)) return renderStore();
     if (view === 'inv' && can('inv', pid)) return renderInv();
     if (view === 'ded' && can('ded', pid)) return renderDed();
@@ -200,7 +203,7 @@ async function loadProject(pid) {
   const [pp, ph, it, rt, rp] = await Promise.all(jobs);
   P.phaseProg = pp.data || []; P.phases = ph.data || [];
   const rates = Object.fromEntries((rt.data || []).map(r => [r.item_id, +r.rate])), camts = Object.fromEntries((rt.data || []).map(r => [r.item_id, +r.contract_amount || 0])), rmeta = Object.fromEntries((rt.data || []).map(r => [r.item_id, r]));
-  P.showRates = ['tech', 'finance', 'management'].includes(role(pid));
+  P.showRates = ['tech', 'finance', 'management', 'exec'].includes(role(pid));
   P.items = (it.data || []).map(i => { const q = +i.qty || 0, ex = +i.executed || 0, rate = rates[i.id] || 0; const fq = +i.form_qty || 0, rq = +i.rebar_qty || 0; const pct = q > 0 ? (i.staged ? stFrac(q, ex, fq, rq) : ex / q) : (i.pct_override != null ? +i.pct_override : 0); const camt = camts[i.id] || 0, rm = rmeta[i.id] || {}; return { ...i, fq, rq, reprice: !!i.reprice || !!i.price_need, ex, rate, camt, rsrc: rm.rate_source, rdoc: rm.rate_doc_id, rqid: rm.rate_quote_id, rdate: rm.rate_updated_at, crate: q > 0 ? camt / q : camt, pct: Math.max(0, pct), rem: q - ex, val: q * rate, w: q * rate, known: q > 0 || i.pct_override != null }; });
   P.reports = rp.data || [];
   P.vendors = can('boq', pid) || can('tasks', pid) ? ((await S.sb.from('vendors').select('*').order('trade').order('name')).data || []) : [];
@@ -215,6 +218,7 @@ async function loadProject(pid) {
   setBadge('quoteN', can('quoteRev', pid) && role(pid) === 'consultant' ? P.quotes.filter(q => q.status === 'submitted').length : can('quoteEd', pid) ? P.quotes.filter(q => q.status === 'rejected' && q.adopted).length : 0);
   P.check = can('tasks', pid) ? ((await S.sb.from('phase_checklist').select('*').eq('project_id', pid).order('phase_n').order('sort').order('created_at')).data || []) : [];
   if (can('ledgerEd', pid)) S.sb.from('ledger_entries').select('id', { count: 'exact', head: true }).eq('project_id', pid).eq('status', 'submitted').then(r => setBadge('custN', r.count || 0)); else if (can('custody', pid)) S.sb.from('ledger_entries').select('id', { count: 'exact', head: true }).eq('project_id', pid).eq('custody_user', S.user.id).eq('status', 'rejected').then(r => setBadge('custN', r.count || 0));
+  if (can('stasks', pid)) { const q = S.sb.from('site_tasks').select('id', { count: 'exact', head: true }).eq('project_id', pid).not('status', 'in', '(done,cancelled)'); (can('stasksEd', pid) ? q.or(`due_date.lt.${today()},proposed_due.not.is.null`) : q.eq('assignee', S.user.id)).then(r => setBadge('stkN', r.count || 0)); }
   setBadge('taskN', can('tasks', pid) ? P.items.filter(lacks).length + P.check.filter(c => c.status !== 'approved').length : 0);
 }
 const overall = list => { const W = list.reduce((s, x) => s + (+x.weight || 0), 0); return W ? list.reduce((s, x) => s + (+x.pct || 0) * (+x.weight || 0), 0) / W : 0; };
@@ -2922,7 +2926,7 @@ function staffDetail(e, recs) {
 async function adminFn(body) { const { data, error } = await S.sb.functions.invoke('admin-users', { body }); if (error) { let m = error.message; try { m = (await error.context.json()).error || m; } catch {} return { error: m }; } return data || {}; }
 const ORG = { resan: 'فريق ريسان', consultant: 'الاستشاري', owner: 'المالك', subcontractor: 'مقاول باطن', other: 'جهة أخرى' };
 const MODS = { construction: { name: 'Construction – المقاولات', note: 'الدور بيتحدد لكل مشروع' }, ops: { name: 'إدارة التشغيل – المولات', pos: { manager: 'مدير التشغيل (صلاحية كاملة)', accountant: 'محاسب / تحصيل', viewer: 'متابعة فقط (قراءة)' } }, study: { name: 'دراسة المشروعات – دراسات الجدوى', pos: { editor: 'إعداد الدراسات (إضافة وتعديل)', viewer: 'اطلاع على الدراسات فقط' } } };
-const ORGROLES = { resan: ['site', 'tech', 'finance', 'management', 'store'], consultant: ['consultant'], owner: ['owner'], subcontractor: ['site'], other: Object.keys(ROLE) };
+const ORGROLES = { resan: ['site', 'exec', 'tech', 'finance', 'management', 'store'], consultant: ['consultant'], owner: ['owner'], subcontractor: ['site'], other: Object.keys(ROLE) };
 function userModsForm(u, mem, um) {
   const org = u.org || 'resan', hasC = S.projects.some(p => mem[u.id + '|' + p.id]) || !u.id, opsPos = um[u.id] || (u.ops ? 'manager' : ''), stPos = (S.umStudy || {})[u.id] || '';
   return `<label class="wide">الجهة<select name="org">${Object.entries(ORG).map(([k, l]) => `<option value="${k}"${org === k ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
@@ -4016,3 +4020,84 @@ addEventListener('visibilitychange', () => { if (document.visibilityState === 'v
 
 addEventListener('beforeunload', e => { if (S.bq?.pend?.size) { e.preventDefault(); e.returnValue = ''; } });
 boot();
+
+/* ---------------- مهام الموقع: مدير التنفيذ ⇄ مهندسين الموقع ---------------- */
+const STK = { open: ['imp', 'لسه متبدأتش'], in_progress: ['run', 'جاري التنفيذ'], delayed: ['ret', 'متأجلة'], done: ['appr', 'اتنفذت'], cancelled: ['imp', 'ملغية'] };
+const STPR = { urgent: ['🔴', 'عاجل'], high: ['🟠', 'مهم'], normal: ['', 'عادي'], low: ['⚪', 'منخفض'] };
+const stLate = t => !['done', 'cancelled'].includes(t.status) && t.due_date < today();
+const stDays = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 864e5);
+async function renderSiteTasks() {
+  const P = S.P, pid = P.id, mgr = can('stasksEd', pid), V = (S.stv ||= { eng: '', st: 'act', q: '' });
+  $('#main').innerHTML = '<p class="mut">بيحمّل المهام…</p>';
+  const [tq, mq] = await Promise.all([S.sb.from('site_tasks').select('*').eq('project_id', pid).order('due_date'), mgr ? S.sb.from('project_members').select('user_id,role').eq('project_id', pid) : Promise.resolve({ data: [] })]);
+  if (tq.error) return $('#main').innerHTML = `<div class="note">${esc(tq.error.message)}</div>`;
+  const T = tq.data || [], M = (mq.data || []).filter(m => ['site', 'tech', 'exec'].includes(m.role));
+  const need = [...new Set([...T.flatMap(t => [t.assignee, t.created_by]), ...M.map(m => m.user_id)].filter(x => x && !(x in S.names)))];
+  if (need.length) { const { data } = await S.sb.from('profiles').select('id,full_name,email').in('id', need); (data || []).forEach(u => S.names[u.id] = u.full_name || u.email); }
+  const nm = id => id ? esc(S.names[id] || '—') : '<span class="mut">مش متحدد</span>', itm = id => P.items?.find(i => i.id === id);
+  const mine = mgr ? T : T.filter(t => t.assignee === S.user.id);
+  const flt = mine.filter(t => (!V.eng || t.assignee === V.eng) && (V.st === 'all' || (V.st === 'act' ? !['done', 'cancelled'].includes(t.status) : V.st === 'late' ? stLate(t) : V.st === 'post' ? t.due_date !== t.orig_due || t.proposed_due : t.status === V.st)) && (!V.q || (t.title + ' ' + (t.details || '')).includes(V.q)));
+  const act = mine.filter(t => !['done', 'cancelled'].includes(t.status)), late = mine.filter(stLate), done = mine.filter(t => t.status === 'done');
+  const onTime = done.filter(t => t.done_at && t.done_at.slice(0, 10) <= t.orig_due).length, req = mine.filter(t => t.proposed_due && !['done', 'cancelled'].includes(t.status));
+  const kpi = (n, l, c, st) => `<button type="button" class="tkk ${c}" data-stf="${st}"><b>${n}</b><span>${l}</span></button>`;
+  // ملخص لكل مهندس (للمدير)
+  const engs = [...new Set(mine.map(t => t.assignee).filter(Boolean))];
+  const perEng = mgr && engs.length ? `<div class="card" style="padding:0"><div class="scroll"><table class="stack"><thead><tr><th>المهندس</th><th class="n">مفتوحة</th><th class="n">متأخرة</th><th class="n">اتنفذت</th><th class="n">في ميعادها</th><th class="n">مرات التأجيل</th></tr></thead><tbody>${engs.map(u => { const L = mine.filter(t => t.assignee === u), D = L.filter(t => t.status === 'done'), ok = D.filter(t => t.done_at && t.done_at.slice(0, 10) <= t.orig_due).length;
+    return `<tr data-steng="${u}" style="cursor:pointer"><td data-l="المهندس"><b>${nm(u)}</b></td><td class="n" data-l="مفتوحة">${L.filter(t => !['done', 'cancelled'].includes(t.status)).length}</td><td class="n" data-l="متأخرة"${L.some(stLate) ? ' style="color:var(--bad);font-weight:700"' : ''}>${L.filter(stLate).length}</td><td class="n" data-l="اتنفذت">${D.length}</td><td class="n" data-l="في ميعادها">${D.length ? Math.round(ok / D.length * 100) + '%' : '–'}</td><td class="n" data-l="التأجيل">${L.filter(t => t.due_date !== t.orig_due).length}</td></tr>`; }).join('')}</tbody></table></div></div>` : '';
+  const items = (P.items || []).filter(i => i.phase_n > 1).slice(0, 2000);
+  const form = (t = {}) => `<form id="stF" class="grid card" style="margin:10px 0">${t.id ? `<input type="hidden" name="id" value="${t.id}">` : ''}
+    <label class="wide">المهمة<input name="title" required value="${esc(t.title || '')}" placeholder="مثلاً: صب سقف الدور الثالث – الجزء الشمالي"></label>
+    <label>المهندس المسئول<select name="assignee" required><option value="">— اختار —</option>${M.map(m => `<option value="${m.user_id}"${m.user_id === t.assignee ? ' selected' : ''}>${nm(m.user_id)} – ${ROLE[m.role]}</option>`).join('')}</select></label>
+    <label>الأولوية<select name="priority">${Object.entries(STPR).map(([k, v]) => `<option value="${k}"${(t.priority || 'normal') === k ? ' selected' : ''}>${v[1]}</option>`).join('')}</select></label>
+    <label>تاريخ البدء<input type="date" name="start_date" value="${t.start_date || today()}"></label>
+    <label>موعد التسليم<input type="date" name="due_date" required value="${t.due_date || ''}"></label>
+    <label class="wide">بند المقايسة (اختياري)<input name="item" list="stItems" value="${t.item_id ? esc((itm(t.item_id)?.code || t.item_id) + ' – ' + (itm(t.item_id)?.name || '').slice(0, 60)) : ''}" placeholder="اكتب الكود أو جزء من اسم البند"><datalist id="stItems">${items.map(i => `<option value="${esc(i.code + ' – ' + i.name.slice(0, 60))}">`).join('')}</datalist></label>
+    ${(P.proj?.buildings || []).length > 1 ? `<label>المبنى<select name="building"><option value="">— عام —</option>${P.proj.buildings.map(b => `<option${b === t.building ? ' selected' : ''}>${esc(b)}</option>`).join('')}</select></label>` : ''}
+    <label class="wide">التفاصيل والمطلوب<textarea name="details" rows="2">${esc(t.details || '')}</textarea></label>
+    ${t.id ? '<label class="wide">سبب تعديل الموعد (لو اتغيّر)<input name="reason"></label>' : ''}
+    <div class="acts wide"><button class="p">${t.id ? 'حفظ التعديل' : '+ إضافة المهمة'}</button>${t.id ? '<button type="button" data-stcancelf>إلغاء</button>' : ''}</div></form>`;
+  const card = t => { const it = itm(t.item_id), lt = stLate(t), [c, l] = lt && t.status !== 'delayed' ? ['ret', 'متأخرة'] : STK[t.status], moved = t.due_date !== t.orig_due, me = t.assignee === S.user.id;
+    const dl = lt ? stDays(t.due_date, today()) : 0, left = !['done', 'cancelled'].includes(t.status) && !lt ? stDays(today(), t.due_date) : null;
+    return `<div class="card stk${lt ? ' late' : ''}${t.status === 'done' ? ' done' : ''}" data-st="${t.id}">
+      <div class="stkh"><div><b>${STPR[t.priority]?.[0] || ''} ${esc(t.title)}</b><div class="mut" style="font-size:12.5px">👷 ${nm(t.assignee)}${it ? ` · <span class="tcode">${esc(it.code)}</span> ${esc(it.name.slice(0, 50))}` : ''}${t.building ? ' · ' + esc(t.building) : ''}</div></div><span class="st ${c}">${l}${t.status === 'in_progress' ? ' ' + t.progress + '%' : ''}</span></div>
+      ${t.details ? `<div style="font-size:13.5px;margin:6px 0;white-space:pre-wrap">${esc(t.details)}</div>` : ''}
+      <div class="stkd">📅 التسليم <b>${fmtD(t.due_date)}</b>${moved ? ` <s class="mut">${fmtD(t.orig_due)}</s> <span class="tag">اتأجلت ${stDays(t.orig_due, t.due_date)} يوم</span>` : ''}${lt ? ` <b style="color:var(--bad)">متأخرة ${dl} يوم</b>` : left != null ? ` <span class="mut">فاضل ${left} يوم</span>` : ''}${t.done_at ? ` · ✅ اتنفذت ${fmtD(t.done_at.slice(0, 10))}${t.done_at.slice(0, 10) > t.orig_due ? ` <span style="color:var(--bad)">(بعد الميعاد الأصلي بـ${stDays(t.orig_due, t.done_at.slice(0, 10))} يوم)</span>` : ' <span style="color:var(--ok)">في الميعاد</span>'}${t.verified_at ? ' · ✔ معتمدة من مدير التنفيذ' : ''}` : ''}</div>
+      ${t.status === 'in_progress' || t.progress ? bar((t.progress || 0) / 100) : ''}
+      ${t.delay_reason && t.status !== 'done' ? `<div class="note" style="margin:6px 0">⚠ سبب التأخير/التأجيل: ${esc(t.delay_reason)}</div>` : ''}
+      ${t.proposed_due ? `<div class="note" style="margin:6px 0;border-color:var(--warn)">⏳ المهندس طالب مد الموعد لـ <b>${fmtD(t.proposed_due)}</b>${mgr ? ` <button type="button" class="xs p" data-stok="${t.id}">موافقة</button> <button type="button" class="xs" data-stno="${t.id}">رفض</button>` : ''}</div>` : ''}
+      <div class="acts" style="margin-top:8px">${me && !['done', 'cancelled'].includes(t.status) ? `<button type="button" class="xs" data-stprog="${t.id}">▶ تحديث التنفيذ</button><button type="button" class="xs p" data-stdone="${t.id}">✅ اتنفذت</button><button type="button" class="xs" data-stdelay="${t.id}">⏸ متأجلة / طلب مد</button>` : ''}
+      ${mgr ? `${t.status === 'done' && !t.verified_at ? `<button type="button" class="xs p" data-stver="${t.id}">✔ اعتماد التنفيذ</button><button type="button" class="xs" data-streopen="${t.id}">↩ رجّعها</button>` : ''}${!['done', 'cancelled'].includes(t.status) ? `<button type="button" class="xs" data-stdue="${t.id}">📅 تحديث الموعد</button>` : ''}<button type="button" class="xs" data-stedit="${t.id}">✏️ تعديل</button>${t.status !== 'cancelled' ? `<button type="button" class="xs" data-stcancel="${t.id}">إلغاء</button>` : ''}<button type="button" class="xs danger" data-stdel="${t.id}">حذف</button>` : ''}
+      <button type="button" class="xs" data-sthist="${t.id}">🕓 السجل</button></div><div class="sthist" id="sh-${t.id}" hidden></div></div>`; };
+  $('#main').innerHTML = `<h2>مهام الموقع</h2><p class="mut">${mgr ? 'وزّع المهام على مهندسين الموقع بموعد تسليم، وتابع تنفيذها والتأخير وأسبابه. أي تأجيل بيتسجل مع الموعد الأصلي.' : 'المهام المطلوبة منك. حدّث حالتها أول بأول، ولو هتتأخر اكتب السبب واطلب مد الموعد.'}</p>
+    <div class="tkks">${kpi(act.length, 'مفتوحة', '', 'act')}${kpi(late.length, 'متأخرة', late.length ? 'bad' : '', 'late')}${kpi(req.length, 'طلبات مد', req.length ? 'warn' : '', 'post')}${kpi(done.length, 'اتنفذت', 'ok', 'done')}${kpi(done.length ? Math.round(onTime / done.length * 100) + '%' : '–', 'الالتزام بالمواعيد', '', 'done')}</div>
+    ${perEng}
+    ${mgr ? `<details class="card addi"${T.length ? '' : ' open'}><summary><b>+ مهمة جديدة</b></summary>${form()}</details>` : ''}
+    <div class="phset" style="margin:10px 0">${mgr ? `<label>المهندس<select id="stE"><option value="">الكل</option>${[...new Set([...M.map(m => m.user_id), ...engs])].map(u => `<option value="${u}"${V.eng === u ? ' selected' : ''}>${nm(u)}</option>`).join('')}</select></label>` : ''}<label>الحالة<select id="stS">${[['act', 'المفتوحة'], ['late', 'المتأخرة'], ['post', 'اتأجلت / طالبة مد'], ['in_progress', 'جاري التنفيذ'], ['done', 'اتنفذت'], ['cancelled', 'ملغية'], ['all', 'الكل']].map(([k, l]) => `<option value="${k}"${V.st === k ? ' selected' : ''}>${l}</option>`).join('')}</select></label><label>بحث<input id="stQ" value="${esc(V.q)}"></label></div>
+    <div id="stL">${flt.length ? flt.sort((a, b) => (stLate(b) - stLate(a)) || a.due_date.localeCompare(b.due_date)).map(card).join('') : '<div class="note">مفيش مهام بالفلتر ده.</div>'}</div>`;
+  const re = () => renderSiteTasks(), M2 = $('#main'), up = async (id, patch, msg) => { const { error } = await S.sb.from('site_tasks').update(patch).eq('id', id); if (error) return toast(error.message); toast(msg || 'اتحدّث'); re(); };
+  const itemOf = v => { const c = (v || '').split(' – ')[0].trim(); return c ? (P.items || []).find(i => i.code === c || i.id === c)?.id || null : null; };
+  const bindForm = () => { const f = $('#stF'); if (!f) return; f.onsubmit = async e => { e.preventDefault(); const d = Object.fromEntries(new FormData(f)), row = { title: d.title.trim(), details: d.details?.trim() || null, assignee: d.assignee || null, priority: d.priority, start_date: d.start_date || null, due_date: d.due_date, item_id: itemOf(d.item), building: d.building || null };
+    if (d.start_date && d.due_date < d.start_date) return toast('موعد التسليم قبل تاريخ البدء');
+    if (d.id) { const o = T.find(t => t.id === d.id); if (o.due_date !== row.due_date) row.delay_reason = d.reason?.trim() || o.delay_reason; const { error } = await S.sb.from('site_tasks').update(row).eq('id', d.id); if (error) return toast(error.message); toast('اتحفظ'); return re(); }
+    const { error } = await S.sb.from('site_tasks').insert({ ...row, project_id: pid, orig_due: row.due_date, created_by: S.user.id }); if (error) return toast(error.message); toast('المهمة اتضافت واتبعت إشعار للمهندس'); re(); }; };
+  bindForm();
+  ['stE', 'stS', 'stQ'].forEach(i => { const el = $('#' + i); if (el) el[i === 'stQ' ? 'onchange' : 'onchange'] = () => { V.eng = $('#stE')?.value || ''; V.st = $('#stS').value; V.q = $('#stQ').value.trim(); re(); }; });
+  M2.onclick = async e => { const b = e.target.closest('button,[data-steng]'); if (!b) return; const D = b.dataset, id = Object.values(D)[0], t = T.find(x => x.id === id);
+    if (D.stf) { V.st = D.stf; return re(); }
+    if (D.steng) { V.eng = D.steng; V.st = 'act'; return re(); }
+    if (D.stprog) { const p = prompt('نسبة التنفيذ لحد دلوقتي (0 – 99)؟', t.progress || 10); if (p == null) return; const n = Math.max(0, Math.min(99, Math.round(+p || 0))); return up(id, { status: 'in_progress', progress: n, delay_reason: null }); }
+    if (D.stdone) { if (!confirm('تأكيد إن المهمة اتنفذت بالكامل؟')) return; return up(id, { status: 'done', delay_reason: null, proposed_due: null }, 'اتسجلت إنها اتنفذت'); }
+    if (D.stdelay) { const r = prompt('سبب التأخير أو التأجيل؟ (مثلاً: الخامات موصلتش، مستني اعتماد الاستشاري، العمالة ناقصة…)', t.delay_reason || ''); if (!r || !r.trim()) return toast('لازم تكتب السبب'); const nd = prompt('الموعد اللي تقدر تسلّم فيه (YYYY-MM-DD) – سيبه فاضي لو مش عارف', t.proposed_due || addDaysISO(t.due_date < today() ? today() : t.due_date, 3)); if (nd && !/^\d{4}-\d{2}-\d{2}$/.test(nd.trim())) return toast('اكتب التاريخ بالشكل 2026-12-05'); return up(id, { status: 'delayed', delay_reason: r.trim(), proposed_due: nd?.trim() || null }, 'اتبعت لمدير التنفيذ'); }
+    if (D.stok) return up(id, { due_date: t.proposed_due, status: t.status === 'delayed' ? 'in_progress' : t.status }, 'الموعد اتمد');
+    if (D.stno) { const r = prompt('سبب رفض المد؟ (هيتسجل)', ''); if (r == null) return; return up(id, { proposed_due: null, delay_reason: (t.delay_reason ? t.delay_reason + ' | ' : '') + 'المد اترفض' + (r.trim() ? ': ' + r.trim() : '') }, 'اترفض المد'); }
+    if (D.stdue) { const nd = prompt('الموعد الجديد (YYYY-MM-DD)؟', t.due_date); if (!nd || nd === t.due_date) return; if (!/^\d{4}-\d{2}-\d{2}$/.test(nd.trim())) return toast('اكتب التاريخ بالشكل 2026-12-05'); const r = prompt('سبب تحديث الموعد؟', t.delay_reason || ''); if (r == null) return; return up(id, { due_date: nd.trim(), delay_reason: r.trim() || t.delay_reason }, 'الموعد اتحدّث'); }
+    if (D.stver) return up(id, { verified_at: new Date().toISOString() }, 'اتعتمد التنفيذ');
+    if (D.streopen) { const r = prompt('ليه بترجّعها؟ (هيتسجل ويوصل للمهندس)', ''); if (r == null) return; return up(id, { status: 'in_progress', progress: 90, delay_reason: 'اترجعت من مدير التنفيذ' + (r.trim() ? ': ' + r.trim() : '') }, 'اترجعت للمهندس'); }
+    if (D.stcancel) { if (!confirm('إلغاء المهمة دي؟')) return; return up(id, { status: 'cancelled' }, 'اتلغت'); }
+    if (D.stdel) { if (!confirm('حذف المهمة وسجلها نهائياً؟')) return; const { error } = await S.sb.from('site_tasks').delete().eq('id', id); if (error) return toast(error.message); toast('اتحذفت'); return re(); }
+    if (D.stedit) { const c = b.closest('.stk'); c.insertAdjacentHTML('afterend', form(t)); c.hidden = true; bindForm(); $('[data-stcancelf]').onclick = re; return; }
+    if (D.sthist) { const h = $('#sh-' + id); if (!h.hidden) return h.hidden = true; h.hidden = false; h.innerHTML = '<span class="mut">…</span>'; const { data, error } = await S.sb.from('site_task_events').select('*').eq('task_id', id).order('at'); if (error) return h.innerHTML = esc(error.message);
+      const ids = [...new Set((data || []).map(x => x.by).filter(x => x && !(x in S.names)))]; if (ids.length) { const r = await S.sb.from('profiles').select('id,full_name,email').in('id', ids); (r.data || []).forEach(u => S.names[u.id] = u.full_name || u.email); }
+      h.innerHTML = (data || []).map(x => `<div class="sthr"><span class="mut">${new Date(x.at).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })}</span> <b>${nm(x.by)}</b>: ${x.kind === 'created' ? `أنشأ المهمة · التسليم ${fmtD(x.to_due)}` : x.kind === 'reschedule' ? `غيّر الموعد من ${fmtD(x.from_due)} لـ ${fmtD(x.to_due)}${x.note ? ' – ' + esc(x.note) : ''}` : `${STK[x.status]?.[1] || x.status}${x.status === 'in_progress' ? ' ' + x.progress + '%' : ''}${x.to_due ? ` · طلب مد لـ ${fmtD(x.to_due)}` : ''}${x.note ? ' – ' + esc(x.note) : ''}`}</div>`).join('') || '<span class="mut">مفيش سجل</span>'; }
+  };
+}

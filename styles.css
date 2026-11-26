@@ -593,3 +593,6 @@ select.pswitch{font:inherit;font-weight:800;border:1px solid rgba(255,255,255,.3
 .rqlump{display:block;font-weight:400;font-size:10.5px;color:#b4471a;white-space:normal;max-width:140px}
 
 tr.dch td{background:#1f3d66;color:#fff;font-weight:800;font-size:14px;padding:8px 10px}tr.dch .mut{color:#c9d6ea}
+
+.tkks{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.tkk{flex:1 1 110px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);cursor:pointer;text-align:start}.tkk b{font-size:22px}.tkk span{font-size:12.5px;color:var(--mut)}.tkk.bad b{color:var(--bad)}.tkk.warn b{color:var(--warn)}.tkk.ok b{color:var(--ok)}
+.stk{margin:8px 0;border-inline-start:4px solid var(--acc)}.stk.late{border-inline-start-color:var(--bad)}.stk.done{border-inline-start-color:var(--ok);opacity:.9}.stkh{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.stkd{font-size:13px;margin:6px 0}.sthist{margin-top:8px;border-top:1px dashed var(--line);padding-top:6px;font-size:12.5px}.sthr{padding:2px 0}
