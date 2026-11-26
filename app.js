@@ -73,7 +73,7 @@ function renderLogin(msg = '') {
   ${msg ? `<div class="note">${esc(msg)}</div>` : ''}
   <label>الإيميل<input type="email" id="le" required autocomplete="username"></label>
   <label>الباسورد<input type="password" id="lp" required autocomplete="current-password"></label>
-  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.34.0</p></form>`;
+  <button class="p" type="submit">دخول</button><button type="button" id="forgot">نسيت الباسورد</button><p class="mut" style="margin:0;font-size:12px;text-align:center">إصدار 4.34.1</p></form>`;
   $('#lf').onsubmit = async e => {
     e.preventDefault();
     const { data, error } = await S.sb.auth.signInWithPassword({ email: $('#le').value.trim(), password: $('#lp').value });
@@ -194,11 +194,13 @@ document.addEventListener('change', e => { const t = e.target.closest?.('select.
 const bindOut = () => { $('#out').onclick = () => S.sb.auth.signOut(); updateBell(); };
 
 /* ---------------- data ---------------- */
+const allRows = async mk => { let out = [], k = 0; for (;;) { const { data, error } = await mk().range(k, k + 999); if (error) return { data: out, error }; out = out.concat(data || []); if (!data || data.length < 1000) return { data: out }; k += 1000; } };
 async function loadProject(pid) {
   const P = S.P, wantItems = can('items', pid), wantReports = can('log', pid);
   const jobs = [S.sb.rpc('phase_progress', { p_project: pid }), S.sb.from('phases').select('*').eq('project_id', pid).order('n')];
-  jobs.push(wantItems ? S.sb.from('boq_progress').select('*').eq('project_id', pid).order('sort') : Promise.resolve({ data: [] }));
-  jobs.push(wantItems ? S.sb.from('boq_rates').select('item_id,rate,contract_amount,rate_source,rate_doc_id,rate_quote_id,rate_updated_at') : Promise.resolve({ data: [] }));
+  // كل الصفوف على صفحات (Supabase بيرجّع 1000 صف بس في الطلب الواحد)
+  jobs.push(wantItems ? allRows(() => S.sb.from('boq_progress').select('*').eq('project_id', pid).order('sort').order('id')) : Promise.resolve({ data: [] }));
+  jobs.push(wantItems ? allRows(() => S.sb.from('boq_rates').select('item_id,rate,contract_amount,rate_source,rate_doc_id,rate_quote_id,rate_updated_at,boq_items!inner(project_id)').eq('boq_items.project_id', pid).order('item_id')) : Promise.resolve({ data: [] }));
   jobs.push(wantReports ? S.sb.from('daily_reports').select('*').eq('project_id', pid).order('report_date', { ascending: false }).limit(400) : Promise.resolve({ data: [] }));
   const [pp, ph, it, rt, rp] = await Promise.all(jobs);
   P.phaseProg = pp.data || []; P.phases = ph.data || [];
